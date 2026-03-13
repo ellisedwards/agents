@@ -1,7 +1,8 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useAgentOfficeStore } from "../store";
-import type { TimeMode, TowerSize } from "../store";
+import type { TimeMode, TowerSize, ThemeId } from "../store";
+import { ALL_THEMES } from "../scene/themes";
 import {
   canvasToDOM,
   domToCanvas,
@@ -30,6 +31,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const setLabelsOn = useAgentOfficeStore((s) => s.setLabelsOn);
   const timeMode = useAgentOfficeStore((s) => s.timeMode);
   const setTimeMode = useAgentOfficeStore((s) => s.setTimeMode);
+  const themeId = useAgentOfficeStore((s) => s.themeId);
+  const setThemeId = useAgentOfficeStore((s) => s.setThemeId);
   const towerSize = useAgentOfficeStore((s) => s.towerSize);
   const setTowerSize = useAgentOfficeStore((s) => s.setTowerSize);
   const towerVisible = useAgentOfficeStore((s) => s.towerVisible);
@@ -132,6 +135,22 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 {TIME_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value} className="bg-[#1e1e2e]">
                     {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Theme */}
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] text-white/50 block">Theme</span>
+              <select
+                value={themeId}
+                onChange={(e) => setThemeId(e.target.value as ThemeId)}
+                className="w-full bg-white/10 text-white/70 font-mono text-[10px] rounded px-1.5 py-1 border border-white/10 outline-none"
+              >
+                {ALL_THEMES.map((t) => (
+                  <option key={t.id} value={t.id} className="bg-[#1e1e2e]">
+                    {t.name}
                   </option>
                 ))}
               </select>

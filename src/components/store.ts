@@ -10,6 +10,7 @@ export interface MonitorStatus {
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
 export type TowerSize = "small" | "medium" | "large";
+export type ThemeId = "forest" | "golden-ruins" | "mysterious-oasis" | "stark-monumental";
 
 interface TowerPrefs {
   visible: boolean;
@@ -37,6 +38,17 @@ function saveTowerPrefs(prefs: TowerPrefs) {
   } catch {}
 }
 
+const THEME_STORAGE_KEY = "agent-office-theme";
+
+function loadThemeId(): ThemeId {
+  if (typeof window === "undefined") return "forest";
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY);
+    if (raw) return raw as ThemeId;
+  } catch {}
+  return "forest";
+}
+
 interface AgentOfficeStore {
   agents: AgentState[];
   selectedAgentId: string | null;
@@ -45,6 +57,7 @@ interface AgentOfficeStore {
   monitorsLoaded: boolean;
   labelsOn: boolean;
   timeMode: TimeMode;
+  themeId: ThemeId;
   towerSize: TowerSize;
   towerVisible: boolean;
   towerPos: { x: number; y: number };
@@ -55,6 +68,7 @@ interface AgentOfficeStore {
   setMonitors: (monitors: MonitorStatus[]) => void;
   setLabelsOn: (on: boolean) => void;
   setTimeMode: (mode: TimeMode) => void;
+  setThemeId: (id: ThemeId) => void;
   setTowerSize: (size: TowerSize) => void;
   setTowerVisible: (visible: boolean) => void;
   setTowerPos: (pos: { x: number; y: number }) => void;
@@ -71,6 +85,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   monitorsLoaded: false,
   labelsOn: false,
   timeMode: "auto",
+  themeId: loadThemeId(),
   towerSize: initialTower.size,
   towerVisible: initialTower.visible,
   towerPos: { x: initialTower.x, y: initialTower.y },
@@ -81,6 +96,10 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setMonitors: (monitors) => set({ monitors, monitorsLoaded: true }),
   setLabelsOn: (labelsOn) => set({ labelsOn }),
   setTimeMode: (timeMode) => set({ timeMode }),
+  setThemeId: (themeId) => {
+    set({ themeId });
+    try { localStorage.setItem(THEME_STORAGE_KEY, themeId); } catch {}
+  },
   setTowerSize: (size) => {
     set({ towerSize: size });
     const s = get();

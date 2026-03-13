@@ -11,6 +11,7 @@ import { buildSpriteCache } from "./characters/sprite-cache";
 import { renderScene, pokeCat, getCatPosition } from "./scene/renderer";
 import { domToCanvas } from "./canvas-transform";
 import { useUptimeKuma } from "@/hooks/use-uptime-kuma";
+import { getThemeById } from "./scene/themes";
 
 interface OfficeCanvasProps {
   onTransformChange?: (t: CanvasTransform) => void;
@@ -71,10 +72,11 @@ export function OfficeCanvas({ onTransformChange }: OfficeCanvasProps) {
       lastTime = time - (delta % TARGET_MS);
 
       frameRef.current++;
-      const { agents, monitors, timeMode } = useAgentOfficeStore.getState();
+      const { agents, monitors, timeMode, themeId } = useAgentOfficeStore.getState();
       if (spriteCacheRef.current) {
         const timeOverride = timeMode === "auto" ? undefined : timeMode;
-        renderScene(ctx, agents, spriteCacheRef.current, frameRef.current, monitors, timeOverride);
+        const theme = getThemeById(themeId);
+        renderScene(ctx, agents, spriteCacheRef.current, frameRef.current, monitors, timeOverride, theme);
       }
     }
 

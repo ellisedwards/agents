@@ -128,6 +128,8 @@ function renderStatusPoster(
 }
 
 import type { TimeOfDay } from "./environment";
+import type { SceneTheme } from "./themes/types";
+import { forestTheme } from "./themes/forest";
 
 export function renderScene(
   ctx: CanvasRenderingContext2D,
@@ -135,7 +137,8 @@ export function renderScene(
   spriteCache: ReturnType<typeof buildSpriteCache>,
   frame: number,
   monitors?: MonitorStatus[],
-  timeOverride?: TimeOfDay
+  timeOverride?: TimeOfDay,
+  theme: SceneTheme = forestTheme
 ) {
   // 1. Desk avoid zones — shared by all walkers
   const deskAvoidZones: AvoidZone[] = DESK_POSITIONS.map((d) => ({
@@ -160,7 +163,7 @@ export function renderScene(
 
   // 4. Draw environment
   const deskCenters = DESK_POSITIONS.map((d) => ({ x: d.x, y: d.y }));
-  drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride);
+  drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride, theme);
 
   // 4.5. Status poster (back wall, near fireplace)
   if (monitors && monitors.length > 0) {
