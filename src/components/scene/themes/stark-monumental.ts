@@ -82,10 +82,7 @@ export const starkMonumentalTheme: SceneTheme = {
     bookColors: ["#cc9944", "#aa7733", "#bb8844", "#997733", "#ddaa55", "#ccbb66"],
   },
 
-  clock: {
-    frameColor: "#a08858",
-    faceColor: "#f0e8d0",
-  },
+  clock: null,
 
   plant: {
     potColor: "#a08050",

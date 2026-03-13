@@ -64,15 +64,7 @@ export const mysteriousOasisTheme: SceneTheme = {
     style: "brazier",
   },
 
-  glassPanel: {
-    frameColor: "#5a4a40",
-    glassColor: "#4a6a7a",
-    glassAlt: "#4e6e7e",
-    throughGlass: "dunes",
-    throughColor1: "#8a7a60",
-    throughColor2: "#9a8a70",
-    throughColor3: "#aa9a80",
-  },
+  glassPanel: null,
 
   hasGuitar: false,
 
@@ -82,10 +74,7 @@ export const mysteriousOasisTheme: SceneTheme = {
     bookColors: ["#5a3a6a", "#8a5a3a", "#3a5a6a", "#6a5a3a", "#4a3a5a", "#7a6a3a"],
   },
 
-  clock: {
-    frameColor: "#5a4a40",
-    faceColor: "#d8c8a8",
-  },
+  clock: null,
 
   plant: {
     potColor: "#6a4a28",

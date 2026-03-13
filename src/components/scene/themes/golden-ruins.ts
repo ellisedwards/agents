@@ -64,15 +64,7 @@ export const goldenRuinsTheme: SceneTheme = {
     style: "brazier",
   },
 
-  glassPanel: {
-    frameColor: "#a08050",
-    glassColor: "#c4a870",
-    glassAlt: "#c8ac78",
-    throughGlass: "desert",
-    throughColor1: "#b8935a",
-    throughColor2: "#c4a060",
-    throughColor3: "#d4b070",
-  },
+  glassPanel: null,
 
   hasGuitar: false,
 
@@ -82,10 +74,7 @@ export const goldenRuinsTheme: SceneTheme = {
     bookColors: ["#cc8833", "#886644", "#aa7744", "#997744", "#bb9955", "#aa8844"],
   },
 
-  clock: {
-    frameColor: "#8a7050",
-    faceColor: "#e8d8b8",
-  },
+  clock: null,
 
   plant: {
     potColor: "#8a6a40",
