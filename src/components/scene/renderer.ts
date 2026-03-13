@@ -82,29 +82,26 @@ interface DrawableEntity {
   source: string;
 }
 
-// Status poster — on the first glass panel right of the fireplace
+// Status poster — on the back wall near the fireplace
 const STATUS_UP = "#22c55e";
 const STATUS_DOWN = "#ef4444";
 const BAR_COLOR = "#2a2a2a";
-const POSTER_BG = "#555068";
-const POSTER_BORDER = "#444058";
 
 function renderStatusPoster(
   ctx: CanvasRenderingContext2D,
-  monitors: MonitorStatus[]
+  monitors: MonitorStatus[],
+  theme: { wallColor: string; wallDark: string }
 ) {
   const contentW = 3 * 3 + 1 + 2; // 3 bars + gap + dot = 12
   const contentH = 3 * 4 - 2; // 3 rows * 4px spacing - last gap = 10
   const pad = 2;
-  // Align with first glass panel: glassStart = fpx + 28 = BUILDING_X + 5 + 28 = BUILDING_X + 33
-  // glassY = BUILDING_Y + 3
   const px = BUILDING_X + 33 + 5;
   const py = BUILDING_Y + 3 + 5;
 
-  // Poster backdrop
-  ctx.fillStyle = POSTER_BORDER;
+  // Poster backdrop — uses theme wall colors
+  ctx.fillStyle = theme.wallDark;
   ctx.fillRect(px - pad - 1, py - pad - 1, contentW + pad * 2 + 2, contentH + pad * 2 + 2);
-  ctx.fillStyle = POSTER_BG;
+  ctx.fillStyle = theme.wallColor;
   ctx.fillRect(px - pad, py - pad, contentW + pad * 2, contentH + pad * 2);
 
   const barCounts = [3, 2, 1];
@@ -165,9 +162,9 @@ export function renderScene(
   const deskCenters = DESK_POSITIONS.map((d) => ({ x: d.x, y: d.y }));
   drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride, theme);
 
-  // 4.5. Status poster (back wall, near fireplace)
-  if (monitors && monitors.length > 0) {
-    renderStatusPoster(ctx, monitors);
+  // 4.5. Status poster (back wall, near fireplace — skip if no building)
+  if (monitors && monitors.length > 0 && theme.building.style !== "none") {
+    renderStatusPoster(ctx, monitors, theme.building);
   }
 
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)

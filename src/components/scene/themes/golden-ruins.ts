@@ -72,13 +72,7 @@ export const goldenRuinsTheme: SceneTheme = {
 
   clock: null,
 
-  plant: {
-    potColor: "#8a6a40",
-    potLight: "#9a7a50",
-    leafColor1: "#5a8a3a",
-    leafColor2: "#6a9a4a",
-    style: "papyrus",
-  },
+  plant: null,
 
   desk: {
     topColor: "#8a7050",

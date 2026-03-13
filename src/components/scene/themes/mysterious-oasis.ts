@@ -72,13 +72,7 @@ export const mysteriousOasisTheme: SceneTheme = {
 
   clock: null,
 
-  plant: {
-    potColor: "#6a4a28",
-    potLight: "#7a5a38",
-    leafColor1: "#4a7a3a",
-    leafColor2: "#5a8a4a",
-    style: "papyrus",
-  },
+  plant: null,
 
   desk: {
     topColor: "#6a5a48",

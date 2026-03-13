@@ -80,13 +80,7 @@ export const starkMonumentalTheme: SceneTheme = {
 
   clock: null,
 
-  plant: {
-    potColor: "#a08050",
-    potLight: "#b09060",
-    leafColor1: "#5a7a3a",
-    leafColor2: "#6a8a4a",
-    style: "cactus",
-  },
+  plant: null,
 
   desk: {
     topColor: "#a08858",
