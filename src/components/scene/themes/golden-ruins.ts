@@ -68,11 +68,7 @@ export const goldenRuinsTheme: SceneTheme = {
 
   hasGuitar: false,
 
-  bookshelf: {
-    woodColor: "#8a6a40",
-    shelfColor: "#9a7a50",
-    bookColors: ["#cc8833", "#886644", "#aa7744", "#997744", "#bb9955", "#aa8844"],
-  },
+  bookshelf: null,
 
   clock: null,
 

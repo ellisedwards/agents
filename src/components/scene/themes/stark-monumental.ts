@@ -76,11 +76,7 @@ export const starkMonumentalTheme: SceneTheme = {
 
   hasGuitar: false,
 
-  bookshelf: {
-    woodColor: "#a08050",
-    shelfColor: "#b09060",
-    bookColors: ["#cc9944", "#aa7733", "#bb8844", "#997733", "#ddaa55", "#ccbb66"],
-  },
+  bookshelf: null,
 
   clock: null,
 

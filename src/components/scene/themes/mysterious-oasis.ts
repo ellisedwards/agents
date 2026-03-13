@@ -68,11 +68,7 @@ export const mysteriousOasisTheme: SceneTheme = {
 
   hasGuitar: false,
 
-  bookshelf: {
-    woodColor: "#6a4a28",
-    shelfColor: "#7a5a38",
-    bookColors: ["#5a3a6a", "#8a5a3a", "#3a5a6a", "#6a5a3a", "#4a3a5a", "#7a6a3a"],
-  },
+  bookshelf: null,
 
   clock: null,
 
