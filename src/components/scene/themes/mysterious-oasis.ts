@@ -66,6 +66,13 @@ export const mysteriousOasisTheme: SceneTheme = {
 
   glassPanel: null,
 
+  posterMount: {
+    style: "stone-tablet",
+    color: "#5a4a40",
+    colorLight: "#6a5a50",
+    colorDark: "#4a3a30",
+  },
+
   hasGuitar: false,
 
 

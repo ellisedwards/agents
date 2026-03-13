@@ -74,6 +74,13 @@ export const starkMonumentalTheme: SceneTheme = {
     throughColor3: "#e4d8c0",
   },
 
+  posterMount: {
+    style: "stone-tablet",
+    color: "#b89858",
+    colorLight: "#c8a868",
+    colorDark: "#a08848",
+  },
+
   hasGuitar: false,
 
 

@@ -501,17 +501,20 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
       rect(ctx, bx + 4, wy, bw - 8, 1, b.wallAccent);
     }
   } else if (b.style === "open-air") {
-    rect(ctx, bx, by, bw, bh, b.wallColor);
-    rect(ctx, bx, by, 3, bh * 0.6, b.wallDark);
-    rect(ctx, bx + bw - 3, by, 3, bh * 0.7, b.wallDark);
+    // Back wall only (low ruined wall, not full background)
     rect(ctx, bx, by, bw, 8, b.wallDark);
     rect(ctx, bx + 3, by + 2, bw - 6, 4, b.wallAccent);
+    // Partial side walls (crumbling)
+    rect(ctx, bx, by, 3, bh * 0.6, b.wallDark);
+    rect(ctx, bx + bw - 3, by, 3, bh * 0.7, b.wallDark);
+    // Column stumps
     for (let cy = by + 12; cy < by + bh; cy += 20) {
       rect(ctx, bx, cy, 4, 8, b.wallDark);
       rect(ctx, bx + 1, cy, 2, 1, b.wallAccent);
       rect(ctx, bx + bw - 4, cy, 4, 8, b.wallDark);
       rect(ctx, bx + bw - 3, cy, 2, 1, b.wallAccent);
     }
+    // Hieroglyph decorations on back wall
     for (let hx = bx + 10; hx < bx + bw - 10; hx += 12) {
       px(ctx, hx, by + 4, b.wallAccent);
       px(ctx, hx + 2, by + 3, b.wallAccent);

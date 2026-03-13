@@ -99,6 +99,14 @@ export interface SceneTheme {
     throughColor3: string;
   } | null;
 
+  // Status poster mount
+  posterMount: {
+    style: "wall" | "stone-tablet" | "wooden-sign" | "driftwood";
+    color: string;
+    colorLight: string;
+    colorDark: string;
+  };
+
   // Furniture
   hasGuitar: boolean;
   clock: {

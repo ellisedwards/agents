@@ -69,6 +69,13 @@ export const tropicalIslandTheme: SceneTheme = {
 
   glassPanel: null,
 
+  posterMount: {
+    style: "driftwood",
+    color: "#8a7a58",
+    colorLight: "#9a8a68",
+    colorDark: "#6a5a38",
+  },
+
   hasGuitar: false,
 
 

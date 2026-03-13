@@ -74,6 +74,13 @@ export const forestTheme: SceneTheme = {
     throughColor3: "#44aa55",
   },
 
+  posterMount: {
+    style: "wall",
+    color: "#555068",
+    colorLight: "#6a6080",
+    colorDark: "#444058",
+  },
+
   hasGuitar: true,
 
 

@@ -90,35 +90,91 @@ const BAR_COLOR = "#2a2a2a";
 function renderStatusPoster(
   ctx: CanvasRenderingContext2D,
   monitors: MonitorStatus[],
-  theme: { wallColor: string; wallDark: string }
+  theme: SceneTheme
 ) {
-  const contentW = 3 * 3 + 1 + 2; // 3 bars + gap + dot = 12
-  const contentH = 3 * 4 - 2; // 3 rows * 4px spacing - last gap = 10
+  const contentW = 3 * 3 + 1 + 2;
+  const contentH = 3 * 4 - 2;
   const pad = 2;
+  const mount = theme.posterMount;
+
+  // Position: near fireplace area, adjusted for building-less themes
   const px = BUILDING_X + 33 + 5;
   const py = BUILDING_Y + 3 + 5;
 
-  // Poster backdrop — uses theme wall colors
-  ctx.fillStyle = theme.wallDark;
-  ctx.fillRect(px - pad - 1, py - pad - 1, contentW + pad * 2 + 2, contentH + pad * 2 + 2);
-  ctx.fillStyle = theme.wallColor;
+  const totalW = contentW + pad * 2 + 2;
+  const totalH = contentH + pad * 2 + 2;
+  const mx = px - pad - 1;
+  const my = py - pad - 1;
+
+  if (mount.style === "wall") {
+    // Simple wall-mounted poster
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx, my, totalW, totalH);
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx + 1, my + 1, totalW - 2, totalH - 2);
+  } else if (mount.style === "stone-tablet") {
+    // Carved stone tablet with chiseled edges
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx - 1, my - 1, totalW + 2, totalH + 4);
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx, my, totalW, totalH + 2);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx, my, totalW, 1); // top chisel highlight
+    ctx.fillRect(mx, my, 1, totalH + 2); // left highlight
+    // Pedestal base
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx - 1, my + totalH + 2, totalW + 2, 2);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx, my + totalH + 2, totalW, 1);
+  } else if (mount.style === "wooden-sign") {
+    // Wooden sign on two posts
+    // Posts
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + 1, my - 2, 2, totalH + 6);
+    ctx.fillRect(mx + totalW - 3, my - 2, 2, totalH + 6);
+    // Sign board
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx, my, totalW, totalH);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx, my, totalW, 1);
+    // Rope lashings at top
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + 1, my - 1, 2, 2);
+    ctx.fillRect(mx + totalW - 3, my - 1, 2, 2);
+  } else {
+    // Driftwood — weathered plank on angled stick
+    // Angled support stick
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + Math.floor(totalW / 2), my - 3, 2, totalH + 8);
+    ctx.fillRect(mx + Math.floor(totalW / 2) - 1, my + totalH + 3, 4, 2);
+    // Weathered plank
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx - 1, my, totalW + 2, totalH);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx - 1, my, totalW + 2, 1);
+    // Wood grain
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + 2, my + 2, totalW - 4, 1);
+    ctx.fillRect(mx + 3, my + totalH - 3, totalW - 6, 1);
+  }
+
+  // Content area background
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.fillRect(px - pad, py - pad, contentW + pad * 2, contentH + pad * 2);
 
   const barCounts = [3, 2, 1];
   const rowH = 4;
-  const dotCol = px + 3 * 3 + 1; // aligned dot column after max bars
+  const dotCol = px + 3 * 3 + 1;
 
   for (let i = 0; i < 3 && i < monitors.length; i++) {
     const mon = monitors[i];
     const ry = py + i * rowH;
 
-    // Bars
     ctx.fillStyle = BAR_COLOR;
     for (let b = 0; b < barCounts[i]; b++) {
       ctx.fillRect(px + b * 3, ry, 2, 2);
     }
 
-    // Health dot — aligned column
     ctx.fillStyle = mon.up ? STATUS_UP : STATUS_DOWN;
     ctx.fillRect(dotCol, ry, 2, 2);
   }
@@ -162,9 +218,9 @@ export function renderScene(
   const deskCenters = DESK_POSITIONS.map((d) => ({ x: d.x, y: d.y }));
   drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride, theme);
 
-  // 4.5. Status poster (back wall, near fireplace — skip if no building)
-  if (monitors && monitors.length > 0 && theme.building.style !== "none") {
-    renderStatusPoster(ctx, monitors, theme.building);
+  // 4.5. Status poster on themed mount
+  if (monitors && monitors.length > 0) {
+    renderStatusPoster(ctx, monitors, theme);
   }
 
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)

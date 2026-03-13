@@ -66,6 +66,13 @@ export const goldenRuinsTheme: SceneTheme = {
 
   glassPanel: null,
 
+  posterMount: {
+    style: "stone-tablet",
+    color: "#a08050",
+    colorLight: "#b89060",
+    colorDark: "#887040",
+  },
+
   hasGuitar: false,
 
 
