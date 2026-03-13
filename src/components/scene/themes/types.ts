@@ -41,7 +41,6 @@ export interface SceneTheme {
       waterColor1: string;
       waterColor2: string;
       waterHighlight: string;
-      sandColor: string;
       sandEdge: string;
       /** How many px the sand extends beyond the building bounds */
       margin: number;

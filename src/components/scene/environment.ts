@@ -702,15 +702,16 @@ function drawBackgroundTrees(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
   seed = 500;
   const count = Math.floor(16 * theme.vegetation.density);
   if (count <= 0) return;
+  const hasIsland = !!theme.ground.island;
+  const islandMargin = theme.ground.island?.margin ?? 0;
   const spacing = Math.floor(W / count);
   for (let i = 0; i < count; i++) {
-    drawVegetation(
-      ctx,
-      Math.floor(spacing * 0.5) + i * spacing + Math.floor(srand() * 6),
-      28 + Math.floor(srand() * 4),
-      Math.floor(srand() * 4),
-      theme
-    );
+    const vx = Math.floor(spacing * 0.5) + i * spacing + Math.floor(srand() * 6);
+    const vy = 28 + Math.floor(srand() * 4);
+    const vv = Math.floor(srand() * 4);
+    if (!hasIsland || isOnIsland(vx, vy, islandMargin)) {
+      drawVegetation(ctx, vx, vy, vv, theme);
+    }
   }
 }
 
@@ -733,15 +734,23 @@ function drawSideTrees(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
   ];
 
   const keep = (i: number, total: number) => i < Math.ceil(total * theme.vegetation.density);
+  const hasIsland = !!theme.ground.island;
+  const islandMargin = theme.ground.island?.margin ?? 0;
+
+  const canDraw = (x: number, y: number) =>
+    !hasIsland || isOnIsland(x, y, islandMargin);
 
   for (let i = 0; i < leftBase.length; i++) {
-    if (keep(i, leftBase.length)) drawVegetation(ctx, leftBase[i].x, leftBase[i].y, leftBase[i].v, theme);
+    if (keep(i, leftBase.length) && canDraw(leftBase[i].x, leftBase[i].y))
+      drawVegetation(ctx, leftBase[i].x, leftBase[i].y, leftBase[i].v, theme);
   }
   for (let i = 0; i < rightBase.length; i++) {
-    if (keep(i, rightBase.length)) drawVegetation(ctx, rightBase[i].x, rightBase[i].y, rightBase[i].v, theme);
+    if (keep(i, rightBase.length) && canDraw(rightBase[i].x, rightBase[i].y))
+      drawVegetation(ctx, rightBase[i].x, rightBase[i].y, rightBase[i].v, theme);
   }
   for (let i = 0; i < frontBase.length; i++) {
-    if (keep(i, frontBase.length)) drawVegetation(ctx, frontBase[i].x, frontBase[i].y, frontBase[i].v, theme);
+    if (keep(i, frontBase.length) && canDraw(frontBase[i].x, frontBase[i].y))
+      drawVegetation(ctx, frontBase[i].x, frontBase[i].y, frontBase[i].v, theme);
   }
 }
 

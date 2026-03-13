@@ -26,7 +26,6 @@ export const tropicalIslandTheme: SceneTheme = {
       waterColor1: "#2a7a9a",
       waterColor2: "#2680a0",
       waterHighlight: "#44aacc",
-      sandColor: "#ddd0a0",
       sandEdge: "#c8b888",
       margin: 14,
     },

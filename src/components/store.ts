@@ -39,12 +39,13 @@ function saveTowerPrefs(prefs: TowerPrefs) {
 }
 
 const THEME_STORAGE_KEY = "agent-office-theme";
+const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "mysterious-oasis", "stark-monumental", "tropical-island"];
 
 function loadThemeId(): ThemeId {
   if (typeof window === "undefined") return "forest";
   try {
     const raw = localStorage.getItem(THEME_STORAGE_KEY);
-    if (raw) return raw as ThemeId;
+    if (raw && VALID_THEMES.includes(raw as ThemeId)) return raw as ThemeId;
   } catch {}
   return "forest";
 }
