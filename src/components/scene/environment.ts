@@ -656,25 +656,6 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     ctx.stroke();
   }
 
-  // Bookshelf
-  if (theme.bookshelf) {
-    const sh = theme.bookshelf;
-    const shX = bx + 4;
-    const shY = fy + 2;
-    rect(ctx, shX, shY, 10, 22, sh.woodColor);
-    rect(ctx, shX, shY, 10, 1, sh.shelfColor);
-    rect(ctx, shX, shY + 7, 10, 1, sh.shelfColor);
-    rect(ctx, shX, shY + 14, 10, 1, sh.shelfColor);
-    for (let s = 0; s < 3; s++) {
-      let bkX = shX + 1;
-      for (let i = 0; i < 2; i++) {
-        rect(ctx, bkX, shY + 1 + s * 7, 3, 5, sh.bookColors[s * 2 + i]);
-        rect(ctx, bkX, shY + 1 + s * 7, 3, 1, "rgba(255,255,255,0.15)");
-        bkX += 4;
-      }
-    }
-  }
-
   // Wall clock
   if (theme.clock) {
     const cl = theme.clock;

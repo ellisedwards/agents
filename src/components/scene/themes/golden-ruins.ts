@@ -68,7 +68,7 @@ export const goldenRuinsTheme: SceneTheme = {
 
   hasGuitar: false,
 
-  bookshelf: null,
+
 
   clock: null,
 

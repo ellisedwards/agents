@@ -76,11 +76,7 @@ export const forestTheme: SceneTheme = {
 
   hasGuitar: true,
 
-  bookshelf: {
-    woodColor: "#774422",
-    shelfColor: "#886633",
-    bookColors: ["#3366aa", "#aa3344", "#44aa55", "#aa8833", "#7733aa", "#33aaaa"],
-  },
+
 
   clock: {
     frameColor: "#444",

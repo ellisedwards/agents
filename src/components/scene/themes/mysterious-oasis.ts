@@ -68,7 +68,7 @@ export const mysteriousOasisTheme: SceneTheme = {
 
   hasGuitar: false,
 
-  bookshelf: null,
+
 
   clock: null,
 

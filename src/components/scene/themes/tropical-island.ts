@@ -72,7 +72,7 @@ export const tropicalIslandTheme: SceneTheme = {
 
   hasGuitar: false,
 
-  bookshelf: null,
+
   clock: null,
   plant: null,
 

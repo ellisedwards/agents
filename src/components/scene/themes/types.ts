@@ -102,11 +102,6 @@ export interface SceneTheme {
 
   // Furniture
   hasGuitar: boolean;
-  bookshelf: {
-    woodColor: string;
-    shelfColor: string;
-    bookColors: string[];
-  } | null;
   clock: {
     frameColor: string;
     faceColor: string;

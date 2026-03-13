@@ -76,7 +76,7 @@ export const starkMonumentalTheme: SceneTheme = {
 
   hasGuitar: false,
 
-  bookshelf: null,
+
 
   clock: null,
 
