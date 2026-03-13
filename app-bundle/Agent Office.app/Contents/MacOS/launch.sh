@@ -1,5 +1,5 @@
 #!/bin/bash
-APP_DIR="/Users/ellisedwards/Code/workspace/agent-office"
+APP_DIR="/Users/ellisedwards/Code/workspace/agentoffice"
 PORT=4747
 PID_FILE="/tmp/.agent-office.pid"
 

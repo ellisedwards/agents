@@ -13,18 +13,19 @@ export interface DeskPosition {
   characterY: number;
 }
 
-// 3x3 grid of desks inside the building floor area
+// 3x3 grid of desks inside the building floor area, pushed toward the front
 const dLeft = BUILDING_X + 18;
 const dRight = BUILDING_X + BUILDING_W - 22;
 const dW = dRight - dLeft;
 const dSpX = Math.floor(dW / 3);
-const dSpY = Math.floor((FLOOR_H - 6) / 3);
+const DESK_TOP_OFFSET = 16; // push desks down from FLOOR_Y
+const dSpY = Math.floor((FLOOR_H - DESK_TOP_OFFSET - 4) / 3);
 
 const DESK_POSITIONS: DeskPosition[] = [];
 for (let row = 0; row < 3; row++) {
   for (let col = 0; col < 3; col++) {
     const x = dLeft + Math.floor(dSpX / 2) + col * dSpX;
-    const y = FLOOR_Y + 4 + row * dSpY;
+    const y = FLOOR_Y + DESK_TOP_OFFSET + row * dSpY;
     DESK_POSITIONS.push({
       x,
       y,

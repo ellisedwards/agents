@@ -8,6 +8,7 @@ import {
   type CanvasTransform,
 } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
+import { getAgentPosition } from "../scene/renderer";
 import { TEAM_COLORS } from "@/shared/types";
 
 interface AgentLabelsProps {
@@ -67,8 +68,11 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       for (const agent of agents) {
         const pos = deskMap.get(agent.id);
         if (!pos) continue;
-        const dx = canvasPos.x - pos.characterX;
-        const dy = canvasPos.y - pos.characterY;
+        const walkPos = getAgentPosition(agent.id);
+        const cx = walkPos ? walkPos.x : pos.characterX;
+        const cy = walkPos ? walkPos.y : pos.characterY;
+        const dx = canvasPos.x - cx;
+        const dy = canvasPos.y - cy;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < closestDist) {
           closestDist = dist;
@@ -184,11 +188,12 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         const pos = deskMap.get(agent.id);
         if (!pos) return null;
 
-        const domPos = canvasToDOM(
-          transform,
-          pos.characterX,
-          pos.characterY
-        );
+        // Use walk position if agent is moving, otherwise desk position
+        const walkPos = getAgentPosition(agent.id);
+        const charX = walkPos ? walkPos.x : pos.characterX;
+        const charY = walkPos ? walkPos.y : pos.characterY;
+
+        const domPos = canvasToDOM(transform, charX, charY);
 
         const isHovered = hoveredId === agent.id;
         const isActive = agent.currentTool !== null;

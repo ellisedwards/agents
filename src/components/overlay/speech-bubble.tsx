@@ -2,6 +2,7 @@
 import { useAgentOfficeStore } from "../store";
 import { canvasToDOM, type CanvasTransform } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
+import { getAgentPosition } from "../scene/renderer";
 
 interface SpeechBubblesProps {
   transform: CanvasTransform;
@@ -18,11 +19,11 @@ export function SpeechBubbles({ transform }: SpeechBubblesProps) {
         const pos = deskMap.get(agent.id);
         if (!pos) return null;
 
-        const domPos = canvasToDOM(
-          transform,
-          pos.characterX,
-          pos.characterY
-        );
+        const walkPos = getAgentPosition(agent.id);
+        const charX = walkPos ? walkPos.x : pos.characterX;
+        const charY = walkPos ? walkPos.y : pos.characterY;
+
+        const domPos = canvasToDOM(transform, charX, charY);
 
         return (
           <div

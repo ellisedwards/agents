@@ -17,6 +17,31 @@ import type { MonitorStatus } from "../store";
 const walkStates = new Map<string, WalkState>();
 let catWalkState: WalkState | null = null;
 
+/** Wake the cat if it's sleeping. Returns true if cat was woken. */
+export function pokeCat(): boolean {
+  if (catWalkState?.isSleeping) {
+    catWalkState.isSleeping = false;
+    catWalkState.sleepFramesRemaining = 0;
+    catWalkState.idleCyclesSinceNap = 0;
+    catWalkState.idleFramesRemaining = 30; // wake up quickly
+    return true;
+  }
+  return false;
+}
+
+/** Get the cat's current canvas position for hit testing */
+export function getCatPosition(): { x: number; y: number } | null {
+  if (!catWalkState) return null;
+  return { x: catWalkState.currentX, y: catWalkState.currentY };
+}
+
+/** Get an agent's current rendered position (walk position or desk position) */
+export function getAgentPosition(agentId: string): { x: number; y: number } | null {
+  const ws = walkStates.get(agentId);
+  if (ws) return { x: ws.currentX, y: ws.currentY };
+  return null;
+}
+
 // Poof particle system
 interface Poof {
   x: number;
@@ -204,12 +229,29 @@ export function renderScene(
       flipX = ws.facingRight;
       const walkSprite = getWalkSpriteState(ws);
       if (walkSprite) spriteState = walkSprite;
+    } else if (agent.state === "idle" && agent.source === "cc") {
+      // Idle CC agents wander near their desk
+      const pos = deskMap.get(agent.id);
+      if (!pos) continue;
+      if (!walkStates.has(agent.id)) {
+        walkStates.set(agent.id, createWalkState(pos.characterX, pos.characterY));
+      }
+      const ws = walkStates.get(agent.id)!;
+      updateWalkState(ws, false, pos.characterX, pos.characterY, 15, deskAvoidZones);
+      drawX = ws.currentX;
+      drawY = ws.currentY;
+      flipX = ws.facingRight;
+      const walkSprite = getWalkSpriteState(ws);
+      if (walkSprite) spriteState = walkSprite;
+      else spriteState = "idle";
     } else {
-      // Desk-bound agents
+      // Active desk-bound agents sit at their desk
       const pos = deskMap.get(agent.id);
       if (!pos) continue;
       drawX = pos.characterX;
       drawY = pos.characterY;
+      // Clear walk state so they return to desk position
+      walkStates.delete(agent.id);
     }
 
     // Idle bob — barely perceptible, brief 1px lift every ~3s, only when stationary

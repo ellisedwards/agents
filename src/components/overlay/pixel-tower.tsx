@@ -8,9 +8,9 @@ const COLS = 5;
 const ROWS = 5;
 
 const SIZES: Record<TowerSize, { px: number; gap: number; panelGap: number }> = {
-  small: { px: 6, gap: 2, panelGap: 4 },
-  medium: { px: 12, gap: 3, panelGap: 8 },
-  large: { px: 24, gap: 6, panelGap: 16 },
+  small: { px: 12, gap: 3, panelGap: 8 },
+  medium: { px: 24, gap: 6, panelGap: 16 },
+  large: { px: 36, gap: 7, panelGap: 22 },
 };
 
 function brighten(hex: string, factor: number): string {
@@ -106,9 +106,15 @@ export function PixelTower() {
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragRef.current) return;
+    const container = e.currentTarget.parentElement;
+    if (!container) return;
+    const bounds = container.getBoundingClientRect();
+    const towerW = e.currentTarget.offsetWidth;
+    const rawX = dragRef.current.origX + (e.clientX - dragRef.current.startX);
+    const rawY = dragRef.current.origY + (e.clientY - dragRef.current.startY);
     setTowerPos({
-      x: dragRef.current.origX + (e.clientX - dragRef.current.startX),
-      y: dragRef.current.origY + (e.clientY - dragRef.current.startY),
+      x: Math.max(0, Math.min(rawX, bounds.width - towerW)),
+      y: Math.max(-bounds.height / 2, Math.min(rawY, bounds.height / 2)),
     });
   }, [setTowerPos]);
 

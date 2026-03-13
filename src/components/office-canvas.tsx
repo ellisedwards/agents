@@ -8,7 +8,8 @@ import {
   type CanvasTransform,
 } from "./canvas-transform";
 import { buildSpriteCache } from "./characters/sprite-cache";
-import { renderScene } from "./scene/renderer";
+import { renderScene, pokeCat, getCatPosition } from "./scene/renderer";
+import { domToCanvas } from "./canvas-transform";
 import { useUptimeKuma } from "@/hooks/use-uptime-kuma";
 
 interface OfficeCanvasProps {
@@ -91,6 +92,22 @@ export function OfficeCanvas({ onTransformChange }: OfficeCanvasProps) {
         ref={canvasRef}
         width={CANVAS_WIDTH}
         height={CANVAS_HEIGHT}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const canvasPos = domToCanvas(
+            transformRef.current,
+            e.clientX - rect.left,
+            e.clientY - rect.top
+          );
+          const catPos = getCatPosition();
+          if (catPos) {
+            const dx = canvasPos.x - catPos.x;
+            const dy = canvasPos.y - catPos.y;
+            if (Math.sqrt(dx * dx + dy * dy) < 12) {
+              pokeCat();
+            }
+          }
+        }}
         style={{
           imageRendering: "pixelated",
           width: canvasStyle.width,

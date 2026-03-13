@@ -39,7 +39,8 @@ app.get("/api/pixels", async (_req, res) => {
     const r = await fetch(`${claw}/pixels`, { signal: AbortSignal.timeout(2000) });
     if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
     res.json(await r.json());
-  } catch {
+  } catch (e) {
+    console.error("[proxy] /api/pixels error:", e);
     res.status(502).json({ error: "claw unreachable" });
   }
 });
@@ -49,7 +50,8 @@ app.get("/api/uptime-kuma", async (_req, res) => {
     const r = await fetch(`${claw}/hook/uptime-kuma`, { signal: AbortSignal.timeout(2000) });
     if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
     res.json(await r.json());
-  } catch {
+  } catch (e) {
+    console.error("[proxy] /api/uptime-kuma error:", e);
     res.status(502).json({ error: "claw unreachable" });
   }
 });
