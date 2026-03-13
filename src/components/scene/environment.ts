@@ -117,17 +117,134 @@ function drawBackgroundFeature(
   }
 }
 
-function drawGround(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
+// Precomputed island edge offsets — organic, jagged coastline
+// Seeded once so the shape is stable across frames
+let islandEdgeCache: number[] | null = null;
+function getIslandEdges(): number[] {
+  if (islandEdgeCache) return islandEdgeCache;
+  const edges: number[] = [];
+  const oldSeed = seed;
+  seed = 314;
+  for (let i = 0; i < H; i++) {
+    // Organic wobble: combine two frequencies for natural look
+    edges.push(
+      Math.floor(srand() * 6) - 3 +
+      Math.floor(Math.sin(i * 0.15) * 4) +
+      Math.floor(Math.sin(i * 0.07 + 2) * 3)
+    );
+  }
+  seed = oldSeed;
+  islandEdgeCache = edges;
+  return edges;
+}
+
+function isOnIsland(x: number, y: number, margin: number): boolean {
+  const bx = BUILDING_X;
+  const by = BUILDING_Y;
+  const bw = BUILDING_W;
+  const bh = BUILDING_H;
+  const edges = getIslandEdges();
+
+  const left = bx - margin;
+  const right = bx + bw + margin;
+  const top = by - margin;
+  const bottom = by + bh + margin;
+
+  if (y < top || y >= bottom) return false;
+
+  const edgeIdx = Math.max(0, Math.min(edges.length - 1, y));
+  const wobble = edges[edgeIdx];
+
+  // Different wobble for left vs right edge
+  const leftEdge = left + wobble;
+  const rightEdge = right - edges[(edgeIdx + 50) % edges.length];
+
+  // Softer corners: shrink horizontal extent near top and bottom
+  const vy = y < by ? (y - top) / margin : y > by + bh ? (bottom - y) / margin : 1;
+  const cornerShrink = Math.floor((1 - vy) * margin * 0.6);
+
+  return x >= leftEdge + cornerShrink && x < rightEdge - cornerShrink;
+}
+
+// Cached offscreen island canvas — built once per theme
+let islandCanvasCache: { canvas: OffscreenCanvas; themeId: string } | null = null;
+
+function buildIslandCanvas(theme: SceneTheme): OffscreenCanvas {
   const g = theme.ground;
+  const island = g.island!;
+  const oc = new OffscreenCanvas(W, H);
+  const octx = oc.getContext("2d")!;
+
+  // Water background
   for (let ty = 20; ty < H; ty += g.tileSize) {
     for (let tx = 0; tx < W; tx += g.tileSize) {
-      rect(ctx, tx, ty, g.tileSize, g.tileSize,
-        (tx / g.tileSize + ty / g.tileSize) % 2 === 0 ? g.baseColor1 : g.baseColor2);
+      octx.fillStyle = (tx / g.tileSize + ty / g.tileSize) % 2 === 0 ? island.waterColor1 : island.waterColor2;
+      octx.fillRect(tx, ty, g.tileSize, g.tileSize);
     }
   }
+
+  // Water highlights
+  const oldSeed = seed;
+  seed = 200;
+  for (let i = 0; i < 40; i++) {
+    const wx = Math.floor(srand() * W);
+    const wy = 20 + Math.floor(srand() * (H - 20));
+    if (!isOnIsland(wx, wy, island.margin + 2)) {
+      octx.fillStyle = island.waterHighlight;
+      octx.fillRect(wx, wy, 2, 1);
+    }
+  }
+
+  // Island sand — pixel by pixel for organic edge
+  for (let y = 20; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (isOnIsland(x, y, island.margin)) {
+        if (!isOnIsland(x, y, island.margin - 2)) {
+          octx.fillStyle = island.sandEdge;
+        } else {
+          const sandVariant = (Math.floor(x / g.tileSize) + Math.floor(y / g.tileSize)) % 2;
+          octx.fillStyle = sandVariant === 0 ? g.baseColor1 : g.baseColor2;
+        }
+        octx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+
+  // Sand decor
   seed = 100;
   for (let i = 0; i < g.decorCount; i++) {
-    rect(ctx, Math.floor(srand() * W), 20 + Math.floor(srand() * (H - 20)), 1, g.decorHeight, g.decorColor);
+    const dx = Math.floor(srand() * W);
+    const dy = 20 + Math.floor(srand() * (H - 20));
+    if (isOnIsland(dx, dy, island.margin - 3)) {
+      octx.fillStyle = g.decorColor;
+      octx.fillRect(dx, dy, 1, g.decorHeight);
+    }
+  }
+  seed = oldSeed;
+
+  return oc;
+}
+
+function drawGround(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
+  const g = theme.ground;
+
+  if (g.island) {
+    // Use cached island canvas (built once)
+    if (!islandCanvasCache || islandCanvasCache.themeId !== theme.id) {
+      islandCanvasCache = { canvas: buildIslandCanvas(theme), themeId: theme.id };
+    }
+    ctx.drawImage(islandCanvasCache.canvas, 0, 0);
+  } else {
+    for (let ty = 20; ty < H; ty += g.tileSize) {
+      for (let tx = 0; tx < W; tx += g.tileSize) {
+        rect(ctx, tx, ty, g.tileSize, g.tileSize,
+          (tx / g.tileSize + ty / g.tileSize) % 2 === 0 ? g.baseColor1 : g.baseColor2);
+      }
+    }
+    seed = 100;
+    for (let i = 0; i < g.decorCount; i++) {
+      rect(ctx, Math.floor(srand() * W), 20 + Math.floor(srand() * (H - 20)), 1, g.decorHeight, g.decorColor);
+    }
   }
 }
 

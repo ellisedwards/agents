@@ -35,7 +35,17 @@ export interface SceneTheme {
     tileSize: number;
     decorColor: string;
     decorCount: number;
-    decorHeight: number; // height of each decor tuft/speck
+    decorHeight: number;
+    /** If set, ground is water with an island shape around the building */
+    island?: {
+      waterColor1: string;
+      waterColor2: string;
+      waterHighlight: string;
+      sandColor: string;
+      sandEdge: string;
+      /** How many px the sand extends beyond the building bounds */
+      margin: number;
+    };
   };
 
   // Vegetation
