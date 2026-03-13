@@ -1,0 +1,291 @@
+import { EventEmitter } from "events";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+import { parseTranscriptLine } from "./transcript-parser";
+import type { AgentState, AgentActivityState, MageColorIndex } from "../../shared/types";
+
+const CLAUDE_DIR = path.join(os.homedir(), ".claude", "projects");
+const STALE_MS = 30 * 60 * 1000; // 30 minutes
+const SUBAGENT_STALE_MS = 2 * 60 * 1000; // 2 minutes
+const LOUNGE_MS = 2 * 60 * 1000; // 2 minutes idle → lounging
+const SCAN_INTERVAL_MS = 10_000;
+const WATCH_INTERVAL_MS = 500;
+const MAX_WATCHED = 20;
+let nextMageColor = 0;
+
+interface SessionInfo {
+  filePath: string;
+  byteOffset: number;
+  state: AgentActivityState;
+  currentTool: string | null;
+  name: string;
+  parentId: string | null;
+  subagentClass: MageColorIndex | null;
+  teamColor: MageColorIndex;
+  lastActivity: number;
+  pendingSubAgents: number;
+  expectingSubAgentSince: number;
+  idleSinceCheck: ReturnType<typeof setTimeout> | null;
+  hasBeenActive: boolean;
+}
+
+export class ClaudeCodeWatcher extends EventEmitter {
+  private sessions = new Map<string, SessionInfo>();
+  private departedPaths = new Set<string>();
+  private scanInterval: ReturnType<typeof setInterval> | null = null;
+  private ccCounter = 0;
+
+  start() {
+    this.scan();
+    this.scanInterval = setInterval(() => this.scan(), SCAN_INTERVAL_MS);
+  }
+
+  stop() {
+    if (this.scanInterval) clearInterval(this.scanInterval);
+    for (const [filePath] of this.sessions) {
+      fs.unwatchFile(filePath);
+    }
+    this.sessions.clear();
+  }
+
+  private scan() {
+    const now = Date.now();
+
+    // Clean up stale sessions
+    for (const [filePath, session] of this.sessions) {
+      const staleLimit = session.subagentClass !== null ? SUBAGENT_STALE_MS : STALE_MS;
+      if (now - session.lastActivity > staleLimit) {
+        fs.unwatchFile(filePath);
+        this.sessions.delete(filePath);
+      }
+    }
+
+    // Find active JSONL files
+    if (!fs.existsSync(CLAUDE_DIR)) return;
+
+    const projectDirs = this.getProjectDirs();
+    for (const dir of projectDirs) {
+      const jsonlFiles = this.findJsonlFiles(dir, now);
+      for (const filePath of jsonlFiles) {
+        if (this.sessions.has(filePath)) continue;
+        if (this.departedPaths.has(filePath)) continue;
+        if (this.sessions.size >= MAX_WATCHED) break;
+        this.startWatching(filePath, now);
+      }
+    }
+
+    this.emitUpdate();
+  }
+
+  private getProjectDirs(): string[] {
+    try {
+      return fs
+        .readdirSync(CLAUDE_DIR, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => path.join(CLAUDE_DIR, d.name));
+    } catch {
+      return [];
+    }
+  }
+
+  private findJsonlFiles(dir: string, now: number): string[] {
+    const results: string[] = [];
+    const addJsonl = (d: string) => {
+      try {
+        for (const f of fs.readdirSync(d)) {
+          if (f.endsWith(".jsonl")) {
+            const full = path.join(d, f);
+            try {
+              const stat = fs.statSync(full);
+              const limit = d.includes("/subagents/") ? SUBAGENT_STALE_MS : STALE_MS;
+              if (now - stat.mtimeMs < limit) results.push(full);
+            } catch {}
+          }
+        }
+      } catch {}
+    };
+
+    // Scan top-level JSONL files
+    addJsonl(dir);
+
+    // Scan session UUID subdirectories for subagents/
+    try {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          const subagentsDir = path.join(dir, entry.name, "subagents");
+          addJsonl(subagentsDir);
+        }
+      }
+    } catch {}
+
+    return results;
+  }
+
+  private startWatching(filePath: string, now: number) {
+    let parentId: string | null = null;
+    let subagentClass: MageColorIndex | null = null;
+    let teamColor: MageColorIndex = (nextMageColor++ % 6) as MageColorIndex;
+
+    for (const [parentPath, parentSession] of this.sessions) {
+      if (
+        parentSession.pendingSubAgents > 0 &&
+        now - parentSession.expectingSubAgentSince < 30_000
+      ) {
+        parentId = parentPath;
+        subagentClass = parentSession.teamColor;
+        teamColor = parentSession.teamColor;
+        parentSession.pendingSubAgents--;
+        break;
+      }
+    }
+
+    // Fallback: detect subagent from path if parent timing was missed
+    if (subagentClass === null && filePath.includes("/subagents/")) {
+      subagentClass = teamColor;
+    }
+
+    this.ccCounter++;
+    const session: SessionInfo = {
+      filePath,
+      byteOffset: 0,
+      state: "idle",
+      currentTool: null,
+      name: subagentClass !== null ? `sub-${this.ccCounter}` : `cc-${this.ccCounter}`,
+      parentId,
+      subagentClass,
+      teamColor,
+      lastActivity: now,
+      pendingSubAgents: 0,
+      expectingSubAgentSince: 0,
+      idleSinceCheck: null,
+      hasBeenActive: false,
+    };
+
+    this.sessions.set(filePath, session);
+
+    // Read existing content to catch up
+    this.tailFile(session);
+
+    // Watch for changes
+    fs.watchFile(filePath, { interval: WATCH_INTERVAL_MS }, () => {
+      this.tailFile(session);
+      this.emitUpdate();
+    });
+
+    // Schedule idle check immediately for path-detected subagents
+    if (session.subagentClass !== null) {
+      this.scheduleSubagentIdleCheck(session);
+    }
+  }
+
+  private tailFile(session: SessionInfo) {
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(session.filePath);
+    } catch {
+      return;
+    }
+
+    if (stat.size <= session.byteOffset) return;
+
+    // Use synchronous read to avoid race condition where emitUpdate()
+    // fires before async stream finishes processing new lines
+    let buffer: string;
+    try {
+      const fd = fs.openSync(session.filePath, "r");
+      const length = stat.size - session.byteOffset;
+      const buf = Buffer.alloc(length);
+      fs.readSync(fd, buf, 0, length, session.byteOffset);
+      fs.closeSync(fd);
+      buffer = buf.toString("utf-8");
+    } catch {
+      return;
+    }
+
+    session.byteOffset = stat.size;
+    const lines = buffer.split("\n").filter((l) => l.trim());
+
+    for (const line of lines) {
+      const event = parseTranscriptLine(line);
+      if (!event) continue;
+
+      session.lastActivity = Date.now();
+
+      if (event.type === "state_change" && event.state) {
+        session.state = event.state;
+        session.currentTool = event.toolName ?? null;
+        session.hasBeenActive = true;
+      } else if (event.type === "sub_agent_spawn") {
+        session.pendingSubAgents++;
+        session.expectingSubAgentSince = Date.now();
+        // Quickly rescan to pick up the subagent's JSONL file
+        setTimeout(() => this.scan(), 500);
+        setTimeout(() => this.scan(), 2000);
+      } else if (event.type === "turn_end") {
+        if (session.subagentClass !== null) {
+          this.departSubagent(session);
+        } else {
+          session.state = "idle";
+          session.currentTool = null;
+        }
+      }
+    }
+
+    // Schedule idle check for subagents only after they've been seen active
+    if (session.subagentClass !== null && session.hasBeenActive && session.state !== "departing") {
+      this.scheduleSubagentIdleCheck(session);
+    }
+  }
+
+  private departSubagent(session: SessionInfo) {
+    if (session.state === "departing") return;
+    session.state = "departing";
+    session.currentTool = null;
+    this.departedPaths.add(session.filePath);
+    this.emitUpdate();
+    setTimeout(() => {
+      if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
+      fs.unwatchFile(session.filePath);
+      this.sessions.delete(session.filePath);
+      this.emitUpdate();
+    }, 500);
+  }
+
+  private scheduleSubagentIdleCheck(session: SessionInfo) {
+    // Reset any existing check
+    if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
+    // If file doesn't grow in 5s, subagent is done
+    const sizeAtCheck = session.byteOffset;
+    session.idleSinceCheck = setTimeout(() => {
+      if (session.byteOffset === sizeAtCheck && session.state !== "departing") {
+        this.departSubagent(session);
+      }
+    }, 5000);
+  }
+
+  private emitUpdate() {
+    const now = Date.now();
+    const agents: AgentState[] = [];
+    for (const [filePath, session] of this.sessions) {
+      // Main agents (not subagents) idle for 2+ min → lounging
+      const isLounging =
+        session.subagentClass === null &&
+        session.state === "idle" &&
+        now - session.lastActivity > LOUNGE_MS;
+
+      agents.push({
+        id: filePath,
+        source: "cc",
+        state: isLounging ? "lounging" : session.state,
+        currentTool: session.currentTool,
+        name: session.name,
+        parentId: session.parentId,
+        subagentClass: session.subagentClass,
+        teamColor: session.teamColor,
+        lastActivity: session.lastActivity,
+      });
+    }
+    this.emit("update", agents);
+  }
+}

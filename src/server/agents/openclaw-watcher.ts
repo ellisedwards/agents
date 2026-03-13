@@ -1,0 +1,83 @@
+import { EventEmitter } from "events";
+import type { AgentState, AgentActivityState } from "../../shared/types";
+
+interface OpenClawStatus {
+  connected: boolean;
+  animation_running: boolean;
+  zones: {
+    thinking: string;
+    display: string;
+    context: string;
+  };
+  agent_slots: {
+    active_count: number;
+    activity_running: boolean;
+  };
+  // Dedicated claw activity field (added by claw on request)
+  claw_activity?: "idle" | "thinking" | "typing";
+}
+
+export class OpenClawWatcher extends EventEmitter {
+  private interval: ReturnType<typeof setInterval> | null = null;
+  private readonly statusUrl: string;
+
+  constructor(clawBaseUrl: string) {
+    super();
+    this.statusUrl = `${clawBaseUrl}/status`;
+  }
+
+  start() {
+    this.poll();
+    this.interval = setInterval(() => this.poll(), 2000);
+  }
+
+  stop() {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+  }
+
+  private async poll() {
+    try {
+      const res = await fetch(this.statusUrl, {
+        signal: AbortSignal.timeout(1500),
+      });
+      if (res.ok) {
+        const status: OpenClawStatus = await res.json();
+        const state = this.deriveState(status);
+        this.emit("update", this.makeAgent(state));
+      } else {
+        this.emit("update", this.makeAgent("idle", true));
+      }
+    } catch {
+      this.emit("update", this.makeAgent("idle", true));
+    }
+  }
+
+  private deriveState(status: OpenClawStatus): AgentActivityState {
+    // Use dedicated field if claw provides it
+    if (status.claw_activity) {
+      return status.claw_activity;
+    }
+    // Fallback: assume idle — agent_slots are shared with CC and unreliable
+    return "idle";
+  }
+
+  private makeAgent(
+    state: AgentState["state"],
+    unreachable = false
+  ): AgentState {
+    return {
+      id: "openclaw-main",
+      source: "openclaw",
+      state: unreachable ? "idle" : state,
+      currentTool: null,
+      name: "claw-main",
+      parentId: null,
+      subagentClass: null,
+      teamColor: 0 as import("../../shared/types").MageColorIndex,
+      lastActivity: unreachable ? 0 : Date.now(),
+    };
+  }
+}
