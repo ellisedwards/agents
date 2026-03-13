@@ -490,7 +490,9 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
   const bh = BUILDING_H;
   const b = theme.building;
 
-  if (b.style === "walled") {
+  if (b.style === "none") {
+    // No building — open workspace on the ground. Skip walls entirely.
+  } else if (b.style === "walled") {
     rect(ctx, bx, by, bw, bh, b.wallColor);
     rect(ctx, bx, by, bw, 2, b.wallDark);
     rect(ctx, bx, by, 3, bh, b.wallDark);
@@ -536,7 +538,9 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
   const fpy = by + 2;
   drawFireVessel(ctx, fpx, fpy, frame, theme);
 
-  // Glass panels / openings
+  // Glass panels / openings (skip if theme has no glass)
+  const gp = theme.glassPanel;
+  if (gp) {
   const glassY = by + 3;
   const glassH = 20;
   const glassStart = fpx + 28;
@@ -546,7 +550,6 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
   const panelW = Math.floor(
     (glassEnd - glassStart - glassGap * (panelCount - 1)) / panelCount
   );
-  const gp = theme.glassPanel;
   for (let p = 0; p < panelCount; p++) {
     const gpx = glassStart + p * (panelW + glassGap);
     rect(ctx, gpx, glassY, panelW, glassH, gp.frameColor);
@@ -587,18 +590,21 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     rect(ctx, gpx + 2, glassY + 2, Math.floor(panelW * 0.3), 1, "rgba(255,255,255,0.15)");
     rect(ctx, gpx + Math.floor(panelW / 2), glassY + 1, 1, glassH - 2, "rgba(60,55,80,0.3)");
   }
+  } // end glass panels
 
-  // Floor
+  // Floor (skip for "none" — ground already visible)
   const fy = FLOOR_Y;
   const fh = FLOOR_H;
-  rect(ctx, bx + 3, fy, bw - 6, fh, b.floorColor1);
-  for (let row = 0; row < fh; row += 4) {
-    for (let col = 0; col < bw - 6; col += 4) {
-      rect(ctx, bx + 3 + col, fy + row, 4, 4, (col / 4 + row / 4) % 2 === 0 ? b.floorColor1 : b.floorColor2);
+  if (b.style !== "none") {
+    rect(ctx, bx + 3, fy, bw - 6, fh, b.floorColor1);
+    for (let row = 0; row < fh; row += 4) {
+      for (let col = 0; col < bw - 6; col += 4) {
+        rect(ctx, bx + 3 + col, fy + row, 4, 4, (col / 4 + row / 4) % 2 === 0 ? b.floorColor1 : b.floorColor2);
+      }
     }
+    rect(ctx, bx + 3, fy, bw - 6, 2, b.floorEdge1);
+    rect(ctx, bx + 3, fy, bw - 6, 1, b.floorEdge2);
   }
-  rect(ctx, bx + 3, fy, bw - 6, 2, b.floorEdge1);
-  rect(ctx, bx + 3, fy, bw - 6, 1, b.floorEdge2);
 
   // Guitar (only in themes that have it)
   if (theme.hasGuitar) {
@@ -651,57 +657,63 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
   }
 
   // Bookshelf
-  const sh = theme.bookshelf;
-  const shX = bx + 4;
-  const shY = fy + 2;
-  rect(ctx, shX, shY, 10, 22, sh.woodColor);
-  rect(ctx, shX, shY, 10, 1, sh.shelfColor);
-  rect(ctx, shX, shY + 7, 10, 1, sh.shelfColor);
-  rect(ctx, shX, shY + 14, 10, 1, sh.shelfColor);
-  for (let s = 0; s < 3; s++) {
-    let bkX = shX + 1;
-    for (let i = 0; i < 2; i++) {
-      rect(ctx, bkX, shY + 1 + s * 7, 3, 5, sh.bookColors[s * 2 + i]);
-      rect(ctx, bkX, shY + 1 + s * 7, 3, 1, "rgba(255,255,255,0.15)");
-      bkX += 4;
+  if (theme.bookshelf) {
+    const sh = theme.bookshelf;
+    const shX = bx + 4;
+    const shY = fy + 2;
+    rect(ctx, shX, shY, 10, 22, sh.woodColor);
+    rect(ctx, shX, shY, 10, 1, sh.shelfColor);
+    rect(ctx, shX, shY + 7, 10, 1, sh.shelfColor);
+    rect(ctx, shX, shY + 14, 10, 1, sh.shelfColor);
+    for (let s = 0; s < 3; s++) {
+      let bkX = shX + 1;
+      for (let i = 0; i < 2; i++) {
+        rect(ctx, bkX, shY + 1 + s * 7, 3, 5, sh.bookColors[s * 2 + i]);
+        rect(ctx, bkX, shY + 1 + s * 7, 3, 1, "rgba(255,255,255,0.15)");
+        bkX += 4;
+      }
     }
   }
 
   // Wall clock
-  const cl = theme.clock;
-  rect(ctx, bx + 6, by + 5, 6, 6, cl.frameColor);
-  rect(ctx, bx + 7, by + 6, 4, 4, cl.faceColor);
-  px(ctx, bx + 9, by + 7, "#111");
-  px(ctx, bx + 9, by + 8, "#111");
-  px(ctx, bx + 10, by + 8, "#cc3333");
+  if (theme.clock) {
+    const cl = theme.clock;
+    rect(ctx, bx + 6, by + 5, 6, 6, cl.frameColor);
+    rect(ctx, bx + 7, by + 6, 4, 4, cl.faceColor);
+    px(ctx, bx + 9, by + 7, "#111");
+    px(ctx, bx + 9, by + 8, "#111");
+    px(ctx, bx + 10, by + 8, "#cc3333");
+  }
 
   // Plant
-  const pl = theme.plant;
-  const plx = bx + 6;
-  const ply = fy + fh - 6;
-  if (pl.style === "potted") {
-    rect(ctx, plx, ply, 5, 4, pl.potColor);
-    rect(ctx, plx + 1, ply, 3, 1, pl.potLight);
-    rect(ctx, plx + 1, ply - 7, 3, 8, pl.leafColor1);
-    rect(ctx, plx - 1, ply - 5, 2, 4, pl.leafColor2);
-    rect(ctx, plx + 4, ply - 4, 2, 3, pl.leafColor2);
-  } else if (pl.style === "cactus") {
-    rect(ctx, plx, ply, 5, 4, pl.potColor);
-    rect(ctx, plx + 1, ply, 3, 1, pl.potLight);
-    rect(ctx, plx + 1, ply - 6, 3, 7, pl.leafColor1);
-    rect(ctx, plx + 2, ply - 6, 1, 7, pl.leafColor2);
-    rect(ctx, plx - 1, ply - 3, 2, 1, pl.leafColor1);
-    rect(ctx, plx - 1, ply - 5, 1, 3, pl.leafColor1);
-    rect(ctx, plx + 4, ply - 2, 2, 1, pl.leafColor1);
-    rect(ctx, plx + 5, ply - 4, 1, 3, pl.leafColor1);
-  } else {
-    // Papyrus
-    rect(ctx, plx, ply, 5, 4, pl.potColor);
-    rect(ctx, plx + 1, ply, 3, 1, pl.potLight);
-    rect(ctx, plx + 2, ply - 8, 1, 9, pl.leafColor1);
-    rect(ctx, plx, ply - 9, 5, 2, pl.leafColor2);
-    rect(ctx, plx - 1, ply - 8, 7, 1, pl.leafColor1);
-    rect(ctx, plx + 1, ply - 10, 3, 1, pl.leafColor2);
+  if (theme.plant) {
+    const pl = theme.plant;
+    const plx = bx + 6;
+    const ply = fy + fh - 6;
+    if (pl.style === "potted") {
+      rect(ctx, plx, ply, 5, 4, pl.potColor);
+      rect(ctx, plx + 1, ply, 3, 1, pl.potLight);
+      rect(ctx, plx + 1, ply - 7, 3, 8, pl.leafColor1);
+      rect(ctx, plx - 1, ply - 5, 2, 4, pl.leafColor2);
+      rect(ctx, plx + 4, ply - 4, 2, 3, pl.leafColor2);
+    } else if (pl.style === "cactus") {
+      rect(ctx, plx, ply, 5, 4, pl.potColor);
+      rect(ctx, plx + 1, ply, 3, 1, pl.potLight);
+      rect(ctx, plx + 1, ply - 6, 3, 7, pl.leafColor1);
+      rect(ctx, plx + 2, ply - 6, 1, 7, pl.leafColor2);
+      rect(ctx, plx - 1, ply - 3, 2, 1, pl.leafColor1);
+      rect(ctx, plx - 1, ply - 5, 1, 3, pl.leafColor1);
+      rect(ctx, plx + 4, ply - 2, 2, 1, pl.leafColor1);
+      rect(ctx, plx + 5, ply - 4, 1, 3, pl.leafColor1);
+    } else {
+      // Papyrus
+      rect(ctx, plx, ply, 5, 4, pl.potColor);
+      rect(ctx, plx + 1, ply, 3, 1, pl.potLight);
+      rect(ctx, plx + 2, ply - 8, 1, 9, pl.leafColor1);
+      rect(ctx, plx, ply - 9, 5, 2, pl.leafColor2);
+      rect(ctx, plx - 1, ply - 8, 7, 1, pl.leafColor1);
+      rect(ctx, plx + 1, ply - 10, 3, 1, pl.leafColor2);
+    }
   }
 }
 

@@ -63,7 +63,7 @@ export interface SceneTheme {
     density: number;
   };
 
-  // Building/structure
+  // Building/structure — null means no building (open-air workspace on the ground)
   building: {
     wallColor: string;
     wallDark: string;
@@ -72,7 +72,7 @@ export interface SceneTheme {
     floorColor2: string;
     floorEdge1: string;
     floorEdge2: string;
-    style: "walled" | "open-air" | "carved";
+    style: "walled" | "open-air" | "carved" | "none";
   };
 
   // Fireplace / fire vessel
@@ -88,7 +88,7 @@ export interface SceneTheme {
     style: "fireplace" | "brazier" | "fire-pit";
   };
 
-  // Glass panels / windows
+  // Glass panels / windows — null means no windows
   glassPanel: {
     frameColor: string;
     glassColor: string;
@@ -98,7 +98,7 @@ export interface SceneTheme {
     throughColor1: string;
     throughColor2: string;
     throughColor3: string;
-  };
+  } | null;
 
   // Furniture
   hasGuitar: boolean;
@@ -106,18 +106,18 @@ export interface SceneTheme {
     woodColor: string;
     shelfColor: string;
     bookColors: string[];
-  };
+  } | null;
   clock: {
     frameColor: string;
     faceColor: string;
-  };
+  } | null;
   plant: {
     potColor: string;
     potLight: string;
     leafColor1: string;
     leafColor2: string;
     style: "potted" | "cactus" | "papyrus";
-  };
+  } | null;
 
   // Desk
   desk: {

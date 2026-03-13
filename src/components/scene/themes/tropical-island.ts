@@ -53,7 +53,7 @@ export const tropicalIslandTheme: SceneTheme = {
     floorColor2: "#ccb888",
     floorEdge1: "#c4b080",
     floorEdge2: "#bca878",
-    style: "open-air",
+    style: "none",
   },
 
   fireVessel: {
@@ -68,36 +68,13 @@ export const tropicalIslandTheme: SceneTheme = {
     style: "fire-pit",
   },
 
-  glassPanel: {
-    frameColor: "#b8a470",
-    glassColor: "#4499bb",
-    glassAlt: "#4a9dc0",
-    throughGlass: "sky",
-    throughColor1: "#55aacc",
-    throughColor2: "#3388aa",
-    throughColor3: "#2278a0",
-  },
+  glassPanel: null,
 
   hasGuitar: false,
 
-  bookshelf: {
-    woodColor: "#7a5a30",
-    shelfColor: "#8a6a40",
-    bookColors: ["#cc5544", "#44aa88", "#ddaa33", "#5588cc", "#aa6633", "#44bbaa"],
-  },
-
-  clock: {
-    frameColor: "#7a5a30",
-    faceColor: "#f0e8d0",
-  },
-
-  plant: {
-    potColor: "#7a5a30",
-    potLight: "#8a6a40",
-    leafColor1: "#3a9a4a",
-    leafColor2: "#4aaa5a",
-    style: "potted",
-  },
+  bookshelf: null,
+  clock: null,
+  plant: null,
 
   desk: {
     topColor: "#8a7a58",
