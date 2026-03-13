@@ -18,7 +18,7 @@ const dLeft = BUILDING_X + 18;
 const dRight = BUILDING_X + BUILDING_W - 22;
 const dW = dRight - dLeft;
 const dSpX = Math.floor(dW / 3);
-const DESK_TOP_OFFSET = 16; // push desks down from FLOOR_Y
+const DESK_TOP_OFFSET = 22; // push desks down from FLOOR_Y
 const dSpY = Math.floor((FLOOR_H - DESK_TOP_OFFSET - 4) / 3);
 
 const DESK_POSITIONS: DeskPosition[] = [];
