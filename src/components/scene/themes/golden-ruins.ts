@@ -81,6 +81,8 @@ export const goldenRuinsTheme: SceneTheme = {
 
   plant: null,
 
+  petType: "sphynx",
+
   desk: {
     topColor: "#8a7050",
     legColor: "#6a5030",

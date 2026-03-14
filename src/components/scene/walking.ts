@@ -11,6 +11,7 @@ export interface WalkState {
   frameCounter: number;
   facingRight: boolean;
   idleCyclesSinceNap: number;
+  startledFrames: number;
 }
 
 export interface AvoidZone {
@@ -49,6 +50,7 @@ export function createWalkState(x: number, y: number): WalkState {
     frameCounter: 0,
     facingRight: true,
     idleCyclesSinceNap: 0,
+    startledFrames: 0,
   };
 }
 

@@ -19,16 +19,39 @@ const walkStates = new Map<string, WalkState>();
 const smoothPos = new Map<string, { x: number; y: number }>();
 let catWalkState: WalkState | null = null;
 
-/** Wake the cat if it's sleeping. Returns true if cat was woken. */
+// Space cat floating away state
+let floatingAway = false;
+let floatY = 0;
+let floatStartX = 0;
+let floatFrame = 0;
+let floatMaxHeight = -20; // how high before returning (varies)
+let nextFloatCheck = 60 * 60 * (4 + Math.random() * 6); // 4-10 min at 60fps
+
+/** Wake/startle the cat when poked. */
 export function pokeCat(): boolean {
-  if (catWalkState?.isSleeping) {
+  if (!catWalkState) return false;
+  // Startle the cat — jump + freeze for ~1 second
+  catWalkState.startledFrames = 60;
+  if (catWalkState.isSleeping) {
     catWalkState.isSleeping = false;
     catWalkState.sleepFramesRemaining = 0;
     catWalkState.idleCyclesSinceNap = 0;
-    catWalkState.idleFramesRemaining = 30; // wake up quickly
-    return true;
   }
-  return false;
+  catWalkState.isMoving = false;
+  catWalkState.idleFramesRemaining = 45; // short pause after startled
+  return true;
+}
+
+/** Trigger the floating-away animation for space cat */
+export function triggerFloat(): boolean {
+  if (!catWalkState || floatingAway) return false;
+  floatingAway = true;
+  floatY = catWalkState.currentY;
+  floatStartX = catWalkState.currentX;
+  floatFrame = 0;
+  // Vary: sometimes just a short float (20-40px up), sometimes off screen
+  floatMaxHeight = catWalkState.currentY - (20 + Math.random() * 80);
+  return true;
 }
 
 /** Get the cat's current canvas position for hit testing */
@@ -804,22 +827,84 @@ export function renderScene(
   if (!catWalkState) {
     catWalkState = createWalkState(CAT_HOME_X + 8, CAT_HOME_Y);
   }
-  updateWalkState(catWalkState, true, CAT_HOME_X, CAT_HOME_Y, 60, deskAvoidZones);
-  const catWalkSprite = getWalkSpriteState(catWalkState);
-  entities.push({
-    x: catWalkState.currentX,
-    y: catWalkState.currentY,
-    spriteKey: "cat",
-    spriteState: catWalkSprite ?? "idle",
-    agentId: "__cat__",
-    isUnreachable: false,
-    parentId: null,
-    flipX: catWalkState.facingRight,
-    teamColor: 0,
-    isMainCC: false,
-    activityState: "idle",
-    source: "cat",
-  });
+
+  const isSpaceCat = theme.petType === "space-cat";
+
+  // Space cat float-away: check timer, trigger randomly
+  if (isSpaceCat && !floatingAway) {
+    nextFloatCheck--;
+    if (nextFloatCheck <= 0 && !catWalkState.isSleeping && catWalkState.startledFrames === 0) {
+      floatingAway = true;
+      floatY = catWalkState.currentY;
+      floatStartX = catWalkState.currentX;
+      floatFrame = 0;
+      floatMaxHeight = catWalkState.currentY - (20 + Math.random() * 80);
+      nextFloatCheck = 60 * 60 * (4 + Math.random() * 6);
+    }
+  }
+
+  if (floatingAway) {
+    floatFrame++;
+    floatY -= 0.3; // drift upward
+    // Return when reaching max height or off screen
+    if (floatY < floatMaxHeight || floatY < -20) {
+      floatingAway = false;
+      catWalkState.currentY = CAT_HOME_Y;
+      catWalkState.currentX = CAT_HOME_X + 8;
+      catWalkState.idleFramesRemaining = 60;
+      catWalkState.isMoving = false;
+    } else {
+      // Wiggling legs — fast frantic alternation
+      const wiggleSprite = floatFrame % 4 < 2 ? "walk1" : "walk2";
+      entities.push({
+        x: floatStartX,
+        y: floatY,
+        spriteKey: theme.petType,
+        spriteState: wiggleSprite,
+        agentId: "__cat_float__",
+        isUnreachable: false,
+        parentId: null,
+        flipX: catWalkState.facingRight,
+        teamColor: 0,
+        isMainCC: false,
+        activityState: "idle",
+        source: "cat",
+      });
+    }
+  }
+
+  if (!floatingAway) {
+    if (catWalkState.startledFrames > 0) {
+      catWalkState.startledFrames--;
+    } else {
+      updateWalkState(catWalkState, true, CAT_HOME_X, CAT_HOME_Y, 60, deskAvoidZones);
+    }
+    const catWalkSprite = getWalkSpriteState(catWalkState);
+    let catSprite = catWalkState.startledFrames > 0 ? "startled" : (catWalkSprite ?? "idle");
+
+    // Space cat: use regular cat sprite (no helmet) when sleeping
+    let catSpriteKey: string = theme.petType;
+    if (isSpaceCat && catSprite === "sleep") {
+      catSpriteKey = "cat";
+    }
+
+    // Small vertical jump during first half of startle
+    const startledJump = catWalkState.startledFrames > 30 ? -2 : 0;
+    entities.push({
+      x: catWalkState.currentX,
+      y: catWalkState.currentY + startledJump,
+      spriteKey: catSpriteKey as any,
+      spriteState: catSprite,
+      agentId: "__cat__",
+      isUnreachable: false,
+      parentId: null,
+      flipX: catWalkState.facingRight,
+      teamColor: 0,
+      isMainCC: false,
+      activityState: "idle",
+      source: "cat",
+    });
+  }
 
   // Sort all entities by Y for z-ordering
   entities.sort((a, b) => a.y - b.y);
@@ -932,6 +1017,22 @@ export function renderScene(
     // Reset alpha after beam fade-in draw
     if (beamingAgents.has(entity.agentId)) {
       ctx.globalAlpha = 1;
+    }
+
+    // Floating cat worried "!!"
+    if (entity.agentId === "__cat_float__") {
+      const wobble = Math.sin(frame * 0.5) * 0.8;
+      ctx.fillStyle = "#ffaa44";
+      ctx.font = "bold 4px monospace";
+      ctx.fillText("!!", entity.x + 3, entity.y - sprite.height / 2 - 2 + wobble);
+    }
+
+    // Startled cat "!"
+    if (entity.agentId === "__cat__" && entity.spriteState === "startled") {
+      const bounce = Math.sin(frame * 0.4) * 0.5;
+      ctx.fillStyle = "#ff4444";
+      ctx.font = "bold 4px monospace";
+      ctx.fillText("!", entity.x + 5, entity.y - sprite.height / 2 - 2 + bounce);
     }
 
     // Sleeping cat "zzz"

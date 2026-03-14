@@ -9,7 +9,8 @@ import {
   type CanvasTransform,
 } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
-import { getAgentPosition, getCatPosition, pokeCat } from "../scene/renderer";
+import { getAgentPosition, getCatPosition, pokeCat, triggerFloat } from "../scene/renderer";
+import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
 
 interface AgentLabelsProps {
@@ -220,6 +221,42 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 onChange={(e) => setTowerOpacity(Number(e.target.value))}
                 className="w-full h-1 accent-white/50"
               />
+            </div>
+
+            {/* Triggers */}
+            <div className="pt-1 border-t border-white/5 space-y-1">
+              <span className="font-mono text-[10px] text-white/50 block">Triggers</span>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => pokeCat()}
+                  className="font-mono text-[9px] text-white/50 bg-white/10 hover:bg-white/20 rounded px-1.5 py-0.5 transition-colors"
+                >
+                  startle
+                </button>
+                <button
+                  onClick={() => triggerFloat()}
+                  className="font-mono text-[9px] text-white/50 bg-white/10 hover:bg-white/20 rounded px-1.5 py-0.5 transition-colors"
+                >
+                  float
+                </button>
+                <button
+                  onClick={() => triggerUfo()}
+                  className="font-mono text-[9px] text-white/50 bg-white/10 hover:bg-white/20 rounded px-1.5 py-0.5 transition-colors"
+                >
+                  ufo
+                </button>
+              </div>
+            </div>
+
+            {/* Build code */}
+            <div className="pt-1 border-t border-white/5">
+              <button
+                onClick={() => navigator.clipboard.writeText(__BUILD_ID__)}
+                className="font-mono text-[8px] text-white/25 hover:text-white/50 transition-colors"
+                title="Click to copy build ID"
+              >
+                build: {__BUILD_ID__}
+              </button>
             </div>
           </div>
         )}

@@ -95,6 +95,8 @@ export const forestTheme: SceneTheme = {
     style: "potted",
   },
 
+  petType: "cat",
+
   desk: {
     topColor: "#3a3230",
     legColor: "#1a1210",

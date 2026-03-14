@@ -6,6 +6,30 @@ const W = CANVAS_WIDTH;
 const H = CANVAS_HEIGHT;
 const BORDER = 22;
 
+// --- Lunar shooting stars ---
+interface ShootingStar {
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  life: number;
+  maxLife: number;
+}
+const shootingStars: ShootingStar[] = [];
+let nextShootingStarFrame = 120; // first one after 2 sec
+
+// --- Lunar UFO ---
+interface UfoState {
+  phase: "idle" | "materializing" | "hovering" | "zipping" | "trail";
+  x: number;
+  y: number;
+  frame: number;
+  trailX: number;
+  trailFrame: number;
+}
+const ufo: UfoState = { phase: "idle", x: 0, y: 0, frame: 0, trailX: 0, trailFrame: 0 };
+let nextUfoFrame = 60 * 60 * (8 + Math.random() * 5); // 8-13 min
+
 export type TimeOfDay = "day" | "dawn" | "night";
 
 export function getTimeOfDay(): TimeOfDay {
@@ -350,6 +374,75 @@ function drawGround(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
         ctx.fillRect(x, y, 1, 1);
       }
     }
+    // Lunar craters
+    if (theme.id === "lunar-base") {
+      seed = 4242;
+      // Mix of sizes: 3 huge, 4 medium, 7 small
+      const craterSizes = [
+        { min: 10, max: 16 }, { min: 10, max: 16 }, { min: 10, max: 16 },
+        { min: 6, max: 9 }, { min: 6, max: 9 }, { min: 6, max: 9 }, { min: 6, max: 9 },
+        { min: 3, max: 5 }, { min: 3, max: 5 }, { min: 3, max: 5 },
+        { min: 3, max: 5 }, { min: 3, max: 5 }, { min: 3, max: 5 }, { min: 3, max: 5 },
+      ];
+      // Generate positions, then clamp the 3 lowest to the back (near horizon)
+      const craterPositions: Array<{ x: number; y: number; s: typeof craterSizes[0] }> = [];
+      for (let i = 0; i < craterSizes.length; i++) {
+        const s = craterSizes[i];
+        craterPositions.push({
+          x: Math.floor(srand() * (W - 30)) + 15,
+          y: Math.floor(srand() * (H - 45)) + 38,
+          s,
+        });
+      }
+      // Sort by Y descending, push the 3 lowest up near the back
+      const sorted = [...craterPositions].sort((a, b) => b.y - a.y);
+      for (let i = 0; i < 3; i++) {
+        sorted[i].y = 36 + Math.floor(srand() * 8);
+      }
+      // Move specific craters
+      craterPositions[7].x = 45;
+      craterPositions[7].y = 170;
+      // Move the crater between bottom-middle and bottom-right desks to bottom-left
+      craterPositions[3].x = 55;
+      craterPositions[3].y = 165;
+
+      for (let i = 0; i < craterPositions.length; i++) {
+        const s = craterPositions[i].s;
+        const ccx = craterPositions[i].x;
+        const ccy = craterPositions[i].y;
+        const rx = Math.floor(srand() * (s.max - s.min)) + s.min; // horizontal radius
+        const ry = Math.max(2, Math.floor(rx * (0.5 + srand() * 0.25))); // shorter vertically (elongated)
+        // Outer ring — darker
+        for (let dy = -ry; dy <= ry; dy++) {
+          for (let dx = -rx; dx <= rx; dx++) {
+            const d = (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry);
+            if (d <= 1 && d > Math.pow((rx - 1) / rx, 2)) {
+              ctx.fillStyle = `rgb(${sr1 - 15},${sg1 - 12},${sb1 - 15})`;
+              ctx.fillRect(ccx + dx, ccy + dy, 1, 1);
+            }
+          }
+        }
+        // Inner depression
+        const irx = Math.max(1, rx - 1);
+        const iry = Math.max(1, ry - 1);
+        for (let dy = -iry; dy <= iry; dy++) {
+          for (let dx = -irx; dx <= irx; dx++) {
+            if ((dx * dx) / (irx * irx) + (dy * dy) / (iry * iry) <= 1) {
+              ctx.fillStyle = `rgb(${sr1 - 8},${sg1 - 6},${sb1 - 8})`;
+              ctx.fillRect(ccx + dx, ccy + dy, 1, 1);
+            }
+          }
+        }
+        // Highlight on upper rim — lit edge
+        for (let dx = -rx + 1; dx < rx; dx++) {
+          const normDx = dx / rx;
+          const rimDy = -Math.floor(ry * Math.sqrt(1 - normDx * normDx));
+          ctx.fillStyle = `rgb(${Math.min(255, sr2 + 15)},${Math.min(255, sg2 + 12)},${Math.min(255, sb2 + 10)})`;
+          ctx.fillRect(ccx + dx, ccy + rimDy, 1, 1);
+        }
+      }
+    }
+
     seed = 100;
     for (let i = 0; i < g.decorCount; i++) {
       rect(ctx, Math.floor(srand() * W), 20 + Math.floor(srand() * (H - 20)), 1, g.decorHeight, g.decorColor);
@@ -903,7 +996,8 @@ function drawBackgroundTrees(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
   const spacing = Math.floor(W / count);
   for (let i = 0; i < count; i++) {
     const vx = Math.floor(spacing * 0.5) + i * spacing + Math.floor(srand() * 6);
-    const vy = 28 + Math.floor(srand() * 4);
+    const vyBase = theme.id === "lunar-base" ? 34 : 28;
+    const vy = vyBase + Math.floor(srand() * 4);
     const vv = Math.floor(srand() * 4);
     if (!hasIsland || isOnIsland(vx, vy, islandMargin)) {
       drawVegetation(ctx, vx, vy, vv, theme);
@@ -978,6 +1072,145 @@ function drawDesk(
   }
 }
 
+function updateAndDrawShootingStars(ctx: CanvasRenderingContext2D) {
+  // Spawn new shooting stars
+  nextShootingStarFrame--;
+  if (nextShootingStarFrame <= 0) {
+    shootingStars.push({
+      x: Math.random() * W * 0.8,
+      y: Math.random() * 12 + 2,
+      dx: 1.5 + Math.random() * 1.5,
+      dy: 0.3 + Math.random() * 0.4,
+      life: 0,
+      maxLife: 15 + Math.floor(Math.random() * 15),
+    });
+    nextShootingStarFrame = 60 * (3 + Math.random() * 8); // 3-11 sec between
+  }
+
+  for (let i = shootingStars.length - 1; i >= 0; i--) {
+    const s = shootingStars[i];
+    s.life++;
+    s.x += s.dx;
+    s.y += s.dy;
+    if (s.life > s.maxLife) {
+      shootingStars.splice(i, 1);
+      continue;
+    }
+    const alpha = 1 - s.life / s.maxLife;
+    // Trail
+    for (let t = 0; t < 4; t++) {
+      const tx = s.x - s.dx * t * 0.7;
+      const ty = s.y - s.dy * t * 0.7;
+      ctx.globalAlpha = alpha * (1 - t * 0.25);
+      ctx.fillStyle = t === 0 ? "#ffffff" : "#aaccff";
+      ctx.fillRect(Math.floor(tx), Math.floor(ty), 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function updateAndDrawUfo(ctx: CanvasRenderingContext2D) {
+  if (ufo.phase === "idle") {
+    nextUfoFrame--;
+    if (nextUfoFrame <= 0) {
+      ufo.phase = "materializing";
+      ufo.x = 30 + Math.random() * (W - 80);
+      ufo.y = 3 + Math.random() * 6;
+      ufo.frame = 0;
+      nextUfoFrame = 60 * 60 * (8 + Math.random() * 5);
+    }
+    return;
+  }
+
+  ufo.frame++;
+  const ux = Math.floor(ufo.x);
+  const uy = Math.floor(ufo.y);
+
+  if (ufo.phase === "materializing") {
+    // Fade in over 60 frames
+    const alpha = Math.min(1, ufo.frame / 60);
+    drawUfoSprite(ctx, ux, uy, alpha, ufo.frame);
+    if (ufo.frame >= 60) {
+      ufo.phase = "hovering";
+      ufo.frame = 0;
+    }
+  } else if (ufo.phase === "hovering") {
+    // Hover for ~10 sec with slight bob
+    const bob = Math.sin(ufo.frame * 0.05) * 0.5;
+    drawUfoSprite(ctx, ux, Math.floor(ufo.y + bob), 1, ufo.frame);
+    if (ufo.frame >= 600) {
+      ufo.phase = "zipping";
+      ufo.frame = 0;
+      ufo.trailX = ufo.x;
+    }
+  } else if (ufo.phase === "zipping") {
+    // Zip off to the right ultra-fast over 10 frames
+    ufo.x += 25;
+    drawUfoSprite(ctx, Math.floor(ufo.x), uy, Math.max(0, 1 - ufo.frame / 10), ufo.frame);
+    if (ufo.frame >= 10) {
+      ufo.phase = "trail";
+      ufo.frame = 0;
+    }
+  } else if (ufo.phase === "trail") {
+    // Lingering tracer trail for ~2 sec
+    const alpha = Math.max(0, 1 - ufo.frame / 120);
+    const trailLen = Math.min(ufo.x - ufo.trailX, W);
+    ctx.globalAlpha = alpha * 0.6;
+    // Gradient trail
+    for (let t = 0; t < trailLen; t += 2) {
+      const tx = ufo.trailX + t;
+      const fade = t / trailLen;
+      ctx.globalAlpha = alpha * (0.1 + fade * 0.5);
+      ctx.fillStyle = fade > 0.7 ? "#ffffff" : "#88ddff";
+      ctx.fillRect(Math.floor(tx), uy + 2, 2, 1);
+    }
+    ctx.globalAlpha = 1;
+    if (ufo.frame >= 120) {
+      ufo.phase = "idle";
+    }
+  }
+}
+
+function drawUfoSprite(ctx: CanvasRenderingContext2D, x: number, y: number, alpha: number, frame: number) {
+  ctx.globalAlpha = alpha;
+  // Glow under dome
+  ctx.fillStyle = `rgba(100,220,255,${0.15 + 0.05 * Math.sin(frame * 0.1)})`;
+  ctx.fillRect(x, y - 1, 9, 2);
+  // Dome — glowing top
+  ctx.fillStyle = "#66ddff";
+  ctx.fillRect(x + 3, y, 3, 1);
+  ctx.fillRect(x + 2, y + 1, 5, 1);
+  // Dome shine
+  ctx.fillStyle = "#aaeeff";
+  ctx.fillRect(x + 3, y, 2, 1);
+  // Body — wide bright disc
+  ctx.fillStyle = "#b0b8c0";
+  ctx.fillRect(x + 1, y + 2, 7, 1);
+  ctx.fillStyle = "#99a0a8";
+  ctx.fillRect(x, y + 3, 9, 1);
+  ctx.fillStyle = "#808890";
+  ctx.fillRect(x + 1, y + 4, 7, 1);
+  // Lights — blinking
+  const lightOn = frame % 20 < 10;
+  ctx.fillStyle = lightOn ? "#ff5555" : "#883333";
+  ctx.fillRect(x + 1, y + 3, 1, 1);
+  ctx.fillStyle = lightOn ? "#55ff55" : "#338833";
+  ctx.fillRect(x + 7, y + 3, 1, 1);
+  ctx.fillStyle = !lightOn ? "#ffff55" : "#888833";
+  ctx.fillRect(x + 4, y + 3, 1, 1);
+  ctx.globalAlpha = 1;
+}
+
+/** Trigger the UFO to appear */
+export function triggerUfo(): boolean {
+  if (ufo.phase !== "idle") return false;
+  ufo.phase = "materializing";
+  ufo.x = 30 + Math.random() * (W - 80);
+  ufo.y = 3 + Math.random() * 6;
+  ufo.frame = 0;
+  return true;
+}
+
 export function drawEnvironment(
   ctx: CanvasRenderingContext2D,
   deskPositions: Array<{ x: number; y: number }>,
@@ -992,6 +1225,15 @@ export function drawEnvironment(
   for (const feat of theme.backgroundFeatures) {
     drawBackgroundFeature(ctx, feat.cx, feat.peak, feat.base, feat.halfWidth, feat.bodyColor, feat.capColor, feat.shape);
   }
+
+  // Sky effects — shooting stars (lunar only) and UFO (lunar + desert)
+  if (theme.id === "lunar-base") {
+    updateAndDrawShootingStars(ctx);
+  }
+  if (theme.id === "lunar-base" || theme.id === "golden-ruins") {
+    updateAndDrawUfo(ctx);
+  }
+
   drawGround(ctx, theme);
   drawBackgroundTrees(ctx, theme);
   drawBuilding(ctx, frame, theme);

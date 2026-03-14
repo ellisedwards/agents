@@ -73,6 +73,8 @@ export const lunarBaseTheme: SceneTheme = {
   clock: null,
   plant: null,
 
+  petType: "space-cat",
+
   desk: {
     topColor: "#505058",
     legColor: "#383840",

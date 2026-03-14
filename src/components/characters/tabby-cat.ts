@@ -87,6 +87,50 @@ export const CAT_SLEEP: PixelRect[] = [
   { x: 11, y: 2, w: 1, h: 1, color: STRIPE },
 ];
 
+/** Startled — arched back, wide eyes, puffed tail */
+export const CAT_STARTLED: PixelRect[] = [
+  // Arched body — raised in the middle
+  { x: 2, y: 4, w: 8, h: 4, color: BODY },
+  { x: 3, y: 3, w: 6, h: 2, color: BODY },
+  { x: 4, y: 2, w: 4, h: 2, color: BODY },
+  // Belly
+  { x: 3, y: 5, w: 6, h: 2, color: BELLY },
+  // Fur spikes on back
+  { x: 4, y: 1, w: 1, h: 1, color: STRIPE },
+  { x: 6, y: 1, w: 1, h: 1, color: STRIPE },
+  { x: 5, y: 2, w: 1, h: 1, color: STRIPE },
+  { x: 7, y: 2, w: 1, h: 1, color: STRIPE },
+  // Stripes
+  { x: 3, y: 3, w: 2, h: 1, color: STRIPE },
+  { x: 6, y: 3, w: 2, h: 1, color: STRIPE },
+  // Head — slightly raised
+  { x: 0, y: 2, w: 4, h: 4, color: BODY },
+  { x: 0, y: 1, w: 1, h: 2, color: BODY },
+  { x: 3, y: 1, w: 1, h: 2, color: BODY },
+  // Pointy ears
+  { x: 0, y: 0, w: 1, h: 2, color: BODY },
+  { x: 3, y: 0, w: 1, h: 2, color: BODY },
+  { x: 0, y: 0, w: 1, h: 1, color: EAR_INNER },
+  { x: 3, y: 0, w: 1, h: 1, color: EAR_INNER },
+  // Wide eyes — bigger than normal
+  { x: 0, y: 3, w: 1, h: 1, color: "#ffffff" },
+  { x: 2, y: 3, w: 1, h: 1, color: "#ffffff" },
+  { x: 0, y: 3, w: 1, h: 1, color: EYE },
+  { x: 2, y: 3, w: 1, h: 1, color: EYE },
+  // Nose
+  { x: 1, y: 4, w: 1, h: 1, color: NOSE },
+  // Open mouth
+  { x: 1, y: 5, w: 1, h: 1, color: "#cc6666" },
+  // Puffed tail — standing straight up
+  { x: 10, y: 3, w: 2, h: 1, color: BODY },
+  { x: 11, y: 2, w: 2, h: 1, color: BODY },
+  { x: 11, y: 1, w: 2, h: 2, color: STRIPE },
+  { x: 12, y: 0, w: 1, h: 2, color: BODY },
+  // Stiff legs
+  { x: 2, y: 8, w: 1, h: 1, color: FEET },
+  { x: 8, y: 8, w: 1, h: 1, color: FEET },
+];
+
 /** Walk frame 2 — legs shifted other way */
 export const CAT_WALK2: PixelRect[] = [
   { x: 2, y: 3, w: 8, h: 5, color: BODY },

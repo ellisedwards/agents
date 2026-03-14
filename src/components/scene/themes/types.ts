@@ -121,6 +121,9 @@ export interface SceneTheme {
     style: "potted" | "cactus" | "papyrus";
   } | null;
 
+  // Pet type
+  petType: "cat" | "sphynx" | "gecko" | "space-cat";
+
   // Desk
   desk: {
     topColor: string;

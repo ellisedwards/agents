@@ -82,6 +82,8 @@ export const tropicalIslandTheme: SceneTheme = {
   clock: null,
   plant: null,
 
+  petType: "gecko",
+
   desk: {
     topColor: "#8a7a58",
     legColor: "#6a5a38",
