@@ -1,5 +1,7 @@
 # Agent Office Improvements — Design Spec
 
+Future features for agent office. Current themes: Forest, Golden Ruins, Tropical Island.
+
 Five independent features: C (glass panels), D (smooth time transitions), E (reconnection), F (custom themes), A (agent materialization).
 
 ## C. Glass Panels Reflect Current Theme Outside
