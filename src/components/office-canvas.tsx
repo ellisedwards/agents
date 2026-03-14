@@ -11,6 +11,7 @@ import { buildSpriteCache } from "./characters/sprite-cache";
 import { renderScene, pokeCat, getCatPosition } from "./scene/renderer";
 import { domToCanvas } from "./canvas-transform";
 import { useUptimeKuma } from "@/hooks/use-uptime-kuma";
+import { useClawHealth } from "@/hooks/use-claw-health";
 import { getThemeById } from "./scene/themes";
 
 interface OfficeCanvasProps {
@@ -33,6 +34,7 @@ export function OfficeCanvas({ onTransformChange }: OfficeCanvasProps) {
 
   // Poll UptimeKuma status
   useUptimeKuma();
+  useClawHealth();
 
   useEffect(() => {
     const canvas = canvasRef.current;

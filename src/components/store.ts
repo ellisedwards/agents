@@ -8,6 +8,11 @@ export interface MonitorStatus {
   ping: number | null;
 }
 
+export interface ClawHealth {
+  reachable: boolean;
+  yeelightConnected: boolean;
+}
+
 export type TimeMode = "auto" | "day" | "dawn" | "night";
 export type TowerSize = "small" | "medium" | "large" | "obelisk";
 export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base";
@@ -56,6 +61,7 @@ interface AgentOfficeStore {
   connectionStatus: "connecting" | "connected" | "disconnected";
   monitors: MonitorStatus[];
   monitorsLoaded: boolean;
+  clawHealth: ClawHealth | null;
   labelsOn: boolean;
   timeMode: TimeMode;
   themeId: ThemeId;
@@ -67,6 +73,7 @@ interface AgentOfficeStore {
   selectAgent: (id: string | null) => void;
   setConnectionStatus: (status: AgentOfficeStore["connectionStatus"]) => void;
   setMonitors: (monitors: MonitorStatus[]) => void;
+  setClawHealth: (health: ClawHealth) => void;
   setLabelsOn: (on: boolean) => void;
   setTimeMode: (mode: TimeMode) => void;
   setThemeId: (id: ThemeId) => void;
@@ -84,6 +91,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   connectionStatus: "connecting",
   monitors: [],
   monitorsLoaded: false,
+  clawHealth: null,
   labelsOn: false,
   timeMode: "auto",
   themeId: loadThemeId(),
@@ -110,6 +118,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   selectAgent: (id) => set({ selectedAgentId: id }),
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
   setMonitors: (monitors) => set({ monitors, monitorsLoaded: true }),
+  setClawHealth: (clawHealth) => set({ clawHealth }),
   setLabelsOn: (labelsOn) => set({ labelsOn }),
   setTimeMode: (timeMode) => set({ timeMode }),
   setThemeId: (themeId) => {

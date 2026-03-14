@@ -14,6 +14,7 @@ export function useUptimeKuma() {
         const res = await fetch(KUMA_ENDPOINT);
         if (!res.ok) return;
         const data = await res.json();
+        console.log("[uptime-kuma] response:", JSON.stringify(data).slice(0, 200));
         if (data.ok && Array.isArray(data.monitors)) {
           const monitors: MonitorStatus[] = data.monitors.map((m: any) => ({
             id: m.id,

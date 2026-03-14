@@ -885,9 +885,9 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
       }
     } else {
       rect(ctx, bx + 3, fy, bw - 6, fh, b.floorColor1);
-      for (let row = 0; row < fh; row += 4) {
-        for (let col = 0; col < bw - 6; col += 4) {
-          rect(ctx, bx + 3 + col, fy + row, 4, 4, (col / 4 + row / 4) % 2 === 0 ? b.floorColor1 : b.floorColor2);
+      for (let row = 0; row < fh; row += 3) {
+        for (let col = 0; col < bw - 6; col += 3) {
+          rect(ctx, bx + 3 + col, fy + row, 3, 3, (col / 3 + row / 3) % 2 === 0 ? b.floorColor1 : b.floorColor2);
         }
       }
       rect(ctx, bx + 3, fy, bw - 6, 2, b.floorEdge1);

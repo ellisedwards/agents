@@ -11,7 +11,7 @@ import {
   type WalkState,
   type AvoidZone,
 } from "./walking";
-import { useAgentOfficeStore, type MonitorStatus } from "../store";
+import { useAgentOfficeStore, type MonitorStatus, type ClawHealth } from "../store";
 
 // Walk states persist across frames
 const walkStates = new Map<string, WalkState>();
@@ -238,6 +238,108 @@ function renderStatusPoster(
     ctx.fillStyle = mon.up ? STATUS_UP : STATUS_DOWN;
     ctx.fillRect(dotCol, ry, 2, 2);
   }
+}
+
+function renderHealthPoster(
+  ctx: CanvasRenderingContext2D,
+  clawHealth: ClawHealth,
+  theme: SceneTheme
+) {
+  // Match dimensions/style of the status poster (same height: 3 rows)
+  const contentW = 3 * 3 + 1 + 2; // same as status poster
+  const contentH = 3 * 4 - 2; // same 3-row height as status poster
+  const pad = 2;
+  const mount = theme.posterMount;
+
+  // Position: right of the existing status poster with a small gap
+  const statusTotalW = contentW + pad * 2 + 2;
+  const px = BUILDING_X + 33 + 5 + statusTotalW + 4;
+  const py = BUILDING_Y + 3 + 5;
+
+  const totalW = contentW + pad * 2 + 2;
+  const totalH = contentH + pad * 2 + 2;
+  const mx = px - pad - 1;
+  const my = py - pad - 1;
+
+  // Draw themed mount (same logic as status poster)
+  if (mount.style === "wall") {
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx, my, totalW, totalH);
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx + 1, my + 1, totalW - 2, totalH - 2);
+  } else if (mount.style === "stone-tablet") {
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx - 1, my - 1, totalW + 2, totalH + 4);
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx, my, totalW, totalH + 2);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx, my, totalW, 1);
+    ctx.fillRect(mx, my, 1, totalH + 2);
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx - 1, my + totalH + 2, totalW + 2, 2);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx, my + totalH + 2, totalW, 1);
+  } else if (mount.style === "wooden-sign") {
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + 1, my - 2, 2, totalH + 6);
+    ctx.fillRect(mx + totalW - 3, my - 2, 2, totalH + 6);
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx, my, totalW, totalH);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx, my, totalW, 1);
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + 1, my - 1, 2, 2);
+    ctx.fillRect(mx + totalW - 3, my - 1, 2, 2);
+  } else if (mount.style === "metal-panel") {
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + Math.floor(totalW / 2), my + totalH, 2, 6);
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx, my, totalW, totalH);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx, my, totalW, 1);
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + 1, my + 1, 1, 1);
+    ctx.fillRect(mx + totalW - 2, my + 1, 1, 1);
+    ctx.fillRect(mx + 1, my + totalH - 2, 1, 1);
+    ctx.fillRect(mx + totalW - 2, my + totalH - 2, 1, 1);
+  } else {
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + Math.floor(totalW / 2), my - 3, 2, totalH + 8);
+    ctx.fillRect(mx + Math.floor(totalW / 2) - 1, my + totalH + 3, 4, 2);
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx - 1, my, totalW + 2, totalH);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx - 1, my, totalW + 2, 1);
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + 2, my + 2, totalW - 4, 1);
+    ctx.fillRect(mx + 3, my + totalH - 3, totalW - 6, 1);
+  }
+
+  // Content area background
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.fillRect(px - pad, py - pad, contentW + pad * 2, contentH + pad * 2);
+
+  const dotCol = px + 3 * 3 + 1;
+
+  // Row 1 (top): claw server — simple "C" shape
+  const r1y = py + 1;
+  ctx.fillStyle = BAR_COLOR;
+  ctx.fillRect(px + 1, r1y, 3, 1);     // top bar
+  ctx.fillRect(px, r1y + 1, 1, 1);     // left side
+  ctx.fillRect(px + 1, r1y + 2, 3, 1); // bottom bar
+  ctx.fillStyle = clawHealth.reachable ? STATUS_UP : STATUS_DOWN;
+  ctx.fillRect(dotCol, r1y, 2, 2);
+
+  // Row 2 (bottom): yeelight — rays around a dot
+  const r2y = py + contentH - 3;
+  ctx.fillStyle = BAR_COLOR;
+  ctx.fillRect(px + 2, r2y, 1, 1);     // top ray
+  ctx.fillRect(px + 1, r2y + 1, 3, 1); // middle band with center
+  ctx.fillRect(px + 2, r2y + 2, 1, 1); // bottom ray
+  ctx.fillRect(px, r2y + 1, 1, 1);     // left ray
+  ctx.fillRect(px + 4, r2y + 1, 1, 1); // right ray
+  ctx.fillStyle = clawHealth.yeelightConnected ? STATUS_UP : STATUS_DOWN;
+  ctx.fillRect(dotCol, r2y, 2, 2);
 }
 
 import { getTimeOfDay, type TimeOfDay } from "./environment";
@@ -661,10 +763,76 @@ export function renderScene(
     renderStatusPoster(ctx, monitors, theme);
   }
 
+  // 4.55. Claw health poster
+  const clawHealth = useAgentOfficeStore.getState().clawHealth;
+  if (clawHealth) {
+    renderHealthPoster(ctx, clawHealth, theme);
+  }
+
   // 4.6. Obelisk (in-scene pixel tower)
   const { towerSize, towerVisible } = useAgentOfficeStore.getState();
   if (towerVisible && towerSize === "obelisk") {
     drawObelisk(ctx, theme, frame, timeOverride);
+  }
+
+  // 4.7. Golden glow on laptop screens — synced to obelisk quadrants
+  const towerInfo = getPixelTowerData();
+  if (towerInfo.connected) {
+    const topPixels = towerInfo.data.panels.top;
+    // Quadrant pixel indices in top panel (same order as renderer draws them)
+    const quadrantIndices = [
+      [0, 1, 5, 6],     // TL — slot 2
+      [3, 4, 8, 9],     // TR — slot 3
+      [15, 16, 20, 21], // BL — slot 0
+      [18, 19, 23, 24], // BR — slot 1
+    ];
+    // Check which quadrants are lit (any non-black pixel)
+    const litQuadrants = quadrantIndices.map((indices) =>
+      indices.some((i) => topPixels[i] !== "#000000")
+    );
+    // Map CC thinking agents to quadrants by desk order
+    const thinkingAtDesk = agents.filter(
+      (a) => a.state === "thinking" && a.source === "cc" && deskMap.has(a.id)
+    );
+    for (let qi = 0; qi < thinkingAtDesk.length && qi < 4; qi++) {
+      if (!litQuadrants[qi]) continue;
+      const agent = thinkingAtDesk[qi];
+      const pos = deskMap.get(agent.id);
+      if (!pos) continue;
+      const dx = pos.x;
+      const dy = pos.y;
+      // Average the quadrant's pixel colors for the glow tint
+      const indices = quadrantIndices[qi];
+      let rSum = 0, gSum = 0, bSum = 0, litCount = 0;
+      for (const i of indices) {
+        const c = topPixels[i];
+        if (c !== "#000000") {
+          rSum += parseInt(c.slice(1, 3), 16);
+          gSum += parseInt(c.slice(3, 5), 16);
+          bSum += parseInt(c.slice(5, 7), 16);
+          litCount++;
+        }
+      }
+      if (litCount === 0) continue;
+      const avgR = Math.round(rSum / litCount);
+      const avgG = Math.round(gSum / litCount);
+      const avgB = Math.round(bSum / litCount);
+      const glowColor = `rgb(${avgR},${avgG},${avgB})`;
+      const brightColor = `rgb(${Math.min(255, avgR + 40)},${Math.min(255, avgG + 40)},${Math.min(255, avgB + 40)})`;
+      // Outer glow
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = glowColor;
+      ctx.fillRect(dx + 1, dy - 1, 7, 7);
+      // Inner glow
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = brightColor;
+      ctx.fillRect(dx + 2, dy, 5, 5);
+      // Bright screen
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = brightColor;
+      ctx.fillRect(dx + 3, dy + 1, 3, 3);
+      ctx.globalAlpha = 1;
+    }
   }
 
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)

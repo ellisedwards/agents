@@ -65,6 +65,21 @@ app.get("/api/brightness/:level", async (req, res) => {
   }
 });
 
+// --- Claw health ---
+app.get("/api/claw-health", async (_req, res) => {
+  try {
+    const r = await fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) });
+    if (!r.ok) return res.json({ reachable: false, yeelightConnected: false });
+    const data = await r.json();
+    res.json({
+      reachable: true,
+      yeelightConnected: data.connected === true,
+    });
+  } catch {
+    res.json({ reachable: false, yeelightConnected: false });
+  }
+});
+
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
   try {
