@@ -52,12 +52,25 @@ export class ClaudeCodeWatcher extends EventEmitter {
   private scan() {
     const now = Date.now();
 
-    // Clean up stale sessions
+    // Clean up stale sessions and departed paths
     for (const [filePath, session] of this.sessions) {
       const staleLimit = session.subagentClass !== null ? SUBAGENT_STALE_MS : STALE_MS;
       if (now - session.lastActivity > staleLimit) {
         fs.unwatchFile(filePath);
         this.sessions.delete(filePath);
+      }
+    }
+    // Allow departed paths to be re-discovered after 5 minutes
+    for (const dp of this.departedPaths) {
+      try {
+        const stat = fs.statSync(dp);
+        if (now - stat.mtimeMs < STALE_MS && now - stat.mtimeMs > 5 * 60 * 1000) {
+          // File is recent but was departed >5min ago — allow re-discovery
+        } else if (now - stat.mtimeMs >= STALE_MS) {
+          this.departedPaths.delete(dp);
+        }
+      } catch {
+        this.departedPaths.delete(dp);
       }
     }
 
@@ -127,22 +140,27 @@ export class ClaudeCodeWatcher extends EventEmitter {
     let subagentClass: MageColorIndex | null = null;
     let teamColor: MageColorIndex = (nextMageColor++ % 6) as MageColorIndex;
 
-    for (const [parentPath, parentSession] of this.sessions) {
-      if (
-        parentSession.pendingSubAgents > 0 &&
-        now - parentSession.expectingSubAgentSince < 30_000
-      ) {
-        parentId = parentPath;
+    // Only match subagents that live in a /subagents/ subdirectory
+    // of a known parent session's UUID folder
+    const isInSubagentsDir = filePath.includes("/subagents/");
+    if (isInSubagentsDir) {
+      // Try to match to a parent by path: .../projects/<proj>/<uuid>/subagents/<file>.jsonl
+      // Parent would be: .../projects/<proj>/<uuid>.jsonl
+      const subagentsDir = path.dirname(filePath);        // .../subagents
+      const uuidDir = path.dirname(subagentsDir);          // .../<uuid>
+      const parentCandidate = uuidDir + ".jsonl";
+      const parentSession = this.sessions.get(parentCandidate);
+      if (parentSession) {
+        parentId = parentCandidate;
         subagentClass = parentSession.teamColor;
         teamColor = parentSession.teamColor;
-        parentSession.pendingSubAgents--;
-        break;
+        if (parentSession.pendingSubAgents > 0) {
+          parentSession.pendingSubAgents--;
+        }
+      } else {
+        // No parent found but it's in a subagents dir — still mark as subagent
+        subagentClass = teamColor;
       }
-    }
-
-    // Fallback: detect subagent from path if parent timing was missed
-    if (subagentClass === null && filePath.includes("/subagents/")) {
-      subagentClass = teamColor;
     }
 
     this.ccCounter++;
