@@ -44,6 +44,25 @@ export function getAgentPosition(agentId: string): { x: number; y: number } | nu
   return null;
 }
 
+// Teleport beam system — subtle beam-up / beam-down when agents transition
+interface TeleportBeam {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  frame: number;
+  agentId: string;
+}
+const activeBeams: TeleportBeam[] = [];
+const BEAM_UP_DURATION = 14;   // frames to dissolve up
+const BEAM_DOWN_DURATION = 14; // frames to reassemble
+const BEAM_TOTAL = BEAM_UP_DURATION + BEAM_DOWN_DURATION + 4; // +4 gap
+const BEAM_COLORS = ["#aaccff", "#88aadd", "#ccddff", "#ffffff", "#99bbee"];
+// Track which agents are currently beaming (hide their sprite)
+const beamingAgents = new Set<string>();
+// Track last known state to detect wander→desk transitions
+const lastAgentState = new Map<string, string>();
+
 // Poof particle system
 interface Poof {
   x: number;
@@ -706,12 +725,38 @@ export function renderScene(
       // Active desk-bound agents sit at their desk
       const pos = deskMap.get(agent.id);
       if (!pos) continue;
+      // Detect wander→desk transition: spawn teleport beam
+      const ws = walkStates.get(agent.id);
+      if (ws && !beamingAgents.has(agent.id)) {
+        const dist = Math.sqrt(
+          (ws.currentX - pos.characterX) ** 2 + (ws.currentY - pos.characterY) ** 2
+        );
+        if (dist > 4) {
+          // Far enough to warrant a teleport instead of just snapping
+          activeBeams.push({
+            fromX: ws.currentX,
+            fromY: ws.currentY,
+            toX: pos.characterX,
+            toY: pos.characterY,
+            frame: 0,
+            agentId: agent.id,
+          });
+          beamingAgents.add(agent.id);
+        }
+        // Clear smooth position so it doesn't lerp during beam
+        smoothPos.delete(agent.id);
+      }
       drawX = pos.characterX;
       drawY = pos.characterY;
       walkStates.delete(agent.id);
     }
+    lastAgentState.set(agent.id, agent.state);
 
     // Smooth position — lerp toward target to prevent blinking on state changes
+    // Skip lerp for beaming agents — they teleport, not slide
+    if (beamingAgents.has(agent.id)) {
+      smoothPos.delete(agent.id);
+    }
     const sp = smoothPos.get(agent.id);
     if (sp) {
       const lerpSpeed = 0.15; // 15% per frame — smooth but responsive
@@ -779,8 +824,78 @@ export function renderScene(
   // Sort all entities by Y for z-ordering
   entities.sort((a, b) => a.y - b.y);
 
-  // 7. Draw all entities
+  // 7. Draw teleport beams
+  for (let bi = activeBeams.length - 1; bi >= 0; bi--) {
+    const beam = activeBeams[bi];
+    beam.frame++;
+    if (beam.frame > BEAM_TOTAL) {
+      activeBeams.splice(bi, 1);
+      beamingAgents.delete(beam.agentId);
+      continue;
+    }
+
+    const beamUpT = Math.min(beam.frame / BEAM_UP_DURATION, 1);
+    const gapEnd = BEAM_UP_DURATION + 4;
+    const beamDownT = beam.frame > gapEnd
+      ? Math.min((beam.frame - gapEnd) / BEAM_DOWN_DURATION, 1)
+      : -1;
+
+    // Beam-up: particles rise from the source position
+    if (beamUpT < 1) {
+      const alpha = 1 - beamUpT;
+      for (let p = 0; p < 6; p++) {
+        const px = beam.fromX + (p % 3) - 1;
+        const riseOffset = beamUpT * (8 + p * 2);
+        const py = beam.fromY - p * 2 - riseOffset;
+        ctx.globalAlpha = alpha * (0.4 + 0.3 * ((p + beam.frame) % 2));
+        ctx.fillStyle = BEAM_COLORS[p % BEAM_COLORS.length];
+        ctx.fillRect(Math.floor(px), Math.floor(py), 1, 1);
+      }
+      // Fading column at source
+      ctx.globalAlpha = alpha * 0.2;
+      ctx.fillStyle = "#aaccff";
+      ctx.fillRect(beam.fromX - 2, beam.fromY - 10 - beamUpT * 4, 4, 10);
+      ctx.globalAlpha = 1;
+    }
+
+    // Beam-down: particles descend to the destination
+    if (beamDownT >= 0 && beamDownT < 1) {
+      const alpha = beamDownT;
+      for (let p = 0; p < 6; p++) {
+        const px = beam.toX + (p % 3) - 1;
+        const fallOffset = (1 - beamDownT) * (8 + p * 2);
+        const py = beam.toY - p * 2 - fallOffset;
+        ctx.globalAlpha = alpha * (0.4 + 0.3 * ((p + beam.frame) % 2));
+        ctx.fillStyle = BEAM_COLORS[p % BEAM_COLORS.length];
+        ctx.fillRect(Math.floor(px), Math.floor(py), 1, 1);
+      }
+      // Forming column at dest
+      ctx.globalAlpha = alpha * 0.2;
+      ctx.fillStyle = "#aaccff";
+      ctx.fillRect(beam.toX - 2, beam.toY - 10 - (1 - beamDownT) * 4, 4, 10);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // 8. Draw all entities
   for (const entity of entities) {
+    // Hide sprite during teleport beam
+    if (beamingAgents.has(entity.agentId)) {
+      // Show at destination during beam-down phase
+      const beam = activeBeams.find((b) => b.agentId === entity.agentId);
+      if (beam) {
+        const gapEnd = BEAM_UP_DURATION + 4;
+        const beamDownT = beam.frame > gapEnd
+          ? (beam.frame - gapEnd) / BEAM_DOWN_DURATION
+          : -1;
+        if (beamDownT < 0.5) continue; // still invisible
+        // Fade in during second half of beam-down
+        ctx.globalAlpha = Math.min(1, (beamDownT - 0.5) * 2);
+      } else {
+        continue;
+      }
+    }
+
     const sprite = getSprite(
       spriteCache,
       entity.spriteKey,
@@ -813,6 +928,10 @@ export function renderScene(
       ctx.fillStyle = "#666";
       ctx.font = "4px monospace";
       ctx.fillText("zzz", entity.x - 4, entity.y - sprite.height / 2 - 3);
+    }
+    // Reset alpha after beam fade-in draw
+    if (beamingAgents.has(entity.agentId)) {
+      ctx.globalAlpha = 1;
     }
 
     // Sleeping cat "zzz"
@@ -949,5 +1068,8 @@ export function renderScene(
   }
   for (const id of smoothPos.keys()) {
     if (!activeIds.has(id)) smoothPos.delete(id);
+  }
+  for (const id of lastAgentState.keys()) {
+    if (!activeIds.has(id)) lastAgentState.delete(id);
   }
 }
