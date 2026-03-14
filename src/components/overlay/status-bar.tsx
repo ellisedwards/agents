@@ -8,6 +8,10 @@ export function StatusBar() {
   const ccCount = agents.filter((a) => a.source === "cc").length;
   const ocCount = agents.filter((a) => a.source === "openclaw").length;
 
+  const handleClear = () => {
+    fetch("/api/agents/clear", { method: "POST" }).catch(() => {});
+  };
+
   return (
     <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#08080e]/95 flex items-center px-3 gap-4 font-mono text-[10px]">
       <span className="text-neutral-500">
@@ -29,6 +33,15 @@ export function StatusBar() {
           <span className="w-1.5 h-1.5 rounded-full bg-[#cc3333] inline-block" />
           OC: {ocCount}
         </span>
+      )}
+      {status === "connected" && ccCount > 0 && (
+        <button
+          onClick={handleClear}
+          className="text-neutral-500 hover:text-neutral-300 transition-colors underline"
+          title="Clear stale agents"
+        >
+          clear
+        </button>
       )}
     </div>
   );

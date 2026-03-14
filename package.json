@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -n server,client \"tsx watch src/server/server.ts\" \"vite\"",
     "build": "vite build && node scripts/build-server.mjs",
-    "start": "node dist/server.js",
+    "start": "npm run build && node dist/server.js",
     "install-app": "cp -r app-bundle/Agent\\ Office.app /Applications/"
   },
   "dependencies": {

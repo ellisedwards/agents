@@ -33,6 +33,12 @@ app.get("/api/agents", (req, res) => {
   req.on("close", () => watcher.off("agents", onAgents));
 });
 
+// --- Agent management ---
+app.post("/api/agents/clear", (_req, res) => {
+  watcher.clearAll();
+  res.json({ ok: true });
+});
+
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
   try {

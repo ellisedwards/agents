@@ -703,10 +703,8 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     }
   }
 
-  // Fire vessel
+  // Fire vessel drawn after tint overlay (see drawEnvironment)
   const fpx = bx + 5;
-  const fpy = by + 2;
-  drawFireVessel(ctx, fpx, fpy, frame, theme);
 
   // Glass panels / openings (skip if theme has no glass)
   const gp = theme.glassPanel;
@@ -1009,5 +1007,31 @@ export function drawEnvironment(
     ctx.globalAlpha = tint.opacity;
     rect(ctx, 0, 0, W, H, tint.color);
     ctx.globalAlpha = 1;
+  }
+
+  // Fire drawn on top of tint so it always burns bright
+  const fpx = BUILDING_X + 5;
+  const fpy = BUILDING_Y + 2;
+  drawFireVessel(ctx, fpx, fpy, frame, theme);
+
+  // Enhanced glow around fire at night/dawn
+  if (tod === "night" || tod === "dawn") {
+    const isLunar = theme.fireVessel.style === "reactor";
+    const radius = tod === "night" ? 40 : 28;
+    const alpha = tod === "night" ? 0.18 : 0.1;
+    const cx = fpx + 12;
+    const cy = fpy + 14;
+    const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, radius);
+    if (isLunar) {
+      grad.addColorStop(0, `rgba(34,170,204,${alpha})`);
+      grad.addColorStop(0.5, `rgba(20,120,180,${alpha * 0.5})`);
+      grad.addColorStop(1, "rgba(20,100,160,0)");
+    } else {
+      grad.addColorStop(0, `rgba(255,140,50,${alpha})`);
+      grad.addColorStop(0.5, `rgba(255,100,30,${alpha * 0.5})`);
+      grad.addColorStop(1, "rgba(255,80,20,0)");
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
   }
 }

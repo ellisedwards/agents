@@ -44,6 +44,10 @@ class WatcherSingleton extends EventEmitter {
     if (this.ocAgent) all.push(this.ocAgent);
     return all;
   }
+
+  clearAll() {
+    this.ccWatcher.clearAll();
+  }
 }
 
 export function createWatcher(clawBaseUrl: string): WatcherSingleton {

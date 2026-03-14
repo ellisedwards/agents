@@ -6,7 +6,7 @@ import { parseTranscriptLine } from "./transcript-parser";
 import type { AgentState, AgentActivityState, MageColorIndex } from "../../shared/types";
 
 const CLAUDE_DIR = path.join(os.homedir(), ".claude", "projects");
-const STALE_MS = 30 * 60 * 1000; // 30 minutes
+const STALE_MS = 5 * 60 * 1000; // 5 minutes
 const SUBAGENT_STALE_MS = 2 * 60 * 1000; // 2 minutes
 const LOUNGE_MS = 2 * 60 * 1000; // 2 minutes idle → lounging
 const SCAN_INTERVAL_MS = 10_000;
@@ -32,7 +32,7 @@ interface SessionInfo {
 
 export class ClaudeCodeWatcher extends EventEmitter {
   private sessions = new Map<string, SessionInfo>();
-  private departedPaths = new Set<string>();
+  private departedPaths = new Map<string, number>(); // path → departure timestamp
   private scanInterval: ReturnType<typeof setInterval> | null = null;
   private ccCounter = 0;
 
@@ -60,16 +60,10 @@ export class ClaudeCodeWatcher extends EventEmitter {
         this.sessions.delete(filePath);
       }
     }
-    // Allow departed paths to be re-discovered after 5 minutes
-    for (const dp of this.departedPaths) {
-      try {
-        const stat = fs.statSync(dp);
-        if (now - stat.mtimeMs < STALE_MS && now - stat.mtimeMs > 5 * 60 * 1000) {
-          // File is recent but was departed >5min ago — allow re-discovery
-        } else if (now - stat.mtimeMs >= STALE_MS) {
-          this.departedPaths.delete(dp);
-        }
-      } catch {
+    // Allow departed paths to be re-discovered after 2 minutes
+    const DEPART_COOLDOWN_MS = 2 * 60 * 1000;
+    for (const [dp, departedAt] of this.departedPaths) {
+      if (now - departedAt > DEPART_COOLDOWN_MS) {
         this.departedPaths.delete(dp);
       }
     }
@@ -260,7 +254,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
     if (session.state === "departing") return;
     session.state = "departing";
     session.currentTool = null;
-    this.departedPaths.add(session.filePath);
+    this.departedPaths.set(session.filePath, Date.now());
     this.emitUpdate();
     setTimeout(() => {
       if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
@@ -280,6 +274,16 @@ export class ClaudeCodeWatcher extends EventEmitter {
         this.departSubagent(session);
       }
     }, 5000);
+  }
+
+  /** Immediately remove all CC sessions. Active ones will be re-discovered on next scan. */
+  clearAll() {
+    for (const [filePath, session] of this.sessions) {
+      if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
+      fs.unwatchFile(filePath);
+      this.sessions.delete(filePath);
+    }
+    this.emitUpdate();
   }
 
   private emitUpdate() {
