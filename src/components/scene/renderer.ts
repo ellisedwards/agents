@@ -15,6 +15,8 @@ import { useAgentOfficeStore, type MonitorStatus } from "../store";
 
 // Walk states persist across frames
 const walkStates = new Map<string, WalkState>();
+// Smoothed render positions — lerp toward target to prevent blinking
+const smoothPos = new Map<string, { x: number; y: number }>();
 let catWalkState: WalkState | null = null;
 
 /** Wake the cat if it's sleeping. Returns true if cat was woken. */
@@ -463,21 +465,6 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
     ctx.fillRect(ox + slabW, baseY - 7, 1, 3);
   }
 
-  // Lunar base: footprints in the dust approaching the monolith
-  if (theme.id === "lunar-base") {
-    const baseY = oy + slabH;
-    const baseCX = cx;
-    ctx.fillStyle = "#505058";
-    const prints = [
-      { dx: 18, dy: 6 }, { dx: 16, dy: 5 },
-      { dx: 13, dy: 4 }, { dx: 11, dy: 3 },
-      { dx: 8, dy: 3 }, { dx: 6, dy: 2 },
-    ];
-    for (const p of prints) {
-      ctx.fillRect(baseCX + p.dx, baseY + p.dy, 2, 1);
-      ctx.fillRect(baseCX + p.dx + 1, baseY + p.dy + 1, 2, 1);
-    }
-  }
 
   // Stone base (slightly wider)
   ctx.fillStyle = "#222228";
@@ -721,8 +708,24 @@ export function renderScene(
       if (!pos) continue;
       drawX = pos.characterX;
       drawY = pos.characterY;
-      // Clear walk state so they return to desk position
       walkStates.delete(agent.id);
+    }
+
+    // Smooth position — lerp toward target to prevent blinking on state changes
+    const sp = smoothPos.get(agent.id);
+    if (sp) {
+      const lerpSpeed = 0.15; // 15% per frame — smooth but responsive
+      sp.x += (drawX - sp.x) * lerpSpeed;
+      sp.y += (drawY - sp.y) * lerpSpeed;
+      // Snap if very close to avoid sub-pixel wobble
+      if (Math.abs(drawX - sp.x) < 0.3 && Math.abs(drawY - sp.y) < 0.3) {
+        sp.x = drawX;
+        sp.y = drawY;
+      }
+      drawX = sp.x;
+      drawY = sp.y;
+    } else {
+      smoothPos.set(agent.id, { x: drawX, y: drawY });
     }
 
     // Idle bob — barely perceptible, brief 1px lift every ~3s, only when stationary
@@ -782,7 +785,7 @@ export function renderScene(
       spriteCache,
       entity.spriteKey,
       entity.spriteState as any
-    );
+    ) ?? getSprite(spriteCache, entity.spriteKey, "idle");
     if (!sprite) continue;
 
     if (entity.isUnreachable) {
@@ -943,5 +946,8 @@ export function renderScene(
   }
   for (const id of poofedIds) {
     if (!activeIds.has(id)) poofedIds.delete(id);
+  }
+  for (const id of smoothPos.keys()) {
+    if (!activeIds.has(id)) smoothPos.delete(id);
   }
 }

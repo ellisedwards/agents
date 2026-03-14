@@ -91,7 +91,22 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   towerVisible: initialTower.visible,
   towerPos: { x: initialTower.x, y: initialTower.y },
   towerOpacity: initialTower.opacity,
-  setAgents: (agents) => set({ agents }),
+  setAgents: (incoming) => {
+    const now = Date.now();
+    const prev = get().agents;
+    // Build map of incoming agents
+    const incomingMap = new Map(incoming.map((a) => [a.id, a]));
+    // Merge: use incoming data, but keep recently-seen agents that
+    // briefly disappeared (grace period prevents flicker from transient poll gaps)
+    const graceMs = 5000;
+    const merged: AgentState[] = [...incoming];
+    for (const old of prev) {
+      if (!incomingMap.has(old.id) && now - old.lastActivity < graceMs) {
+        merged.push(old);
+      }
+    }
+    set({ agents: merged });
+  },
   selectAgent: (id) => set({ selectedAgentId: id }),
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
   setMonitors: (monitors) => set({ monitors, monitorsLoaded: true }),

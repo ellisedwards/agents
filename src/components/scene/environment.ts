@@ -54,23 +54,37 @@ function drawSky(ctx: CanvasRenderingContext2D, tod: TimeOfDay, theme: SceneThem
   const sky = theme.timeTints[tod].skyColors;
   rect(ctx, 0, 0, W, 8, sky[0]);
   rect(ctx, 0, 8, W, 8, sky[1]);
-  rect(ctx, 0, 16, W, 10, sky[2]);
+  // Lunar base: extend sky lower for more visible horizon
+  const skyBottom = theme.id === "lunar-base" ? 20 : 10;
+  rect(ctx, 0, 16, W, skyBottom, sky[2]);
 
-  // Earth rise — lunar-base only
+  // Earth rise — lunar-base only, rounder 8x8 with clipped corners
   if (theme.id === "lunar-base") {
     const ex = W - 60;
-    const ey = 8;
-    ctx.globalAlpha = 0.15;
-    rect(ctx, ex - 2, ey - 2, 10, 10, "#4488cc");
+    const ey = 6;
+    // Glow
+    ctx.globalAlpha = 0.12;
+    rect(ctx, ex - 1, ey - 1, 10, 10, "#4488cc");
     ctx.globalAlpha = 1;
-    rect(ctx, ex, ey, 6, 6, "#226644");
-    rect(ctx, ex, ey, 6, 3, "#4488cc");
-    rect(ctx, ex + 1, ey + 2, 2, 2, "#338855");
-    rect(ctx, ex + 4, ey + 3, 1, 2, "#338855");
-    px(ctx, ex + 1, ey, "#ccddee");
-    px(ctx, ex + 2, ey, "#ccddee");
-    px(ctx, ex + 3, ey, "#ccddee");
-    px(ctx, ex + 4, ey, "#ccddee");
+    // Round body: 8x8 with corners clipped
+    //   ..XXXX..
+    //   .XXXXXX.
+    //   XXXXXXXX  (rows 2-5)
+    //   .XXXXXX.
+    //   ..XXXX..
+    rect(ctx, ex + 2, ey, 4, 1, "#4488cc");       // row 0
+    rect(ctx, ex + 1, ey + 1, 6, 1, "#4488cc");   // row 1
+    rect(ctx, ex, ey + 2, 8, 4, "#4488cc");        // rows 2-5 (ocean base)
+    rect(ctx, ex + 1, ey + 6, 6, 1, "#226644");   // row 6
+    rect(ctx, ex + 2, ey + 7, 4, 1, "#226644");   // row 7
+    // Land masses
+    rect(ctx, ex + 1, ey + 3, 3, 2, "#338855");
+    rect(ctx, ex + 5, ey + 2, 2, 3, "#2a7744");
+    rect(ctx, ex + 2, ey + 5, 2, 1, "#338855");
+    // Polar cap
+    rect(ctx, ex + 2, ey, 4, 1, "#ccddee");
+    px(ctx, ex + 3, ey + 1, "#bbccdd");
+    px(ctx, ex + 4, ey + 1, "#bbccdd");
   }
 
   // Stars — always visible on lunar-base (no atmosphere), otherwise night only
@@ -310,14 +324,15 @@ function drawGround(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
     }
     ctx.drawImage(islandCanvasCache.canvas, 0, 0);
   } else if (g.tileSize <= 1) {
-    // Per-pixel sand noise (same technique as island sand)
+    // Per-pixel noise ground
+    const groundBase = theme.id === "lunar-base" ? 30 : 20;
     const sr1 = parseInt(g.baseColor1.slice(1, 3), 16);
     const sg1 = parseInt(g.baseColor1.slice(3, 5), 16);
     const sb1 = parseInt(g.baseColor1.slice(5, 7), 16);
     const sr2 = parseInt(g.baseColor2.slice(1, 3), 16);
     const sg2 = parseInt(g.baseColor2.slice(3, 5), 16);
     const sb2 = parseInt(g.baseColor2.slice(5, 7), 16);
-    for (let y = 20; y < H; y++) {
+    for (let y = groundBase; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const h = ((x * 374761393 + y * 668265263) >>> 0) % 256;
         const t = h / 255;
