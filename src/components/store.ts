@@ -8,6 +8,11 @@ export interface MonitorStatus {
   ping: number | null;
 }
 
+export interface RelayMessage {
+  msg: string;
+  time: string;
+}
+
 export interface ClawHealth {
   reachable: boolean;
   yeelightConnected: boolean;
@@ -64,6 +69,8 @@ interface AgentOfficeStore {
   clawHealth: ClawHealth | null;
   statusPosterOn: boolean;
   healthPosterOn: boolean;
+  relayMessages: RelayMessage[];
+  relayUnread: number;
   labelsOn: boolean;
   timeMode: TimeMode;
   themeId: ThemeId;
@@ -78,6 +85,8 @@ interface AgentOfficeStore {
   setClawHealth: (health: ClawHealth) => void;
   setStatusPosterOn: (on: boolean) => void;
   setHealthPosterOn: (on: boolean) => void;
+  setRelayMessages: (messages: RelayMessage[]) => void;
+  clearRelayUnread: () => void;
   setLabelsOn: (on: boolean) => void;
   setTimeMode: (mode: TimeMode) => void;
   setThemeId: (id: ThemeId) => void;
@@ -98,6 +107,8 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   clawHealth: null,
   statusPosterOn: true,
   healthPosterOn: true,
+  relayMessages: [],
+  relayUnread: 0,
   labelsOn: false,
   timeMode: "auto",
   themeId: loadThemeId(),
@@ -127,6 +138,12 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setClawHealth: (clawHealth) => set({ clawHealth }),
   setStatusPosterOn: (statusPosterOn) => set({ statusPosterOn }),
   setHealthPosterOn: (healthPosterOn) => set({ healthPosterOn }),
+  setRelayMessages: (relayMessages) => {
+    const prev = get().relayMessages;
+    const newCount = relayMessages.length - prev.length;
+    set({ relayMessages, relayUnread: newCount > 0 ? get().relayUnread + newCount : get().relayUnread });
+  },
+  clearRelayUnread: () => set({ relayUnread: 0 }),
   setLabelsOn: (labelsOn) => set({ labelsOn }),
   setTimeMode: (timeMode) => set({ timeMode }),
   setThemeId: (themeId) => {

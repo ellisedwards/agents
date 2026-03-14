@@ -5,12 +5,16 @@ import { useAgentOfficeStore } from "../store";
 export function StatusBar() {
   const agents = useAgentOfficeStore((s) => s.agents);
   const status = useAgentOfficeStore((s) => s.connectionStatus);
+  const relayMessages = useAgentOfficeStore((s) => s.relayMessages);
+  const relayUnread = useAgentOfficeStore((s) => s.relayUnread);
+  const clearRelayUnread = useAgentOfficeStore((s) => s.clearRelayUnread);
 
   const ccCount = agents.filter((a) => a.source === "cc").length;
   const ocCount = agents.filter((a) => a.source === "openclaw").length;
 
   const [brightness, setBrightness] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [relayOpen, setRelayOpen] = useState(false);
 
   // Poll brightness every 10s (only when not dragging)
   useEffect(() => {
@@ -34,6 +38,11 @@ export function StatusBar() {
 
   const handleClear = () => {
     fetch("/api/agents/clear", { method: "POST" }).catch(() => {});
+  };
+
+  const toggleRelay = () => {
+    setRelayOpen((v) => !v);
+    clearRelayUnread();
   };
 
   return (
@@ -66,6 +75,36 @@ export function StatusBar() {
         >
           clear
         </button>
+      )}
+
+      {/* Relay indicator */}
+      {relayMessages.length > 0 && (
+        <button
+          onClick={toggleRelay}
+          className="text-cyan-400/70 hover:text-cyan-300 flex items-center gap-1 relative transition-colors"
+          title="Relay messages from claw"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/70 inline-block" />
+          relay: {relayMessages.length}
+          {relayUnread > 0 && (
+            <span className="absolute -top-1.5 -right-2.5 w-2.5 h-2.5 rounded-full bg-red-500 text-[7px] text-white flex items-center justify-center">
+              {relayUnread}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* Relay message panel */}
+      {relayOpen && relayMessages.length > 0 && (
+        <div className="absolute bottom-7 left-4 w-80 max-h-48 overflow-y-auto bg-[#12121e]/95 border border-white/10 rounded-md p-2.5 space-y-1.5 font-mono text-[10px] z-50">
+          <div className="text-white/30 text-[9px] mb-1">Relay messages from claw</div>
+          {relayMessages.map((m, i) => (
+            <div key={i} className="text-neutral-300">
+              <span className="text-neutral-500">{new Date(m.time).toLocaleTimeString()}</span>{" "}
+              {m.msg}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Brightness slider — right side */}

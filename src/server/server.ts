@@ -80,6 +80,18 @@ app.get("/api/claw-health", async (_req, res) => {
   }
 });
 
+// --- Relay ---
+app.get("/api/relay", async (_req, res) => {
+  try {
+    const r = await fetch(`${claw}/relay/reply`, { signal: AbortSignal.timeout(2000) });
+    if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
+    res.json(await r.json());
+  } catch (e) {
+    console.error("[proxy] /api/relay error:", e);
+    res.status(502).json({ error: "claw unreachable" });
+  }
+});
+
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
   try {

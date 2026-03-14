@@ -12,6 +12,7 @@ import { renderScene, pokeCat, getCatPosition } from "./scene/renderer";
 import { domToCanvas } from "./canvas-transform";
 import { useUptimeKuma } from "@/hooks/use-uptime-kuma";
 import { useClawHealth } from "@/hooks/use-claw-health";
+import { useRelay } from "@/hooks/use-relay";
 import { getThemeById } from "./scene/themes";
 
 interface OfficeCanvasProps {
@@ -35,6 +36,7 @@ export function OfficeCanvas({ onTransformChange }: OfficeCanvasProps) {
   // Poll UptimeKuma status
   useUptimeKuma();
   useClawHealth();
+  useRelay();
 
   useEffect(() => {
     const canvas = canvasRef.current;
