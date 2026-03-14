@@ -38,6 +38,10 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const setTowerSize = useAgentOfficeStore((s) => s.setTowerSize);
   const towerVisible = useAgentOfficeStore((s) => s.towerVisible);
   const setTowerVisible = useAgentOfficeStore((s) => s.setTowerVisible);
+  const statusPosterOn = useAgentOfficeStore((s) => s.statusPosterOn);
+  const setStatusPosterOn = useAgentOfficeStore((s) => s.setStatusPosterOn);
+  const healthPosterOn = useAgentOfficeStore((s) => s.healthPosterOn);
+  const setHealthPosterOn = useAgentOfficeStore((s) => s.setHealthPosterOn);
   const towerOpacity = useAgentOfficeStore((s) => s.towerOpacity);
   const setTowerOpacity = useAgentOfficeStore((s) => s.setTowerOpacity);
   const deskMap = assignDesks(agents.map((a) => a.id));
@@ -190,6 +194,40 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 <span
                   className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
                     towerVisible ? "left-[13px]" : "left-[3px]"
+                  }`}
+                />
+              </button>
+            </label>
+
+            {/* Status poster toggle */}
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <span className="font-mono text-[10px] text-white/50">Monitors</span>
+              <button
+                onClick={() => setStatusPosterOn(!statusPosterOn)}
+                className={`w-7 h-4 rounded-full transition-colors relative ${
+                  statusPosterOn ? "bg-green-500/70" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
+                    statusPosterOn ? "left-[13px]" : "left-[3px]"
+                  }`}
+                />
+              </button>
+            </label>
+
+            {/* Health poster toggle */}
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <span className="font-mono text-[10px] text-white/50">Claw</span>
+              <button
+                onClick={() => setHealthPosterOn(!healthPosterOn)}
+                className={`w-7 h-4 rounded-full transition-colors relative ${
+                  healthPosterOn ? "bg-green-500/70" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
+                    healthPosterOn ? "left-[13px]" : "left-[3px]"
                   }`}
                 />
               </button>

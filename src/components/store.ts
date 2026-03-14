@@ -62,6 +62,8 @@ interface AgentOfficeStore {
   monitors: MonitorStatus[];
   monitorsLoaded: boolean;
   clawHealth: ClawHealth | null;
+  statusPosterOn: boolean;
+  healthPosterOn: boolean;
   labelsOn: boolean;
   timeMode: TimeMode;
   themeId: ThemeId;
@@ -74,6 +76,8 @@ interface AgentOfficeStore {
   setConnectionStatus: (status: AgentOfficeStore["connectionStatus"]) => void;
   setMonitors: (monitors: MonitorStatus[]) => void;
   setClawHealth: (health: ClawHealth) => void;
+  setStatusPosterOn: (on: boolean) => void;
+  setHealthPosterOn: (on: boolean) => void;
   setLabelsOn: (on: boolean) => void;
   setTimeMode: (mode: TimeMode) => void;
   setThemeId: (id: ThemeId) => void;
@@ -92,6 +96,8 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   monitors: [],
   monitorsLoaded: false,
   clawHealth: null,
+  statusPosterOn: true,
+  healthPosterOn: true,
   labelsOn: false,
   timeMode: "auto",
   themeId: loadThemeId(),
@@ -119,6 +125,8 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
   setMonitors: (monitors) => set({ monitors, monitorsLoaded: true }),
   setClawHealth: (clawHealth) => set({ clawHealth }),
+  setStatusPosterOn: (statusPosterOn) => set({ statusPosterOn }),
+  setHealthPosterOn: (healthPosterOn) => set({ healthPosterOn }),
   setLabelsOn: (labelsOn) => set({ labelsOn }),
   setTimeMode: (timeMode) => set({ timeMode }),
   setThemeId: (themeId) => {

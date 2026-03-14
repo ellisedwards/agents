@@ -243,7 +243,8 @@ function renderStatusPoster(
 function renderHealthPoster(
   ctx: CanvasRenderingContext2D,
   clawHealth: ClawHealth,
-  theme: SceneTheme
+  theme: SceneTheme,
+  posterX: number
 ) {
   // Match dimensions/style of the status poster (same height: 3 rows)
   const contentW = 3 * 3 + 1 + 2; // same as status poster
@@ -251,9 +252,7 @@ function renderHealthPoster(
   const pad = 2;
   const mount = theme.posterMount;
 
-  // Position: right of the existing status poster with a small gap
-  const statusTotalW = contentW + pad * 2 + 2;
-  const px = BUILDING_X + 33 + 5 + statusTotalW + 4;
+  const px = posterX;
   const py = BUILDING_Y + 3 + 5;
 
   const totalW = contentW + pad * 2 + 2;
@@ -758,15 +757,21 @@ export function renderScene(
   const deskCenters = DESK_POSITIONS.map((d) => ({ x: d.x, y: d.y }));
   drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride, theme);
 
-  // 4.5. Status poster on themed mount
-  if (monitors && monitors.length > 0) {
-    renderStatusPoster(ctx, monitors, theme);
+  // 4.5. Posters on the back wall
+  const { statusPosterOn, healthPosterOn } = useAgentOfficeStore.getState();
+  const clawHealth = useAgentOfficeStore.getState().clawHealth;
+  const posterBaseX = BUILDING_X + 33 + 5;
+  const posterContentW = 3 * 3 + 1 + 2;
+  const posterTotalW = posterContentW + 2 * 2 + 2; // contentW + pad*2 + border
+  const showStatusPoster = statusPosterOn && monitors && monitors.length > 0;
+
+  if (showStatusPoster) {
+    renderStatusPoster(ctx, monitors!, theme);
   }
 
-  // 4.55. Claw health poster
-  const clawHealth = useAgentOfficeStore.getState().clawHealth;
-  if (clawHealth) {
-    renderHealthPoster(ctx, clawHealth, theme);
+  if (healthPosterOn && clawHealth) {
+    const healthX = showStatusPoster ? posterBaseX + posterTotalW + 4 : posterBaseX;
+    renderHealthPoster(ctx, clawHealth, theme, healthX);
   }
 
   // 4.6. Obelisk (in-scene pixel tower)
@@ -775,63 +780,36 @@ export function renderScene(
     drawObelisk(ctx, theme, frame, timeOverride);
   }
 
-  // 4.7. Golden glow on laptop screens — synced to obelisk quadrants
+  // 4.7. Laptop glow synced to obelisk — only during "thinking" (no bubble visible)
   const towerInfo = getPixelTowerData();
   if (towerInfo.connected) {
     const topPixels = towerInfo.data.panels.top;
-    // Quadrant pixel indices in top panel (same order as renderer draws them)
-    const quadrantIndices = [
-      [0, 1, 5, 6],     // TL — slot 2
-      [3, 4, 8, 9],     // TR — slot 3
-      [15, 16, 20, 21], // BL — slot 0
-      [18, 19, 23, 24], // BR — slot 1
-    ];
-    // Check which quadrants are lit (any non-black pixel)
-    const litQuadrants = quadrantIndices.map((indices) =>
-      indices.some((i) => topPixels[i] !== "#000000")
-    );
-    // Map CC thinking agents to quadrants by desk order
-    const thinkingAtDesk = agents.filter(
-      (a) => a.state === "thinking" && a.source === "cc" && deskMap.has(a.id)
-    );
-    for (let qi = 0; qi < thinkingAtDesk.length && qi < 4; qi++) {
-      if (!litQuadrants[qi]) continue;
-      const agent = thinkingAtDesk[qi];
-      const pos = deskMap.get(agent.id);
-      if (!pos) continue;
-      const dx = pos.x;
-      const dy = pos.y;
-      // Average the quadrant's pixel colors for the glow tint
-      const indices = quadrantIndices[qi];
-      let rSum = 0, gSum = 0, bSum = 0, litCount = 0;
-      for (const i of indices) {
-        const c = topPixels[i];
-        if (c !== "#000000") {
-          rSum += parseInt(c.slice(1, 3), 16);
-          gSum += parseInt(c.slice(3, 5), 16);
-          bSum += parseInt(c.slice(5, 7), 16);
-          litCount++;
-        }
+    // All quadrant pixel indices in top panel
+    const allQuadrantPixels = [0, 1, 5, 6, 3, 4, 8, 9, 15, 16, 20, 21, 18, 19, 23, 24];
+    // Check if any quadrant pixel is lit
+    const anyLit = allQuadrantPixels.some((i) => topPixels[i] !== "#000000");
+    if (anyLit) {
+      // Apply bright golden glow to all CC agents in "thinking" state at their desk
+      for (const agent of agents) {
+        if (agent.source !== "cc" || agent.state !== "thinking") continue;
+        const pos = deskMap.get(agent.id);
+        if (!pos) continue;
+        const dx = pos.x;
+        const dy = pos.y;
+        // Radiance around laptop screen
+        ctx.globalAlpha = 0.1;
+        ctx.fillStyle = "#cc8800";
+        ctx.fillRect(dx + 2, dy + 1, 4, 4);
+        // Glow matching screen size (2x2 at dx+3, dy+2)
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = "#ddaa22";
+        ctx.fillRect(dx + 2, dy + 1, 3, 3);
+        // Golden screen (same 2x2 as original laptop pixel)
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = "#ffcc44";
+        ctx.fillRect(dx + 3, dy + 2, 2, 2);
+        ctx.globalAlpha = 1;
       }
-      if (litCount === 0) continue;
-      const avgR = Math.round(rSum / litCount);
-      const avgG = Math.round(gSum / litCount);
-      const avgB = Math.round(bSum / litCount);
-      const glowColor = `rgb(${avgR},${avgG},${avgB})`;
-      const brightColor = `rgb(${Math.min(255, avgR + 40)},${Math.min(255, avgG + 40)},${Math.min(255, avgB + 40)})`;
-      // Outer glow
-      ctx.globalAlpha = 0.2;
-      ctx.fillStyle = glowColor;
-      ctx.fillRect(dx + 1, dy - 1, 7, 7);
-      // Inner glow
-      ctx.globalAlpha = 0.45;
-      ctx.fillStyle = brightColor;
-      ctx.fillRect(dx + 2, dy, 5, 5);
-      // Bright screen
-      ctx.globalAlpha = 0.7;
-      ctx.fillStyle = brightColor;
-      ctx.fillRect(dx + 3, dy + 1, 3, 3);
-      ctx.globalAlpha = 1;
     }
   }
 
