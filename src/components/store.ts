@@ -10,7 +10,7 @@ export interface MonitorStatus {
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
 export type TowerSize = "small" | "medium" | "large";
-export type ThemeId = "forest" | "golden-ruins" | "mysterious-oasis" | "stark-monumental" | "tropical-island";
+export type ThemeId = "forest" | "golden-ruins" | "tropical-island";
 
 interface TowerPrefs {
   visible: boolean;
@@ -39,7 +39,7 @@ function saveTowerPrefs(prefs: TowerPrefs) {
 }
 
 const THEME_STORAGE_KEY = "agent-office-theme";
-const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "mysterious-oasis", "stark-monumental", "tropical-island"];
+const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "tropical-island"];
 
 function loadThemeId(): ThemeId {
   if (typeof window === "undefined") return "forest";
