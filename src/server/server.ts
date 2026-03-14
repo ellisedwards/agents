@@ -99,16 +99,28 @@ app.get("/api/brightness/:level", async (req, res) => {
 // --- Claw health ---
 app.get("/api/claw-health", async (_req, res) => {
   try {
-    const r = await fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) });
-    if (!r.ok) return res.json({ reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
-    const data = await r.json();
-    const slots = data.agent_slots?.slots || [];
+    const [statusRes, pixelsRes] = await Promise.all([
+      fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) }),
+      fetch(`${claw}/pixels`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+    ]);
+    if (!statusRes.ok) return res.json({ reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
+    const data = await statusRes.json();
+    // Derive slot status from actual pixel data (source of truth)
+    const quadrantIndices = [[15,16,20,21],[18,19,23,24],[0,1,5,6],[3,4,8,9]];
+    let slots = data.agent_slots?.slots || ["off","off","off","off"];
+    if (pixelsRes?.ok) {
+      const px = await pixelsRes.json();
+      const top = px.panels?.top || [];
+      slots = quadrantIndices.map((indices: number[]) =>
+        indices.some((i: number) => top[i] && top[i] !== "#000000") ? "active" : "off"
+      );
+    }
     res.json({
       reachable: true,
       yeelightConnected: data.connected === true,
       slots,
       activeSlots: slots.filter((s: string) => s !== "off").length,
-      matrixMode: data.claw_activity?.claw_activity || data.claw_activity || null,
+      matrixMode: data.claw_activity || null,
       brightness: data.brightness ?? null,
       animationRunning: data.animation_running ?? false,
     });

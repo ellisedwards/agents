@@ -133,7 +133,14 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
     // Merge: use incoming data, but keep recently-seen agents that
     // briefly disappeared (grace period prevents flicker from transient poll gaps)
     const graceMs = 5000;
-    const merged: AgentState[] = [...incoming];
+    const staleMs = 30000;
+    const merged: AgentState[] = incoming.map((a) => {
+      // If agent hasn't updated in 30s, treat as idle
+      if (now - a.lastActivity > staleMs && a.state !== "idle") {
+        return { ...a, state: "idle" as const, currentTool: null };
+      }
+      return a;
+    });
     for (const old of prev) {
       if (!incomingMap.has(old.id) && now - old.lastActivity < graceMs) {
         merged.push(old);
