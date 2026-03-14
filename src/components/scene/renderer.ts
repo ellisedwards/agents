@@ -141,6 +141,22 @@ function renderStatusPoster(
     ctx.fillStyle = mount.colorDark;
     ctx.fillRect(mx + 1, my - 1, 2, 2);
     ctx.fillRect(mx + totalW - 3, my - 1, 2, 2);
+  } else if (mount.style === "metal-panel") {
+    // Metal panel on a thin post
+    // Post
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + Math.floor(totalW / 2), my + totalH, 2, 6);
+    // Metal plate
+    ctx.fillStyle = mount.color;
+    ctx.fillRect(mx, my, totalW, totalH);
+    ctx.fillStyle = mount.colorLight;
+    ctx.fillRect(mx, my, totalW, 1);
+    // Bolt dots at corners
+    ctx.fillStyle = mount.colorDark;
+    ctx.fillRect(mx + 1, my + 1, 1, 1);
+    ctx.fillRect(mx + totalW - 2, my + 1, 1, 1);
+    ctx.fillRect(mx + 1, my + totalH - 2, 1, 1);
+    ctx.fillRect(mx + totalW - 2, my + totalH - 2, 1, 1);
   } else {
     // Driftwood — weathered plank on angled stick
     // Angled support stick
@@ -445,6 +461,22 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
     ctx.fillStyle = fern2;
     ctx.fillRect(ox - 1, baseY - 8, 1, 3);
     ctx.fillRect(ox + slabW, baseY - 7, 1, 3);
+  }
+
+  // Lunar base: footprints in the dust approaching the monolith
+  if (theme.id === "lunar-base") {
+    const baseY = oy + slabH;
+    const baseCX = cx;
+    ctx.fillStyle = "#505058";
+    const prints = [
+      { dx: 18, dy: 6 }, { dx: 16, dy: 5 },
+      { dx: 13, dy: 4 }, { dx: 11, dy: 3 },
+      { dx: 8, dy: 3 }, { dx: 6, dy: 2 },
+    ];
+    for (const p of prints) {
+      ctx.fillRect(baseCX + p.dx, baseY + p.dy, 2, 1);
+      ctx.fillRect(baseCX + p.dx + 1, baseY + p.dy + 1, 2, 1);
+    }
   }
 
   // Stone base (slightly wider)

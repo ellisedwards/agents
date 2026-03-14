@@ -56,7 +56,25 @@ function drawSky(ctx: CanvasRenderingContext2D, tod: TimeOfDay, theme: SceneThem
   rect(ctx, 0, 8, W, 8, sky[1]);
   rect(ctx, 0, 16, W, 10, sky[2]);
 
-  if (tod === "night" && theme.drawStarsAtNight) {
+  // Earth rise — lunar-base only
+  if (theme.id === "lunar-base") {
+    const ex = W - 60;
+    const ey = 8;
+    ctx.globalAlpha = 0.15;
+    rect(ctx, ex - 2, ey - 2, 10, 10, "#4488cc");
+    ctx.globalAlpha = 1;
+    rect(ctx, ex, ey, 6, 6, "#226644");
+    rect(ctx, ex, ey, 6, 3, "#4488cc");
+    rect(ctx, ex + 1, ey + 2, 2, 2, "#338855");
+    rect(ctx, ex + 4, ey + 3, 1, 2, "#338855");
+    px(ctx, ex + 1, ey, "#ccddee");
+    px(ctx, ex + 2, ey, "#ccddee");
+    px(ctx, ex + 3, ey, "#ccddee");
+    px(ctx, ex + 4, ey, "#ccddee");
+  }
+
+  // Stars — always visible on lunar-base (no atmosphere), otherwise night only
+  if ((tod === "night" && theme.drawStarsAtNight) || theme.id === "lunar-base") {
     seed = 777;
     for (let i = 0; i < theme.starCount; i++) {
       px(ctx, Math.floor(srand() * W), Math.floor(srand() * 18), "#ffffff");
@@ -432,6 +450,26 @@ function drawDesertBush(ctx: CanvasRenderingContext2D, x: number, gy: number, va
   }
 }
 
+function drawBoulder(ctx: CanvasRenderingContext2D, x: number, gy: number, variant: number, theme: SceneTheme) {
+  const c = theme.vegetation.colors;
+  const v = variant % 3;
+  if (v === 0) {
+    // Large angular boulder
+    rect(ctx, x - 3, gy - 5, 6, 5, c.trunk);
+    rect(ctx, x - 2, gy - 5, 5, 1, c.trunkLight);
+    rect(ctx, x - 3, gy - 1, 6, 1, c.leaf1);
+    rect(ctx, x - 2, gy - 4, 4, 3, c.trunk);
+  } else if (v === 1) {
+    // Medium rounded rock
+    rect(ctx, x - 2, gy - 3, 4, 3, c.trunk);
+    rect(ctx, x - 1, gy - 3, 3, 1, c.trunkLight);
+  } else {
+    // Small pebble cluster
+    rect(ctx, x - 1, gy - 2, 2, 2, c.trunk);
+    rect(ctx, x + 2, gy - 1, 2, 1, c.leaf2);
+  }
+}
+
 function drawVegetation(ctx: CanvasRenderingContext2D, x: number, gy: number, variant: number, theme: SceneTheme) {
   switch (theme.vegetation.type) {
     case "trees":
@@ -449,6 +487,9 @@ function drawVegetation(ctx: CanvasRenderingContext2D, x: number, gy: number, va
       if (variant % 4 === 0) drawPalmTree(ctx, x, gy, variant, theme);
       else if (variant % 4 === 1) drawCactus(ctx, x, gy, variant, theme);
       else drawDesertBush(ctx, x, gy, variant, theme);
+      break;
+    case "boulders":
+      if (variant % 2 === 0) drawBoulder(ctx, x, gy, variant, theme);
       break;
   }
 }
@@ -551,6 +592,29 @@ function drawFireVessel(ctx: CanvasRenderingContext2D, fpx: number, fpy: number,
     rect(ctx, fpx + 3, fpy + 8, 18, 1, fv.mantleColor);
     px(ctx, fpx + 3, fpy + 9, fv.mantleLight);
     px(ctx, fpx + 20, fpy + 9, fv.mantleLight);
+  } else if (fv.style === "reactor") {
+    // Reactor power core — metallic housing with cyan energy cell
+    rect(ctx, fpx + 3, fpy + 8, 18, 14, fv.stoneDark);
+    rect(ctx, fpx + 4, fpy + 8, 16, 13, fv.stoneColor);
+    rect(ctx, fpx + 4, fpy + 8, 16, 1, fv.stoneLight);
+    // Panel lines
+    rect(ctx, fpx + 4, fpy + 14, 16, 1, fv.stoneBrick);
+    rect(ctx, fpx + 11, fpy + 9, 1, 12, fv.stoneBrick);
+    // Cyan energy cell
+    const glow = 0.6 + 0.3 * Math.sin(frame * 0.06);
+    ctx.globalAlpha = glow;
+    rect(ctx, fpx + 6, fpy + 10, 5, 3, fv.interiorColor);
+    rect(ctx, fpx + 13, fpy + 10, 5, 3, fv.interiorColor);
+    rect(ctx, fpx + 7, fpy + 15, 3, 4, fv.interiorDeep);
+    rect(ctx, fpx + 14, fpy + 15, 3, 4, fv.interiorDeep);
+    ctx.globalAlpha = 1;
+    // Top vent
+    rect(ctx, fpx + 2, fpy + 6, 20, 3, fv.mantleColor);
+    rect(ctx, fpx + 2, fpy + 6, 20, 1, fv.mantleLight);
+    // Cyan glow on ground
+    const cyanGlow = 0.03 + 0.02 * Math.sin(frame * 0.06);
+    rect(ctx, fpx - 2, fpy + 22, 28, 6, `rgba(34,170,204,${cyanGlow.toFixed(3)})`);
+    return; // skip the default orange glow below
   } else {
     // Fire pit — stone ring on ground
     rect(ctx, fpx + 3, fpy + 14, 18, 10, fv.stoneColor);
