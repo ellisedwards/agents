@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execFile } from "child_process";
 import { loadConfig, clawBaseUrl } from "./config";
 import { createWatcher } from "./agents/watcher-singleton";
 import type { AgentState } from "../shared/types";
@@ -83,13 +84,34 @@ app.get("/api/claw-health", async (_req, res) => {
 // --- Relay ---
 app.get("/api/relay", async (_req, res) => {
   try {
-    const r = await fetch(`${claw}/relay/reply`, { signal: AbortSignal.timeout(2000) });
-    if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
-    res.json(await r.json());
+    const [outRes, inRes] = await Promise.all([
+      fetch(`${claw}/relay`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+      fetch(`${claw}/relay/reply`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+    ]);
+    const outData = outRes?.ok ? await outRes.json() : { messages: [] };
+    const inData = inRes?.ok ? await inRes.json() : { replies: [] };
+    // Normalize into unified format
+    const messages = [
+      ...(outData.messages || []).filter((m: any) => m.msg).map((m: any) => ({ from: m.from || "agent-office", msg: m.msg, time: m.time })),
+      ...(inData.replies || []).map((m: any) => ({ from: "claw", msg: m.msg, time: m.time })),
+    ].sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    res.json({ messages, count: messages.length });
   } catch (e) {
     console.error("[proxy] /api/relay error:", e);
     res.status(502).json({ error: "claw unreachable" });
   }
+});
+
+// --- Tower reset ---
+app.post("/api/tower-reset", (_req, res) => {
+  execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "ellis@192.168.50.40", "~/clawd/scripts/tower-reset"], { timeout: 15000 }, (err, stdout, stderr) => {
+    if (err) {
+      console.error("[tower-reset] error:", err.message, stderr);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+    console.log("[tower-reset] done:", stdout);
+    res.json({ ok: true, output: stdout.trim() });
+  });
 });
 
 // --- Claw proxy endpoints ---

@@ -13,8 +13,8 @@ export function useRelay() {
         const res = await fetch(ENDPOINT);
         if (!res.ok) return;
         const data = await res.json();
-        if (Array.isArray(data.replies)) {
-          setRelayMessages(data.replies as RelayMessage[]);
+        if (Array.isArray(data.messages)) {
+          setRelayMessages(data.messages as RelayMessage[]);
         }
       } catch (e) {
         console.debug("[relay] Failed to fetch:", e);

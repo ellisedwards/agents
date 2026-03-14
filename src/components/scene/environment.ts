@@ -884,14 +884,28 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
         }
       }
     } else {
-      rect(ctx, bx + 3, fy, bw - 6, fh, b.floorColor1);
-      for (let row = 0; row < fh; row += 3) {
-        for (let col = 0; col < bw - 6; col += 3) {
-          rect(ctx, bx + 3 + col, fy + row, 3, 3, (col / 3 + row / 3) % 2 === 0 ? b.floorColor1 : b.floorColor2);
+      // Carpet covering entire floor
+      const cx = bx + 3;
+      const cw = bw - 6;
+      rect(ctx, cx, fy, cw, fh, "#5e586e");
+
+      // Top edge highlight
+      rect(ctx, cx, fy, cw, 2, "#666080");
+      rect(ctx, cx, fy, cw, 1, "#6a6484");
+
+      // Subtle color flecks throughout
+      let fleckSeed = 12345;
+      const nextFleck = () => { fleckSeed = (fleckSeed * 16807 + 11) & 0x7fffffff; return fleckSeed; };
+      const fleckColors = ["#6a6482", "#625c76", "#5a5470", "#685e7e", "#564e68", "#6e657a"];
+      for (let y = fy + 2; y < fy + fh; y++) {
+        for (let x = cx; x < cx + cw; x++) {
+          const r = nextFleck();
+          if (r % 7 === 0) {
+            ctx.fillStyle = fleckColors[r % fleckColors.length];
+            ctx.fillRect(x, y, 1, 1);
+          }
         }
       }
-      rect(ctx, bx + 3, fy, bw - 6, 2, b.floorEdge1);
-      rect(ctx, bx + 3, fy, bw - 6, 1, b.floorEdge2);
     }
   }
 
@@ -943,6 +957,92 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     ctx.lineTo(guitarX + 3, fy);
     ctx.lineTo(ampX + 9, ampY);
     ctx.stroke();
+  }
+
+  // Tropical island decorations
+  if (theme.id === "tropical-island") {
+    // Skeleton half-buried in sand — right side where guitar/amp would be
+    const skx = bx + bw - 20;
+    const sky = fy + 4;
+    // Skull
+    ctx.fillStyle = "#e8e0d0";
+    ctx.fillRect(skx + 1, sky, 4, 3);
+    ctx.fillRect(skx, sky + 1, 6, 2);
+    ctx.fillStyle = "#d8d0c0";
+    ctx.fillRect(skx + 1, sky + 3, 4, 1); // jaw
+    // Eye sockets
+    ctx.fillStyle = "#2a2218";
+    ctx.fillRect(skx + 1, sky + 1, 1, 1);
+    ctx.fillRect(skx + 4, sky + 1, 1, 1);
+    // Nose
+    ctx.fillStyle = "#3a3228";
+    ctx.fillRect(skx + 3, sky + 2, 1, 1);
+    // Ribs poking out of sand
+    ctx.fillStyle = "#d8d0c0";
+    ctx.fillRect(skx + 2, sky + 5, 5, 1);
+    ctx.fillRect(skx + 3, sky + 7, 4, 1);
+    ctx.fillRect(skx + 4, sky + 9, 3, 1);
+    ctx.fillStyle = "#c8c0b0";
+    ctx.fillRect(skx + 1, sky + 6, 1, 1);
+    ctx.fillRect(skx + 2, sky + 8, 1, 1);
+    // Arm bone reaching out
+    ctx.fillStyle = "#e0d8c8";
+    ctx.fillRect(skx - 2, sky + 4, 3, 1);
+    ctx.fillRect(skx - 4, sky + 3, 2, 1);
+    // Hand bones
+    ctx.fillStyle = "#d0c8b8";
+    ctx.fillRect(skx - 5, sky + 2, 1, 1);
+    ctx.fillRect(skx - 5, sky + 4, 1, 1);
+    ctx.fillRect(skx - 6, sky + 3, 1, 1);
+    // Sand partially covering
+    ctx.fillStyle = "#d4c490";
+    ctx.fillRect(skx + 1, sky + 10, 6, 2);
+    ctx.fillRect(skx + 3, sky + 9, 1, 1);
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = "#d4c490";
+    ctx.fillRect(skx + 5, sky + 7, 2, 2);
+    ctx.fillRect(skx + 2, sky + 4, 1, 1);
+    ctx.globalAlpha = 1;
+
+    // Shipwreck on the water — lower right
+    const swx = bx + bw + 12;
+    const swy = fy + fh + 4;
+    // Hull
+    ctx.fillStyle = "#5a3a1a";
+    ctx.fillRect(swx, swy + 2, 14, 4);
+    ctx.fillRect(swx + 1, swy + 1, 12, 1);
+    ctx.fillRect(swx + 2, swy, 10, 1);
+    ctx.fillStyle = "#4a2a10";
+    ctx.fillRect(swx, swy + 5, 14, 1);
+    ctx.fillRect(swx - 1, swy + 6, 16, 1);
+    // Hull highlight
+    ctx.fillStyle = "#6a4a2a";
+    ctx.fillRect(swx + 2, swy + 1, 10, 1);
+    // Plank lines
+    ctx.fillStyle = "#4a2a10";
+    ctx.fillRect(swx + 1, swy + 3, 12, 1);
+    // Broken mast
+    ctx.fillStyle = "#5a4020";
+    ctx.fillRect(swx + 5, swy - 6, 2, 8);
+    ctx.fillStyle = "#4a3018";
+    ctx.fillRect(swx + 5, swy - 6, 1, 1);
+    // Tilted — mast leans right
+    ctx.fillStyle = "#5a4020";
+    ctx.fillRect(swx + 7, swy - 7, 1, 2);
+    ctx.fillRect(swx + 8, swy - 8, 1, 2);
+    // Torn sail remnant
+    ctx.fillStyle = "#c8c0a8";
+    ctx.fillRect(swx + 7, swy - 5, 3, 3);
+    ctx.fillRect(swx + 7, swy - 4, 4, 2);
+    ctx.fillStyle = "#b8b098";
+    ctx.fillRect(swx + 9, swy - 3, 2, 1);
+    // Water lapping at hull
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = "#44aacc";
+    ctx.fillRect(swx - 1, swy + 5, 2, 1);
+    ctx.fillRect(swx + 13, swy + 4, 2, 1);
+    ctx.fillRect(swx - 2, swy + 7, 18, 1);
+    ctx.globalAlpha = 1;
   }
 
   // Wall clock

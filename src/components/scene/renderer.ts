@@ -744,9 +744,10 @@ export function renderScene(
   const deskEligible = agents.filter((a) => a.state !== "lounging" && a.state !== "departing");
   const deskMap = assignDesks(deskEligible.map((a) => a.id));
 
-  // 3. Determine which desk indices are occupied
+  // 3. Determine which desk indices have laptops (main agents only, not subagents/mages)
   const occupiedDeskIndices = new Set<number>();
   for (const agent of deskEligible) {
+    if (agent.subagentClass !== null && agent.subagentClass !== undefined) continue;
     const pos = deskMap.get(agent.id);
     if (!pos) continue;
     const idx = DESK_POSITIONS.indexOf(pos);
@@ -1016,11 +1017,8 @@ export function renderScene(
     const catWalkSprite = getWalkSpriteState(catWalkState);
     let catSprite = catWalkState.startledFrames > 0 ? "startled" : (catWalkSprite ?? "idle");
 
-    // Space cat: use regular cat sprite (no helmet) when sleeping
+    // Space cat now has its own sleep sprite — no fallback needed
     let catSpriteKey: string = theme.petType;
-    if (isSpaceCat && catSprite === "sleep") {
-      catSpriteKey = "cat";
-    }
 
     // Small vertical jump during first half of startle
     const startledJump = catWalkState.startledFrames > 30 ? -2 : 0;

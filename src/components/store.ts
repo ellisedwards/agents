@@ -9,6 +9,7 @@ export interface MonitorStatus {
 }
 
 export interface RelayMessage {
+  from: string;
   msg: string;
   time: string;
 }
@@ -70,7 +71,7 @@ interface AgentOfficeStore {
   statusPosterOn: boolean;
   healthPosterOn: boolean;
   relayMessages: RelayMessage[];
-  relayUnread: number;
+  relaySeenCount: number;
   labelsOn: boolean;
   timeMode: TimeMode;
   themeId: ThemeId;
@@ -86,7 +87,7 @@ interface AgentOfficeStore {
   setStatusPosterOn: (on: boolean) => void;
   setHealthPosterOn: (on: boolean) => void;
   setRelayMessages: (messages: RelayMessage[]) => void;
-  clearRelayUnread: () => void;
+  markRelaySeen: () => void;
   setLabelsOn: (on: boolean) => void;
   setTimeMode: (mode: TimeMode) => void;
   setThemeId: (id: ThemeId) => void;
@@ -108,7 +109,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   statusPosterOn: true,
   healthPosterOn: true,
   relayMessages: [],
-  relayUnread: 0,
+  relaySeenCount: (() => { try { return parseInt(localStorage.getItem("relay-seen") || "0", 10); } catch { return 0; } })(),
   labelsOn: false,
   timeMode: "auto",
   themeId: loadThemeId(),
@@ -138,12 +139,12 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setClawHealth: (clawHealth) => set({ clawHealth }),
   setStatusPosterOn: (statusPosterOn) => set({ statusPosterOn }),
   setHealthPosterOn: (healthPosterOn) => set({ healthPosterOn }),
-  setRelayMessages: (relayMessages) => {
-    const prev = get().relayMessages;
-    const newCount = relayMessages.length - prev.length;
-    set({ relayMessages, relayUnread: newCount > 0 ? get().relayUnread + newCount : get().relayUnread });
+  setRelayMessages: (relayMessages) => set({ relayMessages }),
+  markRelaySeen: () => {
+    const count = get().relayMessages.length;
+    set({ relaySeenCount: count });
+    try { localStorage.setItem("relay-seen", String(count)); } catch {}
   },
-  clearRelayUnread: () => set({ relayUnread: 0 }),
   setLabelsOn: (labelsOn) => set({ labelsOn }),
   setTimeMode: (timeMode) => set({ timeMode }),
   setThemeId: (themeId) => {

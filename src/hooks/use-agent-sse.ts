@@ -15,13 +15,19 @@ export function useAgentSSE(enabled: boolean) {
     setConnectionStatus("connecting");
     const es = new EventSource("/api/agents");
 
-    es.onopen = () => setConnectionStatus("connected");
+    let staleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    es.onopen = () => {
+      setConnectionStatus("connected");
+      if (staleTimer) { clearTimeout(staleTimer); staleTimer = null; }
+    };
 
     es.onmessage = (event) => {
       try {
         const agents: AgentState[] = JSON.parse(event.data);
         setAgents(agents);
         setConnectionStatus("connected");
+        if (staleTimer) { clearTimeout(staleTimer); staleTimer = null; }
       } catch {
         // Ignore malformed messages
       }
@@ -29,7 +35,10 @@ export function useAgentSSE(enabled: boolean) {
 
     es.onerror = () => {
       setConnectionStatus("disconnected");
-      // EventSource auto-reconnects
+      // Clear stale agents after 5s of disconnect so they don't freeze
+      if (!staleTimer) {
+        staleTimer = setTimeout(() => setAgents([]), 5000);
+      }
     };
 
     return () => es.close();
