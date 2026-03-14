@@ -9,7 +9,7 @@ import {
   type CanvasTransform,
 } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
-import { getAgentPosition, getCatPosition, pokeCat, triggerFloat } from "../scene/renderer";
+import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds } from "../scene/renderer";
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
 
@@ -102,6 +102,14 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         e.clientX - rect.left,
         e.clientY - rect.top
       );
+      // Health poster click
+      const hpb = getHealthPosterBounds();
+      if (hpb && canvasPos.x >= hpb.x && canvasPos.x <= hpb.x + hpb.w &&
+          canvasPos.y >= hpb.y && canvasPos.y <= hpb.y + hpb.h) {
+        useAgentOfficeStore.getState().toggleClawDetail();
+        return;
+      }
+      // Cat click
       const catPos = getCatPosition();
       if (catPos) {
         const dx = canvasPos.x - catPos.x;

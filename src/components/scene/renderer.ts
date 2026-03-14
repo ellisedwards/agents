@@ -126,6 +126,21 @@ interface DrawableEntity {
   source: string;
 }
 
+/** Get health poster bounds for click hit-testing */
+export function getHealthPosterBounds(): { x: number; y: number; w: number; h: number } | null {
+  const { healthPosterOn, statusPosterOn, clawHealth } = useAgentOfficeStore.getState();
+  if (!healthPosterOn || !clawHealth) return null;
+  const posterBaseX = BUILDING_X + 33 + 5;
+  const contentW = 3 * 3 + 1 + 2;
+  const pad = 2;
+  const totalW = contentW + pad * 2 + 2;
+  const totalH = (3 * 4 - 2) + pad * 2 + 2;
+  const monitors = useAgentOfficeStore.getState().monitors;
+  const showStatus = statusPosterOn && monitors.length > 0;
+  const px = showStatus ? posterBaseX + totalW + 4 : posterBaseX;
+  return { x: px - pad - 1, y: BUILDING_Y + 3 + 5 - pad - 1, w: totalW, h: totalH };
+}
+
 // Status poster — on the back wall near the fireplace
 const STATUS_UP = "#22c55e";
 const STATUS_DOWN = "#ef4444";

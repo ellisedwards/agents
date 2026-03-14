@@ -6,6 +6,36 @@ import { loadConfig, clawBaseUrl } from "./config";
 import { createWatcher } from "./agents/watcher-singleton";
 import type { AgentState } from "../shared/types";
 
+// --- Auto-recovery: reconnect matrix if socket dies ---
+let lastMatrixConnected = true;
+let autoRecoveryInProgress = false;
+
+function checkAndAutoRecover(claw: string) {
+  setInterval(async () => {
+    if (autoRecoveryInProgress) return;
+    try {
+      const r = await fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) });
+      if (!r.ok) return;
+      const data = await r.json();
+      const connected = data.connected === true;
+      if (!connected && lastMatrixConnected) {
+        console.log("[auto-recovery] Matrix socket died, attempting reconnect...");
+        autoRecoveryInProgress = true;
+        execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "ellis@192.168.50.40",
+          "curl -s -X POST http://localhost:9999/matrix/reconnect"], { timeout: 10000 },
+          (err, stdout) => {
+            autoRecoveryInProgress = false;
+            if (err) console.error("[auto-recovery] Failed:", err.message);
+            else console.log("[auto-recovery] Reconnect result:", stdout.trim());
+          });
+      }
+      lastMatrixConnected = connected;
+    } catch {
+      // claw unreachable — nothing to recover
+    }
+  }, 10000); // check every 10s
+}
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const config = loadConfig();
 const claw = clawBaseUrl(config);
@@ -70,14 +100,20 @@ app.get("/api/brightness/:level", async (req, res) => {
 app.get("/api/claw-health", async (_req, res) => {
   try {
     const r = await fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) });
-    if (!r.ok) return res.json({ reachable: false, yeelightConnected: false });
+    if (!r.ok) return res.json({ reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
     const data = await r.json();
+    const slots = data.agent_slots?.slots || [];
     res.json({
       reachable: true,
       yeelightConnected: data.connected === true,
+      slots,
+      activeSlots: slots.filter((s: string) => s !== "off").length,
+      matrixMode: data.claw_activity?.claw_activity || data.claw_activity || null,
+      brightness: data.brightness ?? null,
+      animationRunning: data.animation_running ?? false,
     });
   } catch {
-    res.json({ reachable: false, yeelightConnected: false });
+    res.json({ reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
   }
 });
 
@@ -146,6 +182,7 @@ app.get("*", (_req, res) => {
 
 // --- Start ---
 watcher.start();
+checkAndAutoRecover(claw);
 app.listen(config.port, () => {
   console.log(`Agent Office running at http://localhost:${config.port}`);
 });

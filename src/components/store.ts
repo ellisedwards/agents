@@ -17,6 +17,11 @@ export interface RelayMessage {
 export interface ClawHealth {
   reachable: boolean;
   yeelightConnected: boolean;
+  slots: string[];
+  activeSlots: number;
+  matrixMode: string | null;
+  brightness?: number | null;
+  animationRunning?: boolean;
 }
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
@@ -70,6 +75,7 @@ interface AgentOfficeStore {
   clawHealth: ClawHealth | null;
   statusPosterOn: boolean;
   healthPosterOn: boolean;
+  clawDetailOpen: boolean;
   relayMessages: RelayMessage[];
   relaySeenCount: number;
   labelsOn: boolean;
@@ -86,6 +92,7 @@ interface AgentOfficeStore {
   setClawHealth: (health: ClawHealth) => void;
   setStatusPosterOn: (on: boolean) => void;
   setHealthPosterOn: (on: boolean) => void;
+  toggleClawDetail: () => void;
   setRelayMessages: (messages: RelayMessage[]) => void;
   markRelaySeen: () => void;
   setLabelsOn: (on: boolean) => void;
@@ -108,6 +115,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   clawHealth: null,
   statusPosterOn: true,
   healthPosterOn: true,
+  clawDetailOpen: false,
   relayMessages: [],
   relaySeenCount: (() => { try { return parseInt(localStorage.getItem("relay-seen") || "0", 10); } catch { return 0; } })(),
   labelsOn: false,
@@ -139,6 +147,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setClawHealth: (clawHealth) => set({ clawHealth }),
   setStatusPosterOn: (statusPosterOn) => set({ statusPosterOn }),
   setHealthPosterOn: (healthPosterOn) => set({ healthPosterOn }),
+  toggleClawDetail: () => set({ clawDetailOpen: !get().clawDetailOpen }),
   setRelayMessages: (relayMessages) => set({ relayMessages }),
   markRelaySeen: () => {
     const count = get().relayMessages.length;
