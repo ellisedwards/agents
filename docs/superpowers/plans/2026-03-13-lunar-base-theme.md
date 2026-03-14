@@ -1,6 +1,6 @@
 # Lunar Base Theme Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Status: COMPLETE** — All tasks implemented and shipped. Footprints (Task 6) were removed after user review.
 
 **Goal:** Add a "Lunar Base" theme — Apollo-realism style moon surface with Earth rise, reactor core, boulders, and the 2001 monolith.
 

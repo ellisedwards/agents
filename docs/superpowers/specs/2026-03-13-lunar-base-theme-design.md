@@ -1,5 +1,7 @@
 # Lunar Base Theme — Design Spec
 
+**Status: IMPLEMENTED** — All items shipped. Footprints were removed after review.
+
 ## Overview
 
 A new "Lunar Base" theme for Agent Office inspired by Apollo-era realism. Stark grey moon surface, black sky with Earth rise, total desolation. The obelisk becomes the 2001 monolith.

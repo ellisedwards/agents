@@ -1,8 +1,24 @@
 # Agent Office Improvements — Design Spec
 
-Future features for agent office. Current themes: Forest, Golden Ruins, Tropical Island.
+Future features for agent office.
+
+Current themes: Forest, Golden Ruins, Tropical Island, Lunar Base.
+
+Recent work (2026-03-13):
+- Obelisk monolith mode: invisible when idle, lights up on activity, static white overlay, 25% brightness boost
+- Per-pixel sand noise for island and desert grounds (no grid tiles)
+- Elliptical island shape with asymmetric corners and beachy front shoreline
+- Theme-specific obelisk surrounds: worship stones (island), Egyptian ruins (desert)
+- Lunar Base theme: black sky, Earth rise, grey regolith, boulders, reactor core, metal-panel poster mount
+- Teleport beam effect for agent wander→desk transitions
+- Fixed agent disappearing during walks (missing walk sprites — fallback to idle)
+- Smooth position lerp and SSE grace period to prevent agent flicker
+- Cat poke to wake from sleep
+- Removed chairs from island/desert/lunar, clock from forest
 
 Five independent features: C (glass panels), D (smooth time transitions), E (reconnection), F (custom themes), A (agent materialization).
+
+**Status:** A (agent materialization) is partially implemented — teleport beam effect exists for wander→desk transitions. The full arrival materialization (shimmer column for new agents) is not yet built.
 
 ## C. Glass Panels Reflect Current Theme Outside
 
@@ -43,6 +59,7 @@ Five independent features: C (glass panels), D (smooth time transitions), E (rec
 - Client SSE: relies on browser EventSource auto-reconnect (no backoff, no heartbeat)
 - Server → OpenClaw polling: 2s interval, 1.5s timeout, silent failure marks agent unreachable. No backoff.
 - Proxy endpoints (`/api/pixels`, `/api/uptime-kuma`): 2s timeout, returns 502 on failure. No retry.
+- **Partial fix in place:** Client-side `setAgents` now merges with a 5s grace period to prevent transient poll gaps from removing agents.
 
 **Design:** Two layers of resilience.
 
@@ -93,7 +110,9 @@ Five independent features: C (glass panels), D (smooth time transitions), E (rec
 
 ## A. Agent Materialization (Arrival Animation)
 
-**Current state:** Agents appear instantly at their desk position when they first show up in the SSE stream. Departure has a poof animation. Arrival has nothing.
+**Current state:** Agents appear instantly at their desk position when they first show up in the SSE stream. Departure has a poof animation. A teleport beam effect exists for wander→desk transitions (beam-up particles at source, beam-down at desk with fade-in).
+
+**Remaining work:** The full arrival materialization for brand-new agents (shimmer column for first appearance) is not yet built.
 
 **Design:** Star Trek transporter-style materialization — agent fades in with a shimmering column effect.
 
@@ -117,10 +136,10 @@ Five independent features: C (glass panels), D (smooth time transitions), E (rec
 
 ## Implementation Order
 
-1. **E (reconnection)** — fixes real bugs, standalone
+1. **E (reconnection)** — fixes real bugs, standalone (partial: grace period done)
 2. **D (lerping)** — small, self-contained, immediate visual improvement
 3. **C (glass panels)** — removes code, simplifies theme type
 4. **F (custom themes)** — depends on C being done (simplified theme type)
-5. **A (materialization)** — purely additive, can land anytime
+5. **A (materialization)** — partially done (teleport beam), arrival shimmer remaining
 
 Each feature is independent except F benefits from C simplifying the theme schema first.
