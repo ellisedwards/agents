@@ -9,7 +9,7 @@ export interface MonitorStatus {
 }
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
-export type TowerSize = "small" | "medium" | "large";
+export type TowerSize = "small" | "medium" | "large" | "obelisk";
 export type ThemeId = "forest" | "golden-ruins" | "tropical-island";
 
 interface TowerPrefs {

@@ -11,7 +11,7 @@ import {
   type WalkState,
   type AvoidZone,
 } from "./walking";
-import type { MonitorStatus } from "../store";
+import { useAgentOfficeStore, type MonitorStatus } from "../store";
 
 // Walk states persist across frames
 const walkStates = new Map<string, WalkState>();
@@ -180,9 +180,386 @@ function renderStatusPoster(
   }
 }
 
-import type { TimeOfDay } from "./environment";
+import { getTimeOfDay, type TimeOfDay } from "./environment";
 import type { SceneTheme } from "./themes/types";
 import { forestTheme } from "./themes/forest";
+import { getPixelTowerData } from "@/hooks/use-pixel-tower";
+
+const OBELISK_COLS = 5;
+const OBELISK_ROWS = 5;
+const OBELISK_DOT = 2;    // each pixel dot is 2x2 canvas pixels
+const OBELISK_GAP = 1;    // 1px gap between dots
+const OBELISK_PAD = 2;    // padding inside the slab
+const OBELISK_PANEL_GAP = 3; // gap between panels
+
+function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: number, timeOverride?: TimeOfDay) {
+  const { data, connected } = getPixelTowerData();
+  if (!connected) return;
+
+  const dotStep = OBELISK_DOT + OBELISK_GAP;
+  const panelW = OBELISK_COLS * dotStep - OBELISK_GAP;
+  const panelH = OBELISK_ROWS * dotStep - OBELISK_GAP;
+  const slabW = panelW + OBELISK_PAD * 2;
+  const slabH = 3 * panelH + 2 * OBELISK_PANEL_GAP + OBELISK_PAD * 2;
+
+  // Centered along back wall, towers above it
+  const cx = Math.floor(BUILDING_X + BUILDING_W / 2) - 3;
+  const ox = cx - Math.floor(slabW / 2);
+  const oy = BUILDING_Y - slabH + 29; // top extends above the back wall
+
+
+  // Tropical island: worship stones around the base
+  if (theme.id === "tropical-island") {
+    const baseY = oy + slabH;
+    const baseCX = cx;
+    const stoneColors = ["#8a7a60", "#7a6a50", "#6a5a40", "#9a8a70", "#857560"];
+    const stoneHighlight = "#a09078";
+    const stones = [
+      { dx: -12, dy: 4, w: 4, h: 3 }, { dx: -7, dy: 6, w: 3, h: 2 },
+      { dx: -1, dy: 7, w: 4, h: 3 }, { dx: 6, dy: 6, w: 3, h: 2 },
+      { dx: 10, dy: 4, w: 4, h: 3 },
+      { dx: -14, dy: -2, w: 3, h: 3 }, { dx: -15, dy: 1, w: 3, h: 2 },
+      { dx: 12, dy: -2, w: 3, h: 3 }, { dx: 13, dy: 1, w: 3, h: 2 },
+      { dx: -18, dy: 3, w: 2, h: 2 }, { dx: 17, dy: 5, w: 2, h: 2 },
+      { dx: -4, dy: 9, w: 2, h: 2 }, { dx: 4, dy: 10, w: 3, h: 2 },
+    ];
+    for (let si = 0; si < stones.length; si++) {
+      const s = stones[si];
+      const sx = baseCX + s.dx;
+      const sy = baseY + s.dy;
+      ctx.fillStyle = stoneColors[(si * 3) % stoneColors.length];
+      ctx.fillRect(sx, sy, s.w, s.h);
+      ctx.fillStyle = stoneHighlight;
+      ctx.fillRect(sx, sy, s.w, 1);
+    }
+  }
+
+  // Golden Ruins: crumbling Egyptian temple blocks around the obelisk
+  if (theme.id === "golden-ruins") {
+    const baseY = oy + slabH;
+    const baseCX = cx;
+    const blockDark = "#8a7050";
+    const blockMid = "#a08860";
+    const blockLight = "#b8a070";
+    const blockShadow = "#6a5840";
+
+    // Large broken column base — left side
+    ctx.fillStyle = blockShadow;
+    ctx.fillRect(baseCX - 24, baseY - 8, 8, 12);
+    ctx.fillStyle = blockMid;
+    ctx.fillRect(baseCX - 24, baseY - 8, 8, 10);
+    ctx.fillStyle = blockLight;
+    ctx.fillRect(baseCX - 24, baseY - 8, 8, 1);
+    // Crumbled top — jagged
+    ctx.fillStyle = blockMid;
+    ctx.fillRect(baseCX - 23, baseY - 10, 3, 2);
+    ctx.fillRect(baseCX - 19, baseY - 9, 2, 1);
+
+    // Large broken column base — right side
+    ctx.fillStyle = blockShadow;
+    ctx.fillRect(baseCX + 16, baseY - 8, 8, 12);
+    ctx.fillStyle = blockMid;
+    ctx.fillRect(baseCX + 16, baseY - 8, 8, 10);
+    ctx.fillStyle = blockLight;
+    ctx.fillRect(baseCX + 16, baseY - 8, 8, 1);
+    ctx.fillStyle = blockMid;
+    ctx.fillRect(baseCX + 17, baseY - 10, 2, 2);
+    ctx.fillRect(baseCX + 21, baseY - 9, 3, 1);
+
+    // Stepped platform / altar base beneath obelisk
+    ctx.fillStyle = blockShadow;
+    ctx.fillRect(baseCX - 14, baseY + 1, 28, 5);
+    ctx.fillStyle = blockMid;
+    ctx.fillRect(baseCX - 14, baseY + 1, 28, 4);
+    ctx.fillStyle = blockLight;
+    ctx.fillRect(baseCX - 14, baseY + 1, 28, 1);
+    // Wider lower step
+    ctx.fillStyle = blockShadow;
+    ctx.fillRect(baseCX - 18, baseY + 5, 36, 4);
+    ctx.fillStyle = blockMid;
+    ctx.fillRect(baseCX - 18, baseY + 5, 36, 3);
+    ctx.fillStyle = blockLight;
+    ctx.fillRect(baseCX - 18, baseY + 5, 36, 1);
+
+    // Fallen blocks — scattered rubble
+    const rubble = [
+      { dx: -20, dy: 6, w: 5, h: 3 },
+      { dx: -28, dy: 2, w: 6, h: 4 },
+      { dx: -30, dy: 5, w: 4, h: 3 },
+      { dx: 22, dy: 6, w: 5, h: 3 },
+      { dx: 26, dy: 3, w: 6, h: 4 },
+      { dx: 30, dy: 6, w: 4, h: 2 },
+      // Small debris
+      { dx: -16, dy: 10, w: 3, h: 2 },
+      { dx: 14, dy: 11, w: 3, h: 2 },
+      { dx: -8, dy: 12, w: 2, h: 2 },
+      { dx: 8, dy: 13, w: 2, h: 2 },
+      { dx: -33, dy: 7, w: 2, h: 2 },
+      { dx: 34, dy: 8, w: 2, h: 2 },
+    ];
+    for (let ri = 0; ri < rubble.length; ri++) {
+      const r = rubble[ri];
+      const rx = baseCX + r.dx;
+      const ry = baseY + r.dy;
+      ctx.fillStyle = blockShadow;
+      ctx.fillRect(rx, ry, r.w, r.h);
+      ctx.fillStyle = ri < 6 ? blockMid : blockDark;
+      ctx.fillRect(rx, ry, r.w, r.h - 1);
+      ctx.fillStyle = blockLight;
+      ctx.fillRect(rx, ry, r.w, 1);
+    }
+
+    // Carved line detail on the column bases
+    ctx.fillStyle = blockShadow;
+    ctx.fillRect(baseCX - 23, baseY - 4, 6, 1);
+    ctx.fillRect(baseCX + 17, baseY - 4, 6, 1);
+  }
+
+  // Forest: spirit shrine (disabled for now)
+  if (false && theme.id === "forest") {
+    const baseY = oy + slabH;
+    const baseCX = cx;
+
+    // Shallow wide puddle — mostly horizontal, barely extends down
+    const poolDark = "#2a5a4a";
+    const poolMid = "#3a7a5a";
+    const poolLight = "#5a9a7a";
+    const poolShimmer = "#7abaa0";
+
+    // Wide shallow shape
+    ctx.fillStyle = poolDark;
+    ctx.fillRect(baseCX - 22, baseY + 2, 44, 4);
+    ctx.fillRect(baseCX - 18, baseY + 1, 36, 2);
+    ctx.fillStyle = poolMid;
+    ctx.fillRect(baseCX - 20, baseY + 2, 40, 3);
+    // Ripple highlights
+    ctx.fillStyle = poolLight;
+    ctx.fillRect(baseCX - 14, baseY + 3, 5, 1);
+    ctx.fillRect(baseCX + 6, baseY + 3, 4, 1);
+    ctx.fillStyle = poolShimmer;
+    ctx.fillRect(baseCX - 8, baseY + 2, 2, 1);
+    ctx.fillRect(baseCX + 10, baseY + 3, 2, 1);
+
+    // Mossy stones — wide ring, mostly to the sides
+    const mossStone = "#3a4a2a";
+    const mossStoneLt = "#4a5a3a";
+    const mossStoneHi = "#5a6a4a";
+    const mossTop = "#6a8a4a"; // bright moss cap
+    const stones = [
+      // Left flank
+      { dx: -24, dy: -1, w: 4, h: 3 },
+      { dx: -26, dy: 2, w: 3, h: 2 },
+      { dx: -22, dy: 4, w: 3, h: 2 },
+      // Right flank
+      { dx: 22, dy: -1, w: 4, h: 3 },
+      { dx: 24, dy: 2, w: 3, h: 2 },
+      { dx: 20, dy: 4, w: 3, h: 2 },
+      // Front — spread wide, not deep
+      { dx: -14, dy: 5, w: 3, h: 2 },
+      { dx: -6, dy: 6, w: 3, h: 2 },
+      { dx: 5, dy: 6, w: 3, h: 2 },
+      { dx: 13, dy: 5, w: 3, h: 2 },
+    ];
+    for (const s of stones) {
+      const sx = baseCX + s.dx;
+      const sy = baseY + s.dy;
+      ctx.fillStyle = mossStone;
+      ctx.fillRect(sx, sy, s.w, s.h);
+      ctx.fillStyle = mossStoneLt;
+      ctx.fillRect(sx, sy, s.w, s.h - 1);
+      ctx.fillStyle = mossStoneHi;
+      ctx.fillRect(sx, sy, s.w, 1);
+      // Moss patches on top
+      ctx.fillStyle = mossTop;
+      ctx.fillRect(sx + 1, sy, 1, 1);
+    }
+
+    // Lush fern clusters — flanking wide
+    const fern1 = "#1a6a2a";
+    const fern2 = "#2a8a3a";
+    const fern3 = "#3aaa4a";
+    const fernBright = "#5acc6a";
+
+    // Left fern cluster — tall, bushy
+    ctx.fillStyle = fern1;
+    ctx.fillRect(baseCX - 26, baseY - 4, 2, 6);
+    ctx.fillRect(baseCX - 28, baseY - 2, 1, 4);
+    ctx.fillRect(baseCX - 24, baseY - 6, 1, 4);
+    ctx.fillStyle = fern2;
+    ctx.fillRect(baseCX - 27, baseY - 5, 2, 4);
+    ctx.fillRect(baseCX - 25, baseY - 7, 2, 4);
+    ctx.fillStyle = fern3;
+    ctx.fillRect(baseCX - 26, baseY - 7, 1, 2);
+    ctx.fillRect(baseCX - 28, baseY - 3, 1, 1);
+    ctx.fillStyle = fernBright;
+    ctx.fillRect(baseCX - 25, baseY - 8, 1, 1);
+
+    // Right fern cluster
+    ctx.fillStyle = fern1;
+    ctx.fillRect(baseCX + 24, baseY - 4, 2, 6);
+    ctx.fillRect(baseCX + 27, baseY - 2, 1, 4);
+    ctx.fillRect(baseCX + 23, baseY - 6, 1, 4);
+    ctx.fillStyle = fern2;
+    ctx.fillRect(baseCX + 25, baseY - 5, 2, 4);
+    ctx.fillRect(baseCX + 23, baseY - 7, 2, 4);
+    ctx.fillStyle = fern3;
+    ctx.fillRect(baseCX + 25, baseY - 7, 1, 2);
+    ctx.fillRect(baseCX + 27, baseY - 3, 1, 1);
+    ctx.fillStyle = fernBright;
+    ctx.fillRect(baseCX + 24, baseY - 8, 1, 1);
+
+    // Small ground ferns along the stone ring
+    const groundFerns = [
+      { dx: -16, dy: 5 }, { dx: -8, dy: 6 },
+      { dx: 7, dy: 6 }, { dx: 15, dy: 5 },
+      { dx: -23, dy: 3 }, { dx: 25, dy: 3 },
+    ];
+    for (const f of groundFerns) {
+      ctx.fillStyle = fern2;
+      ctx.fillRect(baseCX + f.dx, baseY + f.dy, 2, 1);
+      ctx.fillStyle = fern3;
+      ctx.fillRect(baseCX + f.dx, baseY + f.dy - 1, 1, 1);
+      ctx.fillRect(baseCX + f.dx + 1, baseY + f.dy - 1, 1, 1);
+    }
+
+    // Exotic glowing flowers
+    const flower1 = "#cc55aa";
+    const flower2 = "#aa44dd";
+    const flower3 = "#55ddbb";
+    const flowers = [
+      { dx: -27, dy: -6, c: flower1 }, { dx: 26, dy: -6, c: flower2 },
+      { dx: -15, dy: 5, c: flower3 }, { dx: 14, dy: 5, c: flower1 },
+      { dx: -7, dy: 7, c: flower2 }, { dx: 8, dy: 7, c: flower3 },
+    ];
+    for (const fl of flowers) {
+      ctx.fillStyle = fl.c;
+      ctx.fillRect(baseCX + fl.dx, baseY + fl.dy, 1, 1);
+    }
+
+    // Hanging vine tendrils down the obelisk sides
+    ctx.fillStyle = fern1;
+    ctx.fillRect(ox - 1, baseY - 6, 1, 6);
+    ctx.fillRect(ox - 2, baseY - 3, 1, 3);
+    ctx.fillRect(ox + slabW, baseY - 5, 1, 5);
+    ctx.fillRect(ox + slabW + 1, baseY - 3, 1, 3);
+    ctx.fillStyle = fern2;
+    ctx.fillRect(ox - 1, baseY - 8, 1, 3);
+    ctx.fillRect(ox + slabW, baseY - 7, 1, 3);
+  }
+
+  // Stone base (slightly wider)
+  ctx.fillStyle = "#222228";
+  ctx.fillRect(ox - 1, oy + slabH, slabW + 2, 3);
+  ctx.fillStyle = "#2a2a30";
+  ctx.fillRect(ox - 1, oy + slabH, slabW + 2, 1);
+
+  // Black obsidian slab
+  ctx.fillStyle = "#0a0a10";
+  ctx.fillRect(ox, oy, slabW, slabH);
+  // Subtle edge highlights
+  ctx.fillStyle = "#1a1a22";
+  ctx.fillRect(ox, oy, slabW, 1);
+  ctx.fillRect(ox, oy, 1, slabH);
+  ctx.fillStyle = "#060608";
+  ctx.fillRect(ox + slabW - 1, oy, 1, slabH);
+
+  // Apply time-of-day color cast to the slab
+  const tod = timeOverride ?? getTimeOfDay();
+  const tint = theme.timeTints[tod];
+  if (tint.opacity > 0) {
+    ctx.globalAlpha = tint.opacity * 0.7;
+    ctx.fillStyle = tint.color;
+    ctx.fillRect(ox, oy, slabW, slabH);
+    ctx.globalAlpha = 1;
+  }
+
+  // Draw three panels (top = diffused, middle/bottom = dots)
+  const panels = [data.panels.top, data.panels.middle, data.panels.bottom];
+  for (let p = 0; p < 3; p++) {
+    const pixels = panels[p];
+    const panelY = oy + OBELISK_PAD + p * (panelH + OBELISK_PANEL_GAP);
+    const panelX = ox + OBELISK_PAD;
+
+    if (p === 0) {
+      // Top panel: diffusion screen with 4 corner quadrants (2x2 each), no center dot
+      // Corner quadrants: TL(0,1,5,6) TR(3,4,8,9) BL(15,16,20,21) BR(18,19,23,24)
+      const quadrants = [
+        [0, 1, 5, 6],     // top-left
+        [3, 4, 8, 9],     // top-right
+        [15, 16, 20, 21], // bottom-left
+        [18, 19, 23, 24], // bottom-right
+      ];
+
+      // Average all lit colors for the pulsing overlay
+      let rSum = 0, gSum = 0, bSum = 0, litCount = 0;
+      for (const color of pixels) {
+        if (color !== "#000000") {
+          rSum += parseInt(color.slice(1, 3), 16);
+          gSum += parseInt(color.slice(3, 5), 16);
+          bSum += parseInt(color.slice(5, 7), 16);
+          litCount++;
+        }
+      }
+
+      // Draw the 4 corner quadrant dots through diffusion
+      for (const quad of quadrants) {
+        for (const i of quad) {
+          const col = i % OBELISK_COLS;
+          const row = (OBELISK_ROWS - 1) - Math.floor(i / OBELISK_COLS);
+          const color = pixels[i];
+          const dx = panelX + col * dotStep;
+          const dy = panelY + row * dotStep;
+
+          if (color !== "#000000") {
+            // Brighten color by 25%
+            const br = Math.min(255, Math.round(parseInt(color.slice(1, 3), 16) * 1.25));
+            const bg = Math.min(255, Math.round(parseInt(color.slice(3, 5), 16) * 1.25));
+            const bb = Math.min(255, Math.round(parseInt(color.slice(5, 7), 16) * 1.25));
+            const bright = `rgb(${br},${bg},${bb})`;
+            // Diffused glow per dot
+            ctx.globalAlpha = 0.2;
+            ctx.fillStyle = bright;
+            ctx.fillRect(dx - 1, dy - 1, OBELISK_DOT + 2, OBELISK_DOT + 2);
+            // Brighter core
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = bright;
+            ctx.fillRect(dx, dy, OBELISK_DOT, OBELISK_DOT);
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+
+      if (litCount > 0) {
+        // Static white diffusion panel over the whole face when active
+        ctx.globalAlpha = 0.08;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(panelX, panelY, panelW, panelH);
+        ctx.globalAlpha = 1;
+      }
+
+    } else {
+      // Middle and bottom panels: individual dots
+      for (let i = 0; i < pixels.length; i++) {
+        const col = i % OBELISK_COLS;
+        const row = (OBELISK_ROWS - 1) - Math.floor(i / OBELISK_COLS);
+        const color = pixels[i];
+        const isLit = color !== "#000000";
+
+        const dx = panelX + col * dotStep;
+        const dy = panelY + row * dotStep;
+
+        if (isLit) {
+          ctx.globalAlpha = 0.15;
+          ctx.fillStyle = color;
+          ctx.fillRect(dx - 1, dy - 1, OBELISK_DOT + 2, OBELISK_DOT + 2);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = color;
+          ctx.fillRect(dx, dy, OBELISK_DOT, OBELISK_DOT);
+        }
+      }
+    }
+  }
+}
 
 export function renderScene(
   ctx: CanvasRenderingContext2D,
@@ -221,6 +598,12 @@ export function renderScene(
   // 4.5. Status poster on themed mount
   if (monitors && monitors.length > 0) {
     renderStatusPoster(ctx, monitors, theme);
+  }
+
+  // 4.6. Obelisk (in-scene pixel tower)
+  const { towerSize, towerVisible } = useAgentOfficeStore.getState();
+  if (towerVisible && towerSize === "obelisk") {
+    drawObelisk(ctx, theme, frame, timeOverride);
   }
 
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)

@@ -148,22 +148,54 @@ function isOnIsland(x: number, y: number, margin: number): boolean {
   const left = bx - margin;
   const right = bx + bw + margin;
   const top = by - margin;
-  const bottom = by + bh + margin;
+  // Pull bottom in more — more visible water at front
+  const bottom = by + bh + margin - 6;
 
   if (y < top || y >= bottom) return false;
 
   const edgeIdx = Math.max(0, Math.min(edges.length - 1, y));
   const wobble = edges[edgeIdx];
 
-  // Different wobble for left vs right edge
   const leftEdge = left + wobble;
   const rightEdge = right - edges[(edgeIdx + 50) % edges.length];
 
-  // Softer corners: shrink horizontal extent near top and bottom
-  const vy = y < by ? (y - top) / margin : y > by + bh ? (bottom - y) / margin : 1;
-  const cornerShrink = Math.floor((1 - vy) * margin * 0.6);
+  const midX = bx + bw / 2;
+  const isLeft = x < midX;
 
-  return x >= leftEdge + cornerShrink && x < rightEdge - cornerShrink;
+  // Per-region corner intensity
+  // vy: 0 at edge, 1 in the building interior
+  let vy: number;
+  let cornerStrength: number;
+
+  if (y < by) {
+    // Back (top) — more aggressive on left
+    vy = (y - top) / margin;
+    cornerStrength = isLeft ? 2.2 : 1.4;
+  } else if (y > by + bh) {
+    // Front (bottom) — rounder on both sides, extra wobble
+    vy = (bottom - y) / (margin - 6);
+    cornerStrength = 2.0;
+    // Extra uneven shoreline wobble at the front
+    const frontWobble = edges[(edgeIdx * 3 + 77) % edges.length] * 0.5;
+    if (y > bottom - 4) {
+      const shrinkExtra = Math.floor((1 - vy) * frontWobble * 2);
+      if (x < leftEdge + shrinkExtra + 8 || x >= rightEdge - shrinkExtra - 8) return false;
+    }
+  } else {
+    vy = 1;
+    cornerStrength = 0;
+  }
+
+  const cornerShrink = Math.floor((1 - vy * vy) * margin * cornerStrength);
+
+  // Left side gets extra inset at back
+  let leftShrink = cornerShrink;
+  let rightShrink = cornerShrink;
+  if (y < by && isLeft) {
+    leftShrink = Math.floor(cornerShrink * 1.3);
+  }
+
+  return x >= leftEdge + leftShrink && x < rightEdge - rightShrink;
 }
 
 // Cached offscreen island canvas — built once per theme
@@ -195,15 +227,40 @@ function buildIslandCanvas(theme: SceneTheme): OffscreenCanvas {
     }
   }
 
-  // Island sand — pixel by pixel for organic edge
+  // Island sand — per-pixel noise for natural sand look
+  // Parse base sand colors once
+  const sr1 = parseInt(g.baseColor1.slice(1, 3), 16);
+  const sg1 = parseInt(g.baseColor1.slice(3, 5), 16);
+  const sb1 = parseInt(g.baseColor1.slice(5, 7), 16);
+  const sr2 = parseInt(g.baseColor2.slice(1, 3), 16);
+  const sg2 = parseInt(g.baseColor2.slice(3, 5), 16);
+  const sb2 = parseInt(g.baseColor2.slice(5, 7), 16);
+
   for (let y = 20; y < H; y++) {
     for (let x = 0; x < W; x++) {
       if (isOnIsland(x, y, island.margin)) {
-        if (!isOnIsland(x, y, island.margin - 2)) {
+        // Wider beach strip at the front (bottom), thinner elsewhere
+        const beachWidth = y > BUILDING_Y + BUILDING_H ? 5 : 2;
+        if (!isOnIsland(x, y, island.margin - beachWidth)) {
           octx.fillStyle = island.sandEdge;
         } else {
-          const sandVariant = (Math.floor(x / g.tileSize) + Math.floor(y / g.tileSize)) % 2;
-          octx.fillStyle = sandVariant === 0 ? g.baseColor1 : g.baseColor2;
+          // Deterministic per-pixel hash for grain
+          const h = ((x * 374761393 + y * 668265263) >>> 0) % 256;
+          const t = h / 255; // 0..1 blend between two sand colors
+          const r = Math.round(sr1 + (sr2 - sr1) * t);
+          const gc = Math.round(sg1 + (sg2 - sg1) * t);
+          const b = Math.round(sb1 + (sb2 - sb1) * t);
+          // Occasional brighter/darker grains for unevenness
+          const grain = ((h * 31) >>> 0) % 100;
+          if (grain < 4) {
+            // Slightly darker speck
+            octx.fillStyle = `rgb(${r - 12},${gc - 10},${b - 12})`;
+          } else if (grain < 7) {
+            // Slightly lighter speck
+            octx.fillStyle = `rgb(${Math.min(255, r + 10)},${Math.min(255, gc + 8)},${Math.min(255, b + 6)})`;
+          } else {
+            octx.fillStyle = `rgb(${r},${gc},${b})`;
+          }
         }
         octx.fillRect(x, y, 1, 1);
       }
@@ -234,7 +291,38 @@ function drawGround(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
       islandCanvasCache = { canvas: buildIslandCanvas(theme), themeId: theme.id };
     }
     ctx.drawImage(islandCanvasCache.canvas, 0, 0);
+  } else if (g.tileSize <= 1) {
+    // Per-pixel sand noise (same technique as island sand)
+    const sr1 = parseInt(g.baseColor1.slice(1, 3), 16);
+    const sg1 = parseInt(g.baseColor1.slice(3, 5), 16);
+    const sb1 = parseInt(g.baseColor1.slice(5, 7), 16);
+    const sr2 = parseInt(g.baseColor2.slice(1, 3), 16);
+    const sg2 = parseInt(g.baseColor2.slice(3, 5), 16);
+    const sb2 = parseInt(g.baseColor2.slice(5, 7), 16);
+    for (let y = 20; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const h = ((x * 374761393 + y * 668265263) >>> 0) % 256;
+        const t = h / 255;
+        const r = Math.round(sr1 + (sr2 - sr1) * t);
+        const gc = Math.round(sg1 + (sg2 - sg1) * t);
+        const b = Math.round(sb1 + (sb2 - sb1) * t);
+        const grain = ((h * 31) >>> 0) % 100;
+        if (grain < 4) {
+          ctx.fillStyle = `rgb(${r - 12},${gc - 10},${b - 12})`;
+        } else if (grain < 7) {
+          ctx.fillStyle = `rgb(${Math.min(255, r + 10)},${Math.min(255, gc + 8)},${Math.min(255, b + 6)})`;
+        } else {
+          ctx.fillStyle = `rgb(${r},${gc},${b})`;
+        }
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    seed = 100;
+    for (let i = 0; i < g.decorCount; i++) {
+      rect(ctx, Math.floor(srand() * W), 20 + Math.floor(srand() * (H - 20)), 1, g.decorHeight, g.decorColor);
+    }
   } else {
+    // Standard tile checkerboard
     for (let ty = 20; ty < H; ty += g.tileSize) {
       for (let tx = 0; tx < W; tx += g.tileSize) {
         rect(ctx, tx, ty, g.tileSize, g.tileSize,
@@ -599,14 +687,42 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
   const fy = FLOOR_Y;
   const fh = FLOOR_H;
   if (b.style !== "none") {
-    rect(ctx, bx + 3, fy, bw - 6, fh, b.floorColor1);
-    for (let row = 0; row < fh; row += 4) {
-      for (let col = 0; col < bw - 6; col += 4) {
-        rect(ctx, bx + 3 + col, fy + row, 4, 4, (col / 4 + row / 4) % 2 === 0 ? b.floorColor1 : b.floorColor2);
+    if (theme.ground.tileSize <= 1) {
+      // Per-pixel sand floor matching the ground
+      const fr1 = parseInt(b.floorColor1.slice(1, 3), 16);
+      const fg1 = parseInt(b.floorColor1.slice(3, 5), 16);
+      const fb1 = parseInt(b.floorColor1.slice(5, 7), 16);
+      const fr2 = parseInt(b.floorColor2.slice(1, 3), 16);
+      const fg2 = parseInt(b.floorColor2.slice(3, 5), 16);
+      const fb2 = parseInt(b.floorColor2.slice(5, 7), 16);
+      for (let y = fy; y < fy + fh; y++) {
+        for (let x = bx + 3; x < bx + 3 + bw - 6; x++) {
+          const h = ((x * 374761393 + y * 668265263) >>> 0) % 256;
+          const t = h / 255;
+          const r = Math.round(fr1 + (fr2 - fr1) * t);
+          const gc = Math.round(fg1 + (fg2 - fg1) * t);
+          const bl = Math.round(fb1 + (fb2 - fb1) * t);
+          const grain = ((h * 31) >>> 0) % 100;
+          if (grain < 4) {
+            ctx.fillStyle = `rgb(${r - 12},${gc - 10},${bl - 12})`;
+          } else if (grain < 7) {
+            ctx.fillStyle = `rgb(${Math.min(255, r + 10)},${Math.min(255, gc + 8)},${Math.min(255, bl + 6)})`;
+          } else {
+            ctx.fillStyle = `rgb(${r},${gc},${bl})`;
+          }
+          ctx.fillRect(x, y, 1, 1);
+        }
       }
+    } else {
+      rect(ctx, bx + 3, fy, bw - 6, fh, b.floorColor1);
+      for (let row = 0; row < fh; row += 4) {
+        for (let col = 0; col < bw - 6; col += 4) {
+          rect(ctx, bx + 3 + col, fy + row, 4, 4, (col / 4 + row / 4) % 2 === 0 ? b.floorColor1 : b.floorColor2);
+        }
+      }
+      rect(ctx, bx + 3, fy, bw - 6, 2, b.floorEdge1);
+      rect(ctx, bx + 3, fy, bw - 6, 1, b.floorEdge2);
     }
-    rect(ctx, bx + 3, fy, bw - 6, 2, b.floorEdge1);
-    rect(ctx, bx + 3, fy, bw - 6, 1, b.floorEdge2);
   }
 
   // Guitar (only in themes that have it)
@@ -765,9 +881,11 @@ function drawDesk(
   theme: SceneTheme
 ) {
   const d = theme.desk;
-  rect(ctx, dx - 3, dy - 1, 6, 3, d.chairBack);
-  rect(ctx, dx - 3, dy + 2, 6, 4, d.chairSeat);
-  rect(ctx, dx - 2, dy + 3, 4, 2, d.chairLight);
+  if (!d.hideChairs) {
+    rect(ctx, dx - 3, dy - 1, 6, 3, d.chairBack);
+    rect(ctx, dx - 3, dy + 2, 6, 4, d.chairSeat);
+    rect(ctx, dx - 2, dy + 3, 4, 2, d.chairLight);
+  }
   rect(ctx, dx - 10, dy + 6, 20, 2, d.topColor);
   rect(ctx, dx - 10, dy + 6, 20, 1, d.topColor);
   rect(ctx, dx - 10, dy + 7, 20, 1, d.legColor);

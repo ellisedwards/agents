@@ -128,5 +128,6 @@ export interface SceneTheme {
     chairBack: string;
     chairSeat: string;
     chairLight: string;
+    hideChairs?: boolean;
   };
 }

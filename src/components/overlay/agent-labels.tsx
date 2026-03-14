@@ -9,7 +9,7 @@ import {
   type CanvasTransform,
 } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
-import { getAgentPosition } from "../scene/renderer";
+import { getAgentPosition, getCatPosition, pokeCat } from "../scene/renderer";
 import { TEAM_COLORS } from "@/shared/types";
 
 interface AgentLabelsProps {
@@ -89,15 +89,36 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
 
   const handleMouseLeave = useCallback(() => setHoveredId(null), []);
 
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const canvasPos = domToCanvas(
+        transform,
+        e.clientX - rect.left,
+        e.clientY - rect.top
+      );
+      const catPos = getCatPosition();
+      if (catPos) {
+        const dx = canvasPos.x - catPos.x;
+        const dy = canvasPos.y - catPos.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 15) {
+          pokeCat();
+        }
+      }
+    },
+    [transform]
+  );
+
   return (
     <div
       className="absolute inset-0"
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
       style={{ pointerEvents: "auto" }}
     >
       {/* Settings button + popup */}
-      <div className="absolute top-2 right-2 z-10" ref={panelRef}>
+      <div className="absolute top-2 right-2 z-30" ref={panelRef}>
         <button
           onClick={() => setSettingsOpen((v) => !v)}
           className="font-mono text-[10px] px-1.5 py-0.5 rounded text-white/20 hover:text-white/50 transition-colors"
@@ -184,6 +205,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 <option value="small" className="bg-[#1e1e2e]">Small</option>
                 <option value="medium" className="bg-[#1e1e2e]">Medium</option>
                 <option value="large" className="bg-[#1e1e2e]">Large</option>
+                <option value="obelisk" className="bg-[#1e1e2e]">Obelisk</option>
               </select>
             </div>
 

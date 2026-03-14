@@ -10,6 +10,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 cd "$APP_DIR"
+npm run build > /tmp/agent-office-build.log 2>&1
 node dist/server.js &
 echo $! > "$PID_FILE"
 

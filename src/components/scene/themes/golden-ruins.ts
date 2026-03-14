@@ -22,7 +22,7 @@ export const goldenRuinsTheme: SceneTheme = {
   ground: {
     baseColor1: "#d4a870",
     baseColor2: "#cca068",
-    tileSize: 8,
+    tileSize: 1,
     decorColor: "#c09860",
     decorCount: 50,
     decorHeight: 1,
@@ -45,8 +45,8 @@ export const goldenRuinsTheme: SceneTheme = {
     wallColor: "#b8935a",
     wallDark: "#a08050",
     wallAccent: "#c4a060",
-    floorColor1: "#c8a868",
-    floorColor2: "#c0a060",
+    floorColor1: "#d4a870",
+    floorColor2: "#cca068",
     floorEdge1: "#b89858",
     floorEdge2: "#b09050",
     style: "open-air",
@@ -87,5 +87,6 @@ export const goldenRuinsTheme: SceneTheme = {
     chairBack: "#9a7a50",
     chairSeat: "#8a6a40",
     chairLight: "#a08050",
+    hideChairs: true,
   },
 };

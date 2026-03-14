@@ -85,10 +85,7 @@ export const forestTheme: SceneTheme = {
 
 
 
-  clock: {
-    frameColor: "#444",
-    faceColor: "#fff",
-  },
+  clock: null,
 
   plant: {
     potColor: "#885533",

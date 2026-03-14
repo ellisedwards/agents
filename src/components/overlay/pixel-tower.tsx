@@ -7,10 +7,12 @@ import type { TowerSize } from "../store";
 const COLS = 5;
 const ROWS = 5;
 
-const SIZES: Record<TowerSize, { px: number; gap: number; panelGap: number }> = {
-  small: { px: 12, gap: 3, panelGap: 8 },
-  medium: { px: 24, gap: 6, panelGap: 16 },
-  large: { px: 36, gap: 7, panelGap: 22 },
+// Medium is the base. Small and large are true 0.5x/1.5x scales.
+// Gap is ~50% of dot size for breathing room between dots.
+const SIZES: Partial<Record<TowerSize, { px: number; gap: number; panelGap: number }>> = {
+  small: { px: 12, gap: 6, panelGap: 8 },
+  medium: { px: 24, gap: 12, panelGap: 16 },
+  large: { px: 36, gap: 18, panelGap: 24 },
 };
 
 function brighten(hex: string, factor: number): string {
@@ -93,9 +95,6 @@ export function PixelTower() {
   const towerPos = useAgentOfficeStore((s) => s.towerPos);
   const setTowerPos = useAgentOfficeStore((s) => s.setTowerPos);
   const towerOpacity = useAgentOfficeStore((s) => s.towerOpacity);
-  const { px, gap, panelGap } = SIZES[towerSize];
-  const panelH = ROWS * (px + gap) - gap;
-  const totalH = 3 * panelH + 2 * panelGap + 16;
 
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
@@ -122,7 +121,14 @@ export function PixelTower() {
     dragRef.current = null;
   }, []);
 
-  if (!connected || !towerVisible) return null;
+  // Obelisk mode renders in the canvas scene, not as an overlay
+  if (!connected || !towerVisible || towerSize === "obelisk") return null;
+  const sizeConfig = SIZES[towerSize];
+  if (!sizeConfig) return null;
+
+  const { px, gap, panelGap } = sizeConfig;
+  const panelH = ROWS * (px + gap) - gap;
+  const totalH = 3 * panelH + 2 * panelGap + 16;
 
   return (
     <div

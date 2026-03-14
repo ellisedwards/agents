@@ -26,6 +26,13 @@ const EMPTY: PixelTowerData = {
   claw: { pixel: 62, status: "idle", color: "#000000" },
 };
 
+// Global accessor for canvas renderer (avoids prop threading)
+let _latestData: PixelTowerData = EMPTY;
+let _latestConnected = false;
+export function getPixelTowerData(): { data: PixelTowerData; connected: boolean } {
+  return { data: _latestData, connected: _latestConnected };
+}
+
 export function usePixelTower() {
   const [data, setData] = useState<PixelTowerData>(EMPTY);
   const [connected, setConnected] = useState(false);
@@ -41,9 +48,14 @@ export function usePixelTower() {
         if (active && json.panels) {
           setData(json);
           setConnected(true);
+          _latestData = json;
+          _latestConnected = true;
         }
       } catch {
-        if (active) setConnected(false);
+        if (active) {
+          setConnected(false);
+          _latestConnected = false;
+        }
       }
     }
 

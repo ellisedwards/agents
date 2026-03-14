@@ -18,7 +18,7 @@ export const tropicalIslandTheme: SceneTheme = {
   ground: {
     baseColor1: "#d4c490",
     baseColor2: "#ccbc88",
-    tileSize: 8,
+    tileSize: 4,
     decorColor: "#c4b480",
     decorCount: 30,
     decorHeight: 1,
@@ -88,5 +88,6 @@ export const tropicalIslandTheme: SceneTheme = {
     chairBack: "#9a8a68",
     chairSeat: "#8a7a58",
     chairLight: "#a09068",
+    hideChairs: true,
   },
 };
