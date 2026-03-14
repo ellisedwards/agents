@@ -18,7 +18,7 @@ export function App() {
   useAgentSSE(!isDemo);
 
   return (
-    <div className="relative w-full h-screen bg-[#0d0d18] flex items-center justify-center">
+    <div className="relative w-full h-screen bg-[#08080e] flex items-center justify-center">
       <OfficeCanvas onTransformChange={setTransform} />
       <AgentLabels transform={transform} />
       <SpeechBubbles transform={transform} />

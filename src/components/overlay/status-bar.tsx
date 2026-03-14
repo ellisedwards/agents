@@ -1,4 +1,5 @@
 
+import { useState, useEffect, useCallback } from "react";
 import { useAgentOfficeStore } from "../store";
 
 export function StatusBar() {
@@ -7,6 +8,29 @@ export function StatusBar() {
 
   const ccCount = agents.filter((a) => a.source === "cc").length;
   const ocCount = agents.filter((a) => a.source === "openclaw").length;
+
+  const [brightness, setBrightness] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  // Poll brightness every 10s (only when not dragging)
+  useEffect(() => {
+    let active = true;
+    const poll = () => {
+      if (dragging) return;
+      fetch("/api/brightness")
+        .then((r) => r.json())
+        .then((d) => { if (active && d.brightness != null) setBrightness(d.brightness); })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 10000);
+    return () => { active = false; clearInterval(id); };
+  }, [dragging]);
+
+  const handleBrightness = useCallback((val: number) => {
+    setBrightness(val);
+    fetch(`/api/brightness/${val}`).catch(() => {});
+  }, []);
 
   const handleClear = () => {
     fetch("/api/agents/clear", { method: "POST" }).catch(() => {});
@@ -42,6 +66,27 @@ export function StatusBar() {
         >
           clear
         </button>
+      )}
+
+      {/* Brightness slider — right side */}
+      {brightness !== null && (
+        <div className="ml-auto flex items-center gap-2 text-neutral-500">
+          <span className="text-[9px]">💡</span>
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={brightness}
+            onChange={(e) => handleBrightness(Number(e.target.value))}
+            onMouseDown={() => setDragging(true)}
+            onMouseUp={() => setDragging(false)}
+            onTouchStart={() => setDragging(true)}
+            onTouchEnd={() => setDragging(false)}
+            className="w-16 h-1 accent-yellow-500/70"
+            title={`Brightness: ${brightness}%`}
+          />
+          <span className="text-[9px] w-5 text-right">{brightness}</span>
+        </div>
       )}
     </div>
   );

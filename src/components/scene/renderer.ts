@@ -715,7 +715,7 @@ export function renderScene(
       const walkSprite = getWalkSpriteState(ws);
       spriteState = walkSprite ?? "idle";
     } else if (agent.subagentClass !== null && agent.subagentClass !== undefined) {
-      // Subagents walk near their desk
+      // Subagents walk near their desk — avoid other desks but not their own
       const pos = deskMap.get(agent.id);
       const homeX = pos ? pos.characterX : BUILDING_X + BUILDING_W / 2;
       const homeY = pos ? pos.characterY : FLOOR_Y + FLOOR_H / 2;
@@ -723,27 +723,15 @@ export function renderScene(
         walkStates.set(agent.id, createWalkState(homeX, homeY));
       }
       const ws = walkStates.get(agent.id)!;
-      updateWalkState(ws, false, homeX, homeY, 20, deskAvoidZones);
+      const otherDesks = pos
+        ? deskAvoidZones.filter((z) => z.x !== pos.x || z.y !== pos.y)
+        : deskAvoidZones;
+      updateWalkState(ws, false, homeX, homeY, 20, otherDesks);
       drawX = ws.currentX;
       drawY = ws.currentY;
       flipX = ws.facingRight;
       const walkSprite = getWalkSpriteState(ws);
       if (walkSprite) spriteState = walkSprite;
-    } else if (agent.state === "idle" && agent.source === "cc") {
-      // Idle CC agents wander near their desk
-      const pos = deskMap.get(agent.id);
-      if (!pos) continue;
-      if (!walkStates.has(agent.id)) {
-        walkStates.set(agent.id, createWalkState(pos.characterX, pos.characterY));
-      }
-      const ws = walkStates.get(agent.id)!;
-      updateWalkState(ws, false, pos.characterX, pos.characterY, 15, deskAvoidZones);
-      drawX = ws.currentX;
-      drawY = ws.currentY;
-      flipX = ws.facingRight;
-      const walkSprite = getWalkSpriteState(ws);
-      if (walkSprite) spriteState = walkSprite;
-      else spriteState = "idle";
     } else {
       // Active desk-bound agents sit at their desk
       const pos = deskMap.get(agent.id);

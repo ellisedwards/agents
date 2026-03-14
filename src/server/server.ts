@@ -39,6 +39,32 @@ app.post("/api/agents/clear", (_req, res) => {
   res.json({ ok: true });
 });
 
+// --- Light brightness ---
+app.get("/api/brightness", async (_req, res) => {
+  try {
+    const r = await fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) });
+    if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
+    const data = await r.json();
+    res.json({ brightness: data.brightness ?? null });
+  } catch {
+    res.status(502).json({ error: "claw unreachable" });
+  }
+});
+
+app.get("/api/brightness/:level", async (req, res) => {
+  const level = parseInt(req.params.level, 10);
+  if (isNaN(level) || level < 0 || level > 100) {
+    return res.status(400).json({ error: "brightness must be 0-100" });
+  }
+  try {
+    const r = await fetch(`${claw}/brightness/${level}`, { signal: AbortSignal.timeout(2000) });
+    if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
+    res.json(await r.json());
+  } catch {
+    res.status(502).json({ error: "claw unreachable" });
+  }
+});
+
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
   try {

@@ -150,8 +150,24 @@ export function updateWalkState(
         }
       }
     } else {
-      state.currentX += (dx / dist) * speed;
-      state.currentY += (dy / dist) * speed;
+      const nextX = state.currentX + (dx / dist) * speed;
+      const nextY = state.currentY + (dy / dist) * speed;
+      // Cats ignore avoid zones — they walk wherever they want
+      if (!isCat && hitsZone(nextX, nextY, avoidZones)) {
+        // Try sliding along just X or Y to go around
+        if (!hitsZone(nextX, state.currentY, avoidZones)) {
+          state.currentX = nextX;
+        } else if (!hitsZone(state.currentX, nextY, avoidZones)) {
+          state.currentY = nextY;
+        } else {
+          // Fully blocked — pick a new target immediately
+          state.isMoving = false;
+          state.idleFramesRemaining = 1;
+        }
+      } else {
+        state.currentX = nextX;
+        state.currentY = nextY;
+      }
     }
 
     state.frameCounter++;

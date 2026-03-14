@@ -3,14 +3,15 @@ import type { PixelRect } from "./clawd";
 export const SPHYNX_WIDTH = 13;
 export const SPHYNX_HEIGHT = 9;
 
-const BODY = "#c4b8aa";
-const SKIN_LIGHT = "#d4ccc0";
-const SKIN_DARK = "#a89888";
-const WRINKLE = "#9a8a7a";
-const EAR_INNER = "#ccaa99";
-const EYE = "#66bb88";
-const NOSE = "#cc9999";
-const FEET = "#b0a090";
+const BODY = "#e8ddd0";
+const SKIN_LIGHT = "#f2ece4";
+const SKIN_DARK = "#c8b8a8";
+const WRINKLE = "#b0a090";
+const EAR_TIP = "#e8ddd0";
+const EAR_INNER = "#eeccbb";
+const EYE = "#55cc88";
+const NOSE = "#dd9999";
+const FEET = "#e8ddd0";
 
 /** Idle — sleek hairless cat with big ears, long tail */
 export const SPHYNX_IDLE: PixelRect[] = [
@@ -26,11 +27,11 @@ export const SPHYNX_IDLE: PixelRect[] = [
   // Head — angular
   { x: 0, y: 2, w: 4, h: 4, color: BODY },
   { x: 0, y: 3, w: 4, h: 2, color: SKIN_LIGHT },
-  // Big ears — taller than tabby
-  { x: 0, y: 0, w: 1, h: 3, color: BODY },
-  { x: 3, y: 0, w: 1, h: 3, color: BODY },
-  { x: 0, y: 0, w: 1, h: 2, color: EAR_INNER },
-  { x: 3, y: 0, w: 1, h: 2, color: EAR_INNER },
+  // Big ears — taller than tabby, dark tips
+  { x: 0, y: 0, w: 1, h: 3, color: EAR_TIP },
+  { x: 3, y: 0, w: 1, h: 3, color: EAR_TIP },
+  { x: 0, y: 1, w: 1, h: 2, color: EAR_INNER },
+  { x: 3, y: 1, w: 1, h: 2, color: EAR_INNER },
   // Eyes
   { x: 0, y: 3, w: 1, h: 1, color: EYE },
   { x: 2, y: 3, w: 1, h: 1, color: EYE },
@@ -57,8 +58,8 @@ export const SPHYNX_WALK1: PixelRect[] = [
   { x: 7, y: 4, w: 1, h: 1, color: WRINKLE },
   { x: 0, y: 2, w: 4, h: 4, color: BODY },
   { x: 0, y: 3, w: 4, h: 2, color: SKIN_LIGHT },
-  { x: 0, y: 0, w: 1, h: 3, color: BODY },
-  { x: 3, y: 0, w: 1, h: 3, color: BODY },
+  { x: 0, y: 0, w: 1, h: 3, color: EAR_TIP },
+  { x: 3, y: 0, w: 1, h: 3, color: EAR_TIP },
   { x: 0, y: 0, w: 1, h: 2, color: EAR_INNER },
   { x: 3, y: 0, w: 1, h: 2, color: EAR_INNER },
   { x: 0, y: 3, w: 1, h: 1, color: EYE },
@@ -83,8 +84,8 @@ export const SPHYNX_WALK2: PixelRect[] = [
   { x: 7, y: 4, w: 1, h: 1, color: WRINKLE },
   { x: 0, y: 2, w: 4, h: 4, color: BODY },
   { x: 0, y: 3, w: 4, h: 2, color: SKIN_LIGHT },
-  { x: 0, y: 0, w: 1, h: 3, color: BODY },
-  { x: 3, y: 0, w: 1, h: 3, color: BODY },
+  { x: 0, y: 0, w: 1, h: 3, color: EAR_TIP },
+  { x: 3, y: 0, w: 1, h: 3, color: EAR_TIP },
   { x: 0, y: 0, w: 1, h: 2, color: EAR_INNER },
   { x: 3, y: 0, w: 1, h: 2, color: EAR_INNER },
   { x: 0, y: 3, w: 1, h: 1, color: EYE },
@@ -112,8 +113,8 @@ export const SPHYNX_SLEEP: PixelRect[] = [
   { x: 1, y: 3, w: 3, h: 3, color: BODY },
   { x: 1, y: 3, w: 3, h: 2, color: SKIN_LIGHT },
   // Big ears
-  { x: 1, y: 1, w: 1, h: 3, color: BODY },
-  { x: 3, y: 1, w: 1, h: 3, color: BODY },
+  { x: 1, y: 1, w: 1, h: 3, color: EAR_TIP },
+  { x: 3, y: 1, w: 1, h: 3, color: EAR_TIP },
   { x: 1, y: 1, w: 1, h: 2, color: EAR_INNER },
   { x: 3, y: 1, w: 1, h: 2, color: EAR_INNER },
   // Closed eyes
@@ -143,8 +144,8 @@ export const SPHYNX_STARTLED: PixelRect[] = [
   { x: 0, y: 2, w: 4, h: 4, color: BODY },
   { x: 0, y: 3, w: 4, h: 2, color: SKIN_LIGHT },
   // Big ears — extra pointy when startled
-  { x: 0, y: 0, w: 1, h: 3, color: BODY },
-  { x: 3, y: 0, w: 1, h: 3, color: BODY },
+  { x: 0, y: 0, w: 1, h: 3, color: EAR_TIP },
+  { x: 3, y: 0, w: 1, h: 3, color: EAR_TIP },
   { x: 0, y: 0, w: 1, h: 2, color: EAR_INNER },
   { x: 3, y: 0, w: 1, h: 2, color: EAR_INNER },
   // Wide eyes
