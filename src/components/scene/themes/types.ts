@@ -49,7 +49,7 @@ export interface SceneTheme {
 
   // Vegetation
   vegetation: {
-    type: "trees" | "palms" | "cacti" | "mixed-desert";
+    type: "trees" | "palms" | "cacti" | "mixed-desert" | "boulders";
     colors: {
       trunk: string;
       trunkLight: string;
@@ -84,7 +84,7 @@ export interface SceneTheme {
     interiorDeep: string;
     mantleColor: string;
     mantleLight: string;
-    style: "fireplace" | "brazier" | "fire-pit";
+    style: "fireplace" | "brazier" | "fire-pit" | "reactor";
   };
 
   // Glass panels / windows — null means no windows
@@ -101,7 +101,7 @@ export interface SceneTheme {
 
   // Status poster mount
   posterMount: {
-    style: "wall" | "stone-tablet" | "wooden-sign" | "driftwood";
+    style: "wall" | "stone-tablet" | "wooden-sign" | "driftwood" | "metal-panel";
     color: string;
     colorLight: string;
     colorDark: string;
