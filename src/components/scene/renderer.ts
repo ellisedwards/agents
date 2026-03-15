@@ -811,17 +811,18 @@ export function renderScene(
       [0, 1, 5, 6],     // slot 2 — TL quadrant
       [3, 4, 8, 9],     // slot 3 — TR quadrant
     ];
-    // Collect main CC agents in discovery order (matches claw slot assignment)
-    const mainCCs: typeof agents[0][] = [];
-    for (const a of agents) {
-      if (a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)) {
-        mainCCs.push(a);
-      }
-    }
-    for (let slot = 0; slot < Math.min(mainCCs.length, 4); slot++) {
-      const agent = mainCCs[slot];
-      const quadrantLit = SLOT_PIXELS[slot].some((i) => topPixels[i] !== "#000000");
-      if (!quadrantLit) continue;
+    // Collect main CC agents sorted by most recently active first
+    const mainCCs = agents
+      .filter((a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined))
+      .sort((a, b) => b.lastActivity - a.lastActivity);
+    // Find which quadrants are lit
+    const litSlots = SLOT_PIXELS
+      .map((pixels, slot) => ({ slot, lit: pixels.some((i) => topPixels[i] !== "#000000") }))
+      .filter((s) => s.lit);
+    // Pair: most active CC → first lit quadrant, etc.
+    for (let i = 0; i < Math.min(mainCCs.length, litSlots.length); i++) {
+      const agent = mainCCs[i];
+      if (agent.state === "lounging" || agent.state === "departing") continue;
       const pos = deskMap.get(agent.id);
       if (!pos) continue;
       const dx = pos.x;

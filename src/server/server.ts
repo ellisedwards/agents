@@ -20,14 +20,14 @@ function checkAndAutoRecover(claw: string) {
       const data = await r.json();
       const connected = data.connected === true;
       if (!connected && lastMatrixConnected) {
-        console.log("[auto-recovery] Matrix socket died, attempting reconnect...");
+        console.log("[auto-recovery] Yeelight disconnected, running tower-reset...");
         autoRecoveryInProgress = true;
         execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "ellis@192.168.50.40",
-          "curl -s -X POST http://localhost:9999/matrix/reconnect"], { timeout: 10000 },
+          "~/clawd/scripts/tower-reset"], { timeout: 15000 },
           (err, stdout) => {
             autoRecoveryInProgress = false;
             if (err) console.error("[auto-recovery] Failed:", err.message);
-            else console.log("[auto-recovery] Reconnect result:", stdout.trim());
+            else console.log("[auto-recovery] Reset result:", stdout.trim());
           });
       }
       lastMatrixConnected = connected;
