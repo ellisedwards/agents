@@ -28,7 +28,7 @@ export class OpenClawWatcher extends EventEmitter {
 
   start() {
     this.poll();
-    this.interval = setInterval(() => this.poll(), 2000);
+    this.interval = setInterval(() => this.poll(), 1000);
   }
 
   stop() {

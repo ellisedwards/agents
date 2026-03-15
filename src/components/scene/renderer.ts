@@ -85,6 +85,8 @@ const BEAM_COLORS = ["#aaccff", "#88aadd", "#ccddff", "#ffffff", "#99bbee"];
 const beamingAgents = new Set<string>();
 // Track last known state to detect wander→desk transitions
 const lastAgentState = new Map<string, string>();
+// Track known agents to detect first appearance (beam-in)
+const knownAgentIds = new Set<string>();
 
 // Poof particle system
 interface Poof {
@@ -688,17 +690,17 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
           const dy = panelY + row * dotStep;
 
           if (color !== "#000000") {
-            // Brighten color by 25%
-            const br = Math.min(255, Math.round(parseInt(color.slice(1, 3), 16) * 1.25));
-            const bg = Math.min(255, Math.round(parseInt(color.slice(3, 5), 16) * 1.25));
-            const bb = Math.min(255, Math.round(parseInt(color.slice(5, 7), 16) * 1.25));
+            // Brighten color by 35%
+            const br = Math.min(255, Math.round(parseInt(color.slice(1, 3), 16) * 1.35));
+            const bg = Math.min(255, Math.round(parseInt(color.slice(3, 5), 16) * 1.35));
+            const bb = Math.min(255, Math.round(parseInt(color.slice(5, 7), 16) * 1.35));
             const bright = `rgb(${br},${bg},${bb})`;
             // Diffused glow per dot
-            ctx.globalAlpha = 0.2;
+            ctx.globalAlpha = 0.25;
             ctx.fillStyle = bright;
             ctx.fillRect(dx - 1, dy - 1, OBELISK_DOT + 2, OBELISK_DOT + 2);
             // Brighter core
-            ctx.globalAlpha = 0.5;
+            ctx.globalAlpha = 0.6;
             ctx.fillStyle = bright;
             ctx.fillRect(dx, dy, OBELISK_DOT, OBELISK_DOT);
           }
@@ -726,7 +728,7 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
         const dy = panelY + row * dotStep;
 
         if (isLit) {
-          ctx.globalAlpha = 0.15;
+          ctx.globalAlpha = 0.2;
           ctx.fillStyle = color;
           ctx.fillRect(dx - 1, dy - 1, OBELISK_DOT + 2, OBELISK_DOT + 2);
           ctx.globalAlpha = 1;
@@ -796,22 +798,52 @@ export function renderScene(
     drawObelisk(ctx, theme, frame, timeOverride);
   }
 
-  // 4.7. Laptop glow — gold when any tower quadrant is lit
+  // 4.7. Laptop glow — each CC agent mapped to its tower quadrant
+  //   Quadrant lit (gold)  → gold laptop glow
+  //   Agent doing tool     → hirst color cycle
+  //   Quadrant off (black) → no glow
   const towerInfo = getPixelTowerData();
   if (towerInfo.connected) {
     const topPixels = towerInfo.data.panels.top;
-    const anyQuadrantLit = [0, 1, 5, 6, 3, 4, 8, 9, 15, 16, 20, 21, 18, 19, 23, 24].some(
-      (i) => topPixels[i] !== "#000000"
-    );
-    if (anyQuadrantLit) {
-      for (const agent of agents) {
-        if (agent.source !== "cc") continue;
-        if (agent.state === "reading" || agent.state === "typing" || agent.state === "waiting") continue;
-        if (agent.subagentClass !== null && agent.subagentClass !== undefined) continue;
-        const pos = deskMap.get(agent.id);
-        if (!pos) continue;
-        const dx = pos.x;
-        const dy = pos.y;
+    const SLOT_PIXELS = [
+      [15, 16, 20, 21], // slot 0 — BL quadrant
+      [18, 19, 23, 24], // slot 1 — BR quadrant
+      [0, 1, 5, 6],     // slot 2 — TL quadrant
+      [3, 4, 8, 9],     // slot 3 — TR quadrant
+    ];
+    // Collect main CC agents in discovery order (matches claw slot assignment)
+    const mainCCs: typeof agents[0][] = [];
+    for (const a of agents) {
+      if (a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)) {
+        mainCCs.push(a);
+      }
+    }
+    for (let slot = 0; slot < Math.min(mainCCs.length, 4); slot++) {
+      const agent = mainCCs[slot];
+      const quadrantLit = SLOT_PIXELS[slot].some((i) => topPixels[i] !== "#000000");
+      if (!quadrantLit) continue;
+      const pos = deskMap.get(agent.id);
+      if (!pos) continue;
+      const dx = pos.x;
+      const dy = pos.y;
+      const isTool = agent.state === "reading" || agent.state === "typing" || agent.state === "waiting";
+      if (isTool) {
+        // Hirst cycle — muted, slow
+        const HIRST = [
+          "#cc5544", "#cc9944", "#aacc55", "#55aa77",
+          "#5599aa", "#5566cc", "#8855aa", "#aa5577",
+        ];
+        const color = HIRST[Math.floor(frame / 4) % HIRST.length];
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = color;
+        ctx.fillRect(dx + 2, dy + 1, 4, 4);
+        ctx.globalAlpha = 0.3;
+        ctx.fillRect(dx + 2, dy + 1, 3, 3);
+        ctx.globalAlpha = 0.55;
+        ctx.fillRect(dx + 3, dy + 2, 2, 2);
+        ctx.globalAlpha = 1;
+      } else {
+        // Gold glow — thinking phase
         ctx.globalAlpha = 0.1;
         ctx.fillStyle = "#cc8800";
         ctx.fillRect(dx + 2, dy + 1, 4, 4);
@@ -895,6 +927,19 @@ export function renderScene(
       // Active desk-bound agents sit at their desk
       const pos = deskMap.get(agent.id);
       if (!pos) continue;
+      // Beam-in for newly appearing agents
+      if (!knownAgentIds.has(agent.id) && !beamingAgents.has(agent.id)) {
+        knownAgentIds.add(agent.id);
+        activeBeams.push({
+          fromX: pos.characterX,
+          fromY: pos.characterY - 30, // beam down from above
+          toX: pos.characterX,
+          toY: pos.characterY,
+          frame: 0,
+          agentId: agent.id,
+        });
+        beamingAgents.add(agent.id);
+      }
       // Detect wander→desk transition: spawn teleport beam
       const ws = walkStates.get(agent.id);
       if (ws && !beamingAgents.has(agent.id)) {
@@ -1316,5 +1361,8 @@ export function renderScene(
   }
   for (const id of lastAgentState.keys()) {
     if (!activeIds.has(id)) lastAgentState.delete(id);
+  }
+  for (const id of knownAgentIds) {
+    if (!activeIds.has(id)) knownAgentIds.delete(id);
   }
 }

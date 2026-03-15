@@ -71,6 +71,13 @@ export function assignDesks(
     if (activeIds.has(id)) taken.add(deskIdx);
   }
 
+  // Reserve bottom-right desk (index 8) for openclaw
+  const OPENCLAW_DESK = 8;
+  if (activeIds.has("openclaw-main") && !stickyDesks.has("openclaw-main")) {
+    stickyDesks.set("openclaw-main", OPENCLAW_DESK);
+    taken.add(OPENCLAW_DESK);
+  }
+
   for (const id of agentIds) {
     // Reuse existing sticky assignment if still valid
     if (stickyDesks.has(id)) {

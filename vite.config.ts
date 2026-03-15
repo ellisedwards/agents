@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import fs from "fs";
 
-const buildId = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
+const buildId = Math.random().toString(36).slice(2, 8);
 fs.writeFileSync("dist/.build-id", buildId);
 
 export default defineConfig({
