@@ -902,84 +902,6 @@ export function renderScene(
     drawMonolith(ctx, theme, frame, timeOverride, monolithTransition);
   }
 
-  // 4.7. Laptop glow — each CC agent mapped to its tower quadrant
-  //   Quadrant lit (gold)  → gold laptop glow
-  //   Agent doing tool     → hirst color cycle
-  //   Quadrant off (black) → no glow
-  const towerInfo = getPixelTowerData();
-  if (towerInfo.connected) {
-    const topPixels = towerInfo.data.panels.top;
-    const SLOT_PIXELS = [
-      [15, 16, 20, 21], // slot 0 — BL quadrant (claw slot 0)
-      [18, 19, 23, 24], // slot 1 — BR quadrant (claw slot 1)
-      [0, 1, 5, 6],     // slot 2 — TL quadrant (claw slot 2)
-      [3, 4, 8, 9],     // slot 3 — TR quadrant (claw slot 3)
-    ];
-    // Collect main CC agents (non-subagent)
-    const mainCCs = agents.filter(
-      (a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
-    );
-    // Sticky quadrant assignment — first CC claims slot 0, second claims slot 1, etc.
-    // Clean up agents that left
-    for (const id of stickyQuadrants.keys()) {
-      if (!mainCCs.some((a) => a.id === id)) stickyQuadrants.delete(id);
-    }
-    // Assign unassigned CCs to the next free slot
-    const takenSlots = new Set(stickyQuadrants.values());
-    for (const agent of mainCCs) {
-      if (stickyQuadrants.has(agent.id)) continue;
-      for (let s = 0; s < 4; s++) {
-        if (!takenSlots.has(s)) {
-          stickyQuadrants.set(agent.id, s);
-          takenSlots.add(s);
-          break;
-        }
-      }
-    }
-    // Draw glow for each assigned CC based on their quadrant's pixels
-    for (const agent of mainCCs) {
-      const slot = stickyQuadrants.get(agent.id);
-      if (slot === undefined) continue;
-      const quadrantLit = SLOT_PIXELS[slot].some((i) => topPixels[i] !== "#000000");
-      if (!quadrantLit) continue;
-      if (agent.state === "lounging" || agent.state === "departing") continue;
-      const pos = deskMap.get(agent.id);
-      if (!pos) continue;
-      const dx = pos.x;
-      const dy = pos.y;
-      const isTool = agent.state === "reading" || agent.state === "typing" || agent.state === "waiting";
-      if (isTool) {
-        // Hirst cycle — jewel tones inspired by spot paintings
-        const HIRST = [
-          "#5ea87a", "#d4a03c", "#4a9bc7", "#7b68ae",
-          "#cc7833", "#4daa8d", "#6b9e8a", "#8baa3c",
-          "#d46a4e", "#5c8dbf", "#5b9a7c", "#78b5a0",
-        ];
-        const color = HIRST[Math.floor(frame / 4) % HIRST.length];
-        ctx.globalAlpha = 0.15;
-        ctx.fillStyle = color;
-        ctx.fillRect(dx + 2, dy + 1, 4, 4);
-        ctx.globalAlpha = 0.3;
-        ctx.fillRect(dx + 2, dy + 1, 3, 3);
-        ctx.globalAlpha = 0.55;
-        ctx.fillRect(dx + 3, dy + 2, 2, 2);
-        ctx.globalAlpha = 1;
-      } else {
-        // Gold glow — thinking phase
-        ctx.globalAlpha = 0.1;
-        ctx.fillStyle = "#cc8800";
-        ctx.fillRect(dx + 2, dy + 1, 4, 4);
-        ctx.globalAlpha = 0.25;
-        ctx.fillStyle = "#ddaa22";
-        ctx.fillRect(dx + 2, dy + 1, 3, 3);
-        ctx.globalAlpha = 0.7;
-        ctx.fillStyle = "#ffcc44";
-        ctx.fillRect(dx + 3, dy + 2, 2, 2);
-        ctx.globalAlpha = 1;
-      }
-    }
-  }
-
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)
   const loungeFireplace = { x: BUILDING_X + 18, y: FLOOR_Y + 12 };
   const loungeGuitar = { x: BUILDING_X + BUILDING_W - 20, y: FLOOR_Y + 12 };
@@ -1421,6 +1343,74 @@ export function renderScene(
 
   // 9. Draw desk fronts (tables + laptops) on top of agents
   drawDeskFronts();
+
+  // 10. Laptop glow — on top of desk fronts
+  const towerInfo = getPixelTowerData();
+  if (towerInfo.connected) {
+    const topPixels = towerInfo.data.panels.top;
+    const SLOT_PIXELS = [
+      [15, 16, 20, 21], // slot 0 — BL quadrant (claw slot 0)
+      [18, 19, 23, 24], // slot 1 — BR quadrant (claw slot 1)
+      [0, 1, 5, 6],     // slot 2 — TL quadrant (claw slot 2)
+      [3, 4, 8, 9],     // slot 3 — TR quadrant (claw slot 3)
+    ];
+    const mainCCs = agents.filter(
+      (a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
+    );
+    for (const id of stickyQuadrants.keys()) {
+      if (!mainCCs.some((a) => a.id === id)) stickyQuadrants.delete(id);
+    }
+    const takenSlots = new Set(stickyQuadrants.values());
+    for (const agent of mainCCs) {
+      if (stickyQuadrants.has(agent.id)) continue;
+      for (let s = 0; s < 4; s++) {
+        if (!takenSlots.has(s)) {
+          stickyQuadrants.set(agent.id, s);
+          takenSlots.add(s);
+          break;
+        }
+      }
+    }
+    for (const agent of mainCCs) {
+      const slot = stickyQuadrants.get(agent.id);
+      if (slot === undefined) continue;
+      const quadrantLit = SLOT_PIXELS[slot].some((i) => topPixels[i] !== "#000000");
+      if (!quadrantLit) continue;
+      if (agent.state === "lounging" || agent.state === "departing") continue;
+      const pos = deskMap.get(agent.id);
+      if (!pos) continue;
+      const dx = pos.x;
+      const dy = pos.y;
+      const isTool = agent.state === "reading" || agent.state === "typing" || agent.state === "waiting";
+      if (isTool) {
+        const HIRST = [
+          "#5ea87a", "#d4a03c", "#4a9bc7", "#7b68ae",
+          "#cc7833", "#4daa8d", "#6b9e8a", "#8baa3c",
+          "#d46a4e", "#5c8dbf", "#5b9a7c", "#78b5a0",
+        ];
+        const color = HIRST[Math.floor(frame / 4) % HIRST.length];
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = color;
+        ctx.fillRect(dx + 2, dy + 1, 4, 4);
+        ctx.globalAlpha = 0.3;
+        ctx.fillRect(dx + 2, dy + 1, 3, 3);
+        ctx.globalAlpha = 0.55;
+        ctx.fillRect(dx + 3, dy + 2, 2, 2);
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.globalAlpha = 0.1;
+        ctx.fillStyle = "#cc8800";
+        ctx.fillRect(dx + 2, dy + 1, 4, 4);
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = "#ddaa22";
+        ctx.fillRect(dx + 2, dy + 1, 3, 3);
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = "#ffcc44";
+        ctx.fillRect(dx + 3, dy + 2, 2, 2);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
 
   // Draw and advance poof particles
   for (let i = activePoofs.length - 1; i >= 0; i--) {
