@@ -499,6 +499,40 @@ function drawForestTree(ctx: CanvasRenderingContext2D, x: number, gy: number, va
   }
 }
 
+function drawRoundTree(ctx: CanvasRenderingContext2D, x: number, gy: number, variant: number, theme: SceneTheme) {
+  const c = theme.vegetation.colors;
+  const v = variant % 3;
+  // GBA Pokemon-style round puffy trees — dense, repeated canopy
+  if (v === 0) {
+    rect(ctx, x, gy - 4, 2, 4, c.trunk);
+    // Round canopy (layered circles approximated with rects)
+    rect(ctx, x - 4, gy - 10, 10, 5, c.leaf1);
+    rect(ctx, x - 5, gy - 9, 12, 3, c.leaf2);
+    rect(ctx, x - 3, gy - 12, 8, 3, c.leaf3);
+    rect(ctx, x - 2, gy - 13, 6, 2, c.leaf4);
+    // Canopy highlights
+    rect(ctx, x - 1, gy - 11, 3, 1, c.leaf4);
+    rect(ctx, x + 2, gy - 9, 2, 1, c.leaf4);
+  } else if (v === 1) {
+    // Slightly taller variant
+    rect(ctx, x, gy - 5, 2, 5, c.trunk);
+    rect(ctx, x + 1, gy - 4, 1, 3, c.trunkLight);
+    rect(ctx, x - 5, gy - 12, 12, 6, c.leaf1);
+    rect(ctx, x - 6, gy - 11, 14, 4, c.leaf2);
+    rect(ctx, x - 4, gy - 15, 10, 4, c.leaf3);
+    rect(ctx, x - 3, gy - 16, 8, 2, c.leaf4);
+    rect(ctx, x - 1, gy - 13, 4, 2, c.leaf4);
+  } else {
+    // Small bush-tree
+    rect(ctx, x, gy - 3, 2, 3, c.trunk);
+    rect(ctx, x - 3, gy - 8, 8, 4, c.leaf2);
+    rect(ctx, x - 4, gy - 7, 10, 2, c.leaf2);
+    rect(ctx, x - 2, gy - 9, 6, 2, c.leaf3);
+    rect(ctx, x - 1, gy - 10, 4, 2, c.leaf4);
+    rect(ctx, x, gy - 8, 2, 1, c.leaf4);
+  }
+}
+
 function drawPalmTree(ctx: CanvasRenderingContext2D, x: number, gy: number, variant: number, theme: SceneTheme) {
   const c = theme.vegetation.colors;
   const v = variant % 3;
@@ -602,6 +636,9 @@ function drawVegetation(ctx: CanvasRenderingContext2D, x: number, gy: number, va
       break;
     case "boulders":
       if (variant % 2 === 0) drawBoulder(ctx, x, gy, variant, theme);
+      break;
+    case "round-trees":
+      drawRoundTree(ctx, x, gy, variant, theme);
       break;
   }
 }
@@ -1074,37 +1111,109 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     px(ctx, ruX + 22, ruY + 13, "#6a5840");
   }
 
-  // Pallet Town — tall grass patch and wooden fence in activity area
-  if (theme.id === "pallet-town" && !theme.hasGuitar) {
-    const ptX = bx + bw - 40;
-    const ptY = by + 18;
-    const grassDk = "#3a8833";
-    const grassMd = "#44aa44";
-    const grassLt = "#55cc55";
+  // Pallet Town — Pokemon GBA-style outdoor scene
+  if (theme.id === "pallet-town") {
+    const grassBright = "#55cc55";
+    const grassMid = "#44bb44";
+    const sandColor = "#d8c8a0";
+    const sandEdge = "#c0b080";
 
-    // Tall grass patch (wild encounter area)
-    rect(ctx, ptX, ptY + 4, 20, 8, grassDk);
-    rect(ctx, ptX + 1, ptY + 4, 18, 7, grassMd);
-    // Grass blade tips
-    for (let gx = 0; gx < 20; gx += 2) {
-      rect(ctx, ptX + gx, ptY + 3, 1, 1, grassLt);
-      if (gx % 4 === 0) rect(ctx, ptX + gx + 1, ptY + 2, 1, 1, grassMd);
+    // Sandy carpet — central clearing where agents work
+    // Draw a large sandy rect with irregular grass edges
+    const sandPad = 8;
+    const sx1 = bx + sandPad;
+    const sy1 = fy + sandPad;
+    const sw = bw - sandPad * 2;
+    const sh = fh - sandPad * 2;
+    // Base sand
+    rect(ctx, sx1, sy1, sw, sh, sandColor);
+    rect(ctx, sx1 + 1, sy1 + 1, sw - 2, sh - 2, "#ddd0a8");
+    // Sand texture dots
+    for (let ty = 0; ty < sh; ty += 4) {
+      for (let tx = 0; tx < sw; tx += 5) {
+        px(ctx, sx1 + tx + (ty % 2) * 2, sy1 + ty, sandEdge);
+      }
+    }
+    // Irregular grass-to-sand border — grass nibbles into sand
+    // Top edge
+    for (let gx = sx1; gx < sx1 + sw; gx += 2) {
+      const depth = 2 + Math.floor(Math.sin(gx * 0.2) * 2 + Math.cos(gx * 0.35) * 1.5);
+      rect(ctx, gx, sy1 - 1, 2, depth, grassMid);
+      rect(ctx, gx, sy1 - 1, 2, depth - 1, grassBright);
+    }
+    // Bottom edge
+    for (let gx = sx1; gx < sx1 + sw; gx += 2) {
+      const depth = 2 + Math.floor(Math.sin(gx * 0.25 + 1) * 2 + Math.cos(gx * 0.15) * 1.5);
+      rect(ctx, gx, sy1 + sh - depth + 1, 2, depth, grassMid);
+      rect(ctx, gx, sy1 + sh - depth + 2, 2, depth - 1, grassBright);
+    }
+    // Left edge
+    for (let gy = sy1; gy < sy1 + sh; gy += 2) {
+      const depth = 2 + Math.floor(Math.sin(gy * 0.2) * 2);
+      rect(ctx, sx1 - 1, gy, depth, 2, grassMid);
+      rect(ctx, sx1 - 1, gy, depth - 1, 2, grassBright);
+    }
+    // Right edge
+    for (let gy = sy1; gy < sy1 + sh; gy += 2) {
+      const depth = 2 + Math.floor(Math.cos(gy * 0.18) * 2);
+      rect(ctx, sx1 + sw - depth + 1, gy, depth, 2, grassMid);
+      rect(ctx, sx1 + sw - depth + 2, gy, depth - 1, 2, grassBright);
     }
 
-    // Wooden fence section
-    const fenceY = ptY + 1;
-    const fenceColor = "#887755";
-    const fenceLight = "#998866";
-    // Posts
-    for (let fp = 0; fp < 4; fp++) {
-      const fpx = ptX + 22 + fp * 5;
-      rect(ctx, fpx, fenceY, 2, 8, fenceColor);
-      rect(ctx, fpx, fenceY, 1, 8, fenceLight);
+    // Houses on the back wall
+    // Right house (teal roof)
+    const hx = bx + bw - 40;
+    const hy = by + 1;
+    rect(ctx, hx - 2, hy, 24, 3, "#449988");
+    rect(ctx, hx - 1, hy, 22, 2, "#55bbaa");
+    rect(ctx, hx, hy, 20, 1, "#66ccbb");
+    rect(ctx, hx, hy + 3, 20, 12, "#c8b890");
+    rect(ctx, hx + 1, hy + 3, 18, 11, "#d8c8a0");
+    rect(ctx, hx + 1, hy + 7, 18, 1, "#c0b080");
+    rect(ctx, hx + 8, hy + 7, 5, 8, "#7a5a33");
+    rect(ctx, hx + 9, hy + 7, 3, 7, "#8a6a44");
+    px(ctx, hx + 11, hy + 10, "#ddaa44");
+    rect(ctx, hx + 2, hy + 4, 5, 4, "#88bbdd");
+    rect(ctx, hx + 3, hy + 4, 3, 3, "#aaddee");
+    rect(ctx, hx + 14, hy + 4, 5, 4, "#88bbdd");
+    rect(ctx, hx + 15, hy + 4, 3, 3, "#aaddee");
+    rect(ctx, hx + 16, hy - 3, 3, 4, "#887766");
+
+    // Left house (red roof) — away from fireplace
+    const h2x = bx + 30;
+    const h2y = by + 3;
+    rect(ctx, h2x - 1, h2y, 16, 3, "#cc5544");
+    rect(ctx, h2x, h2y, 14, 2, "#dd6655");
+    rect(ctx, h2x + 1, h2y, 12, 1, "#ee8877");
+    rect(ctx, h2x, h2y + 3, 14, 10, "#eee8d8");
+    rect(ctx, h2x + 1, h2y + 3, 12, 9, "#f0ebe0");
+    rect(ctx, h2x + 5, h2y + 6, 4, 7, "#7a5a33");
+    rect(ctx, h2x + 6, h2y + 6, 2, 6, "#8a6a44");
+    rect(ctx, h2x + 1, h2y + 4, 4, 3, "#88bbdd");
+    rect(ctx, h2x + 2, h2y + 4, 2, 2, "#aaddee");
+    // Mailbox
+    rect(ctx, h2x - 3, h2y + 10, 3, 3, "#cc4433");
+    rect(ctx, h2x - 3, h2y + 10, 3, 1, "#dd5544");
+    rect(ctx, h2x - 2, h2y + 13, 1, 2, "#665544");
+
+    // Flowers
+    const flowers = [
+      { x: bx + 6, y: fy + 3, c: "#ee6688" },
+      { x: bx + 18, y: fy + 4, c: "#ffaa44" },
+      { x: bx + bw - 10, y: fy + 3, c: "#ee6688" },
+      { x: bx + 5, y: fy + fh - 4, c: "#ffcc44" },
+      { x: bx + bw - 6, y: fy + fh - 3, c: "#ee6688" },
+    ];
+    for (const f of flowers) {
+      px(ctx, f.x, f.y, f.c);
+      px(ctx, f.x + 1, f.y, f.c);
+      px(ctx, f.x, f.y - 1, grassBright);
     }
-    // Horizontal rails
-    rect(ctx, ptX + 22, fenceY + 2, 17, 1, fenceColor);
-    rect(ctx, ptX + 22, fenceY + 5, 17, 1, fenceColor);
-    rect(ctx, ptX + 22, fenceY + 2, 17, 1, fenceLight);
+
+    // Sign post
+    rect(ctx, bx + bw / 2 + 22, fy + fh - 10, 2, 6, "#665544");
+    rect(ctx, bx + bw / 2 + 20, fy + fh - 12, 6, 3, "#aa9060");
+    rect(ctx, bx + bw / 2 + 20, fy + fh - 12, 6, 1, "#bba070");
   }
 
   // Tropical island decorations
@@ -1237,10 +1346,24 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
 
 function drawBackgroundTrees(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
   seed = 500;
-  const count = Math.floor(16 * theme.vegetation.density);
-  if (count <= 0) return;
   const hasIsland = !!theme.ground.island;
   const islandMargin = theme.ground.island?.margin ?? 0;
+
+  // For round-trees: dense clustered rows like GBA Pokemon
+  if (theme.vegetation.type === "round-trees") {
+    // Two dense rows of tightly packed round trees
+    for (let row = 0; row < 2; row++) {
+      const vy = 26 + row * 8;
+      for (let tx = 4; tx < W - 4; tx += 8) {
+        const offset = row % 2 === 0 ? 0 : 4; // stagger rows
+        drawRoundTree(ctx, tx + offset + Math.floor(srand() * 2), vy + Math.floor(srand() * 2), Math.floor(srand() * 3), theme);
+      }
+    }
+    return;
+  }
+
+  const count = Math.floor(16 * theme.vegetation.density);
+  if (count <= 0) return;
   const spacing = Math.floor(W / count);
   for (let i = 0; i < count; i++) {
     const vx = Math.floor(spacing * 0.5) + i * spacing + Math.floor(srand() * 6);
@@ -1255,6 +1378,26 @@ function drawBackgroundTrees(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
 
 function drawSideTrees(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
   if (theme.vegetation.density <= 0) return;
+
+  // Round-trees: dense clustered columns on both sides and bottom
+  if (theme.vegetation.type === "round-trees") {
+    seed = 800;
+    // Left column — 2 trees wide, packed vertically
+    for (let gy = 38; gy < H - 8; gy += 10) {
+      drawRoundTree(ctx, 8, gy, Math.floor(srand() * 3), theme);
+      drawRoundTree(ctx, 18, gy + 4, Math.floor(srand() * 3), theme);
+    }
+    // Right column
+    for (let gy = 40; gy < H - 8; gy += 10) {
+      drawRoundTree(ctx, W - 10, gy, Math.floor(srand() * 3), theme);
+      drawRoundTree(ctx, W - 20, gy + 4, Math.floor(srand() * 3), theme);
+    }
+    // Bottom row — dense
+    for (let gx = 30; gx < W - 30; gx += 10) {
+      drawRoundTree(ctx, gx, H - 4, Math.floor(srand() * 3), theme);
+    }
+    return;
+  }
 
   const leftBase = [
     { x: 10, y: 42, v: 2 }, { x: 18, y: 68, v: 1 }, { x: 6, y: 88, v: 3 },
@@ -1314,11 +1457,13 @@ function drawDeskFront(
   theme: SceneTheme
 ) {
   const d = theme.desk;
-  rect(ctx, dx - 10, dy + 6, 20, 2, d.topColor);
-  rect(ctx, dx - 10, dy + 6, 20, 1, d.topColor);
-  rect(ctx, dx - 10, dy + 7, 20, 1, d.legColor);
-  rect(ctx, dx - 9, dy + 8, 2, 3, d.legColor);
-  rect(ctx, dx + 7, dy + 8, 2, 3, d.legColor);
+  if (!d.hideDesks) {
+    rect(ctx, dx - 10, dy + 6, 20, 2, d.topColor);
+    rect(ctx, dx - 10, dy + 6, 20, 1, d.topColor);
+    rect(ctx, dx - 10, dy + 7, 20, 1, d.legColor);
+    rect(ctx, dx - 9, dy + 8, 2, 3, d.legColor);
+    rect(ctx, dx + 7, dy + 8, 2, 3, d.legColor);
+  }
   if (hasLaptop) {
     rect(ctx, dx + 0, dy + 0, 9, 6, "#bbbbc4");
     rect(ctx, dx + 1, dy + 0, 7, 1, "#ccccd4");

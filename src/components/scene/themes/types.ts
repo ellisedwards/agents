@@ -49,7 +49,7 @@ export interface SceneTheme {
 
   // Vegetation
   vegetation: {
-    type: "trees" | "palms" | "cacti" | "mixed-desert" | "boulders";
+    type: "trees" | "palms" | "cacti" | "mixed-desert" | "boulders" | "round-trees";
     colors: {
       trunk: string;
       trunkLight: string;
@@ -149,5 +149,6 @@ export interface SceneTheme {
     chairSeat: string;
     chairLight: string;
     hideChairs?: boolean;
+    hideDesks?: boolean;
   };
 }

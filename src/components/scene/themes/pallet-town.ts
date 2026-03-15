@@ -20,36 +20,36 @@ export const palletTownTheme: SceneTheme = {
   ],
 
   ground: {
-    baseColor1: "#d4c8a0",
-    baseColor2: "#ccc098",
+    baseColor1: "#55bb55",
+    baseColor2: "#4aaa4a",
     tileSize: 8,
-    decorColor: "#6aaa55",
-    decorCount: 70,
+    decorColor: "#66cc60",
+    decorCount: 100,
     decorHeight: 2,
   },
 
   vegetation: {
-    type: "trees",
+    type: "round-trees",
     colors: {
       trunk: "#665533",
       trunkLight: "#776644",
-      leaf1: "#2a8833",
-      leaf2: "#3aaa44",
-      leaf3: "#44cc55",
-      leaf4: "#55dd66",
+      leaf1: "#2a7733",
+      leaf2: "#339933",
+      leaf3: "#44bb44",
+      leaf4: "#55cc55",
     },
-    density: 1.2,
+    density: 1.8,
   },
 
   building: {
     wallColor: "#f0e8d8",
     wallDark: "#e0d8c8",
     wallAccent: "#e8e0d0",
-    floorColor1: "#8a7a60",
-    floorColor2: "#887858",
-    floorEdge1: "#7a6a50",
-    floorEdge2: "#6a5a40",
-    style: "walled",
+    floorColor1: "#d8c8a0",
+    floorColor2: "#d0c098",
+    floorEdge1: "#c0b088",
+    floorEdge2: "#b8a880",
+    style: "none",
   },
 
   fireVessel: {
@@ -94,5 +94,7 @@ export const palletTownTheme: SceneTheme = {
     chairBack: "#8a7a5a",
     chairSeat: "#9a8a6a",
     chairLight: "#aa9a7a",
+    hideChairs: true,
+    hideDesks: true,
   },
 };
