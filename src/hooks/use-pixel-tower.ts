@@ -15,6 +15,7 @@ export interface PixelTowerData {
     status: string;
     color: string;
   };
+  clawActivity?: string;
 }
 
 const EMPTY: PixelTowerData = {

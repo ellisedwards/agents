@@ -165,9 +165,17 @@ app.post("/api/tower-reset", (_req, res) => {
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
   try {
-    const r = await fetch(`${claw}/pixels`, { signal: AbortSignal.timeout(2000) });
-    if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
-    res.json(await r.json());
+    const [pixelsRes, statusRes] = await Promise.all([
+      fetch(`${claw}/pixels`, { signal: AbortSignal.timeout(2000) }),
+      fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+    ]);
+    if (!pixelsRes.ok) return res.status(pixelsRes.status).json({ error: "claw unreachable" });
+    const data = await pixelsRes.json();
+    if (statusRes?.ok) {
+      const status = await statusRes.json();
+      data.clawActivity = status.claw_activity || "idle";
+    }
+    res.json(data);
   } catch (e) {
     console.error("[proxy] /api/pixels error:", e);
     res.status(502).json({ error: "claw unreachable" });
@@ -187,7 +195,7 @@ app.get("/api/uptime-kuma", async (_req, res) => {
 
 // --- Static files (production) ---
 const clientDir = path.join(__dirname, "client");
-app.use(express.static(clientDir));
+app.use(express.static(clientDir, { etag: false, maxAge: 0 }));
 app.get("*", (_req, res) => {
   res.sendFile(path.join(clientDir, "index.html"));
 });

@@ -796,37 +796,27 @@ export function renderScene(
     drawObelisk(ctx, theme, frame, timeOverride);
   }
 
-  // 4.7. Laptop glow synced to obelisk — only during "thinking" (no bubble visible)
+  // 4.7. Laptop glow synced to claw_activity (500ms poll, same as tower)
   const towerInfo = getPixelTowerData();
-  if (towerInfo.connected) {
-    const topPixels = towerInfo.data.panels.top;
-    // All quadrant pixel indices in top panel
-    const allQuadrantPixels = [0, 1, 5, 6, 3, 4, 8, 9, 15, 16, 20, 21, 18, 19, 23, 24];
-    // Check if any quadrant pixel is lit
-    const anyLit = allQuadrantPixels.some((i) => topPixels[i] !== "#000000");
-    if (anyLit) {
-      // Apply bright golden glow to all CC agents in "thinking" state at their desk
-      for (const agent of agents) {
-        if (agent.source !== "cc" || agent.state !== "thinking") continue;
+  if (towerInfo.connected && towerInfo.data.clawActivity === "thinking") {
+    for (const agent of agents) {
+        if (agent.source !== "cc") continue;
+        if (agent.subagentClass !== null && agent.subagentClass !== undefined) continue;
         const pos = deskMap.get(agent.id);
         if (!pos) continue;
         const dx = pos.x;
         const dy = pos.y;
-        // Radiance around laptop screen
         ctx.globalAlpha = 0.1;
         ctx.fillStyle = "#cc8800";
         ctx.fillRect(dx + 2, dy + 1, 4, 4);
-        // Glow matching screen size (2x2 at dx+3, dy+2)
         ctx.globalAlpha = 0.25;
         ctx.fillStyle = "#ddaa22";
         ctx.fillRect(dx + 2, dy + 1, 3, 3);
-        // Golden screen (same 2x2 as original laptop pixel)
         ctx.globalAlpha = 0.7;
         ctx.fillStyle = "#ffcc44";
         ctx.fillRect(dx + 3, dy + 2, 2, 2);
         ctx.globalAlpha = 1;
       }
-    }
   }
 
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)
@@ -980,7 +970,7 @@ export function renderScene(
 
   const isSpaceCat = theme.petType === "space-cat";
 
-  // Space cat float-away: check timer, trigger randomly
+  // Float-away: auto-trigger only in lunar (space-cat), manual trigger works everywhere
   if (isSpaceCat && !floatingAway) {
     nextFloatCheck--;
     if (nextFloatCheck <= 0 && !catWalkState.isSleeping && catWalkState.startledFrames === 0) {
