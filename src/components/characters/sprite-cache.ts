@@ -14,8 +14,15 @@ import { CAT_WIDTH, CAT_HEIGHT, CAT_IDLE, CAT_WALK1, CAT_WALK2, CAT_SLEEP, CAT_S
 import { SPHYNX_WIDTH, SPHYNX_HEIGHT, SPHYNX_IDLE, SPHYNX_WALK1, SPHYNX_WALK2, SPHYNX_SLEEP, SPHYNX_STARTLED } from "./sphynx-cat";
 import { GECKO_WIDTH, GECKO_HEIGHT, GECKO_IDLE, GECKO_WALK1, GECKO_WALK2, GECKO_SLEEP, GECKO_STARTLED } from "./gecko";
 import { SPACE_CAT_WIDTH, SPACE_CAT_HEIGHT, SPACE_CAT_IDLE, SPACE_CAT_WALK1, SPACE_CAT_WALK2, SPACE_CAT_SLEEP, SPACE_CAT_STARTLED } from "./space-cat";
+import { CHARMANDER_SPRITES, CHARMANDER_WIDTH, CHARMANDER_HEIGHT } from "./charmander";
+import { SQUIRTLE_SPRITES, SQUIRTLE_WIDTH, SQUIRTLE_HEIGHT } from "./squirtle";
+import { BULBASAUR_SPRITES, BULBASAUR_WIDTH, BULBASAUR_HEIGHT } from "./bulbasaur";
+import { TRAINER_SPRITES, TRAINER_WIDTH, TRAINER_HEIGHT } from "./trainer";
+import { PIKACHU_SPRITES, PIKACHU_WIDTH, PIKACHU_HEIGHT, PIKACHU_WALK1, PIKACHU_WALK2 } from "./pikachu";
+import { JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT, JIGGLYPUFF_IDLE, JIGGLYPUFF_WALK1, JIGGLYPUFF_WALK2, JIGGLYPUFF_SLEEP, JIGGLYPUFF_STARTLED } from "./jigglypuff";
 
-export type CharacterType = "clawd" | "claw" | `mage-${MageColorIndex}` | "cat" | "sphynx" | "gecko" | "space-cat";
+export type CharacterType = "clawd" | "claw" | `mage-${MageColorIndex}` | "cat" | "sphynx" | "gecko" | "space-cat"
+  | "charmander" | "squirtle" | "bulbasaur" | "trainer" | "pikachu" | "jigglypuff";
 
 interface CachedSprite {
   canvas: OffscreenCanvas;
@@ -35,6 +42,20 @@ function renderToOffscreen(
     ctx.fillRect(r.x, r.y, r.w, r.h);
   }
   return { canvas, width, height };
+}
+
+// Helper to register all 5 agent states for a simple sprite record
+function registerAgentSprites(
+  cache: Map<string, CachedSprite>,
+  name: string,
+  sprites: Record<AgentSpriteState, PixelRect[]>,
+  w: number,
+  h: number
+) {
+  const states: AgentSpriteState[] = ["idle", "typing", "reading", "thinking", "waiting"];
+  for (const state of states) {
+    cache.set(`${name}:${state}`, renderToOffscreen(sprites[state], w, h));
+  }
 }
 
 export function buildSpriteCache(): Map<string, CachedSprite> {
@@ -105,6 +126,24 @@ export function buildSpriteCache(): Map<string, CachedSprite> {
   cache.set("space-cat:walk2", renderToOffscreen(SPACE_CAT_WALK2, SPACE_CAT_WIDTH, SPACE_CAT_HEIGHT));
   cache.set("space-cat:sleep", renderToOffscreen(SPACE_CAT_SLEEP, SPACE_CAT_WIDTH, SPACE_CAT_HEIGHT));
   cache.set("space-cat:startled", renderToOffscreen(SPACE_CAT_STARTLED, SPACE_CAT_WIDTH, SPACE_CAT_HEIGHT));
+
+  // Pokemon sprites
+  registerAgentSprites(cache, "charmander", CHARMANDER_SPRITES, CHARMANDER_WIDTH, CHARMANDER_HEIGHT);
+  registerAgentSprites(cache, "squirtle", SQUIRTLE_SPRITES, SQUIRTLE_WIDTH, SQUIRTLE_HEIGHT);
+  registerAgentSprites(cache, "bulbasaur", BULBASAUR_SPRITES, BULBASAUR_WIDTH, BULBASAUR_HEIGHT);
+  registerAgentSprites(cache, "trainer", TRAINER_SPRITES, TRAINER_WIDTH, TRAINER_HEIGHT);
+  registerAgentSprites(cache, "pikachu", PIKACHU_SPRITES, PIKACHU_WIDTH, PIKACHU_HEIGHT);
+
+  // Pikachu walk frames (for subagent wandering)
+  cache.set("pikachu:walk1", renderToOffscreen(PIKACHU_WALK1, PIKACHU_WIDTH, PIKACHU_HEIGHT));
+  cache.set("pikachu:walk2", renderToOffscreen(PIKACHU_WALK2, PIKACHU_WIDTH, PIKACHU_HEIGHT));
+
+  // Jigglypuff (pet)
+  cache.set("jigglypuff:idle", renderToOffscreen(JIGGLYPUFF_IDLE, JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT));
+  cache.set("jigglypuff:walk1", renderToOffscreen(JIGGLYPUFF_WALK1, JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT));
+  cache.set("jigglypuff:walk2", renderToOffscreen(JIGGLYPUFF_WALK2, JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT));
+  cache.set("jigglypuff:sleep", renderToOffscreen(JIGGLYPUFF_SLEEP, JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT));
+  cache.set("jigglypuff:startled", renderToOffscreen(JIGGLYPUFF_STARTLED, JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT));
 
   return cache;
 }

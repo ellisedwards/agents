@@ -26,7 +26,7 @@ export interface ClawHealth {
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
 export type TowerSize = "small" | "medium" | "large" | "monolith";
-export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base";
+export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base" | "pallet-town";
 
 interface TowerPrefs {
   visible: boolean;
@@ -57,7 +57,7 @@ function saveTowerPrefs(prefs: TowerPrefs) {
 }
 
 const THEME_STORAGE_KEY = "agent-office-theme";
-const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "tropical-island", "lunar-base"];
+const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "tropical-island", "lunar-base", "pallet-town"];
 
 function loadThemeId(): ThemeId {
   if (typeof window === "undefined") return "forest";

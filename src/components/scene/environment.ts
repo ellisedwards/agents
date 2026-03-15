@@ -1074,6 +1074,39 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     px(ctx, ruX + 22, ruY + 13, "#6a5840");
   }
 
+  // Pallet Town — tall grass patch and wooden fence in activity area
+  if (theme.id === "pallet-town" && !theme.hasGuitar) {
+    const ptX = bx + bw - 40;
+    const ptY = by + 18;
+    const grassDk = "#3a8833";
+    const grassMd = "#44aa44";
+    const grassLt = "#55cc55";
+
+    // Tall grass patch (wild encounter area)
+    rect(ctx, ptX, ptY + 4, 20, 8, grassDk);
+    rect(ctx, ptX + 1, ptY + 4, 18, 7, grassMd);
+    // Grass blade tips
+    for (let gx = 0; gx < 20; gx += 2) {
+      rect(ctx, ptX + gx, ptY + 3, 1, 1, grassLt);
+      if (gx % 4 === 0) rect(ctx, ptX + gx + 1, ptY + 2, 1, 1, grassMd);
+    }
+
+    // Wooden fence section
+    const fenceY = ptY + 1;
+    const fenceColor = "#887755";
+    const fenceLight = "#998866";
+    // Posts
+    for (let fp = 0; fp < 4; fp++) {
+      const fpx = ptX + 22 + fp * 5;
+      rect(ctx, fpx, fenceY, 2, 8, fenceColor);
+      rect(ctx, fpx, fenceY, 1, 8, fenceLight);
+    }
+    // Horizontal rails
+    rect(ctx, ptX + 22, fenceY + 2, 17, 1, fenceColor);
+    rect(ctx, ptX + 22, fenceY + 5, 17, 1, fenceColor);
+    rect(ctx, ptX + 22, fenceY + 2, 17, 1, fenceLight);
+  }
+
   // Tropical island decorations
   if (theme.id === "tropical-island") {
     // Skeleton half-buried in sand — right side where guitar/amp would be

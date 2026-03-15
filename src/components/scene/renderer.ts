@@ -636,6 +636,60 @@ export function drawMonolithSurrounds(ctx: CanvasRenderingContext2D, theme: Scen
     ctx.fillRect(ox + slabW, baseY - 7, 1, 3);
   }
 
+  // Pallet Town: tall grass and sign post around the monolith
+  if (theme.id === "pallet-town") {
+    const baseY = oy + slabH;
+    const baseCX = cx;
+    const grassDk = "#3a8833";
+    const grassMd = "#44aa44";
+    const grassLt = "#55cc55";
+
+    // Tall grass patches — left side
+    const grassPatches = [
+      { dx: -16, dy: 2, w: 6, h: 4 },
+      { dx: -20, dy: 4, w: 5, h: 3 },
+      { dx: -12, dy: 5, w: 4, h: 3 },
+      // Right side
+      { dx: 12, dy: 2, w: 6, h: 4 },
+      { dx: 18, dy: 4, w: 5, h: 3 },
+      { dx: 10, dy: 5, w: 4, h: 3 },
+      // Front
+      { dx: -6, dy: 7, w: 4, h: 3 },
+      { dx: 4, dy: 8, w: 5, h: 3 },
+    ];
+    for (const g of grassPatches) {
+      const gx = baseCX + g.dx;
+      const gy = baseY + g.dy;
+      ctx.fillStyle = grassDk;
+      ctx.fillRect(gx, gy, g.w, g.h);
+      ctx.fillStyle = grassMd;
+      ctx.fillRect(gx, gy, g.w, g.h - 1);
+      // Grass tips
+      for (let t = 0; t < g.w; t += 2) {
+        ctx.fillStyle = grassLt;
+        ctx.fillRect(gx + t, gy - 1, 1, 1);
+      }
+    }
+
+    // Wooden sign post — right of monolith
+    const signX = baseCX + 22;
+    const signY = baseY - 2;
+    // Post
+    ctx.fillStyle = "#665533";
+    ctx.fillRect(signX + 2, signY, 2, 10);
+    ctx.fillStyle = "#776644";
+    ctx.fillRect(signX + 2, signY, 1, 10);
+    // Sign board
+    ctx.fillStyle = "#aa9060";
+    ctx.fillRect(signX, signY - 4, 6, 4);
+    ctx.fillStyle = "#bba070";
+    ctx.fillRect(signX, signY - 4, 6, 1);
+    // Text lines on sign
+    ctx.fillStyle = "#665533";
+    ctx.fillRect(signX + 1, signY - 3, 4, 1);
+    ctx.fillRect(signX + 1, signY - 1, 3, 1);
+  }
+
 
 }
 
@@ -926,11 +980,18 @@ export function renderScene(
     const skins = theme.skins;
     if (agent.subagentClass !== null && agent.subagentClass !== undefined) {
       const prefix = skins?.subagent ?? "mage";
-      charType = `${prefix}-${agent.subagentClass}` as CharacterType;
+      // Pikachu (and other non-colored subagents): no color suffix
+      charType = (prefix === "pikachu" ? "pikachu" : `${prefix}-${agent.subagentClass}`) as CharacterType;
     } else if (agent.source === "openclaw") {
       charType = (skins?.openclaw ?? "claw") as CharacterType;
     } else {
-      charType = (skins?.agent ?? "clawd") as CharacterType;
+      const agentSkin = skins?.agent ?? "clawd";
+      if (agentSkin === "starter") {
+        const starters: CharacterType[] = ["charmander", "squirtle", "bulbasaur"];
+        charType = starters[agent.teamColor % starters.length];
+      } else {
+        charType = agentSkin as CharacterType;
+      }
     }
 
     let drawX: number;
