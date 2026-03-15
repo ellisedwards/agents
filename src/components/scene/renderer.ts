@@ -87,6 +87,8 @@ const beamingAgents = new Set<string>();
 const lastAgentState = new Map<string, string>();
 // Track known agents to detect first appearance (beam-in)
 const knownAgentIds = new Set<string>();
+// Sticky quadrant assignment — each CC keeps its slot for the session
+const stickyQuadrants = new Map<string, number>();
 
 // Poof particle system
 interface Poof {
@@ -806,22 +808,38 @@ export function renderScene(
   if (towerInfo.connected) {
     const topPixels = towerInfo.data.panels.top;
     const SLOT_PIXELS = [
-      [15, 16, 20, 21], // slot 0 — BL quadrant
-      [18, 19, 23, 24], // slot 1 — BR quadrant
-      [0, 1, 5, 6],     // slot 2 — TL quadrant
-      [3, 4, 8, 9],     // slot 3 — TR quadrant
+      [15, 16, 20, 21], // slot 0 — BL quadrant (claw slot 0)
+      [18, 19, 23, 24], // slot 1 — BR quadrant (claw slot 1)
+      [0, 1, 5, 6],     // slot 2 — TL quadrant (claw slot 2)
+      [3, 4, 8, 9],     // slot 3 — TR quadrant (claw slot 3)
     ];
-    // Collect main CC agents sorted by most recently active first
-    const mainCCs = agents
-      .filter((a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined))
-      .sort((a, b) => b.lastActivity - a.lastActivity);
-    // Find which quadrants are lit
-    const litSlots = SLOT_PIXELS
-      .map((pixels, slot) => ({ slot, lit: pixels.some((i) => topPixels[i] !== "#000000") }))
-      .filter((s) => s.lit);
-    // Pair: most active CC → first lit quadrant, etc.
-    for (let i = 0; i < Math.min(mainCCs.length, litSlots.length); i++) {
-      const agent = mainCCs[i];
+    // Collect main CC agents (non-subagent)
+    const mainCCs = agents.filter(
+      (a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
+    );
+    // Sticky quadrant assignment — first CC claims slot 0, second claims slot 1, etc.
+    // Clean up agents that left
+    for (const id of stickyQuadrants.keys()) {
+      if (!mainCCs.some((a) => a.id === id)) stickyQuadrants.delete(id);
+    }
+    // Assign unassigned CCs to the next free slot
+    const takenSlots = new Set(stickyQuadrants.values());
+    for (const agent of mainCCs) {
+      if (stickyQuadrants.has(agent.id)) continue;
+      for (let s = 0; s < 4; s++) {
+        if (!takenSlots.has(s)) {
+          stickyQuadrants.set(agent.id, s);
+          takenSlots.add(s);
+          break;
+        }
+      }
+    }
+    // Draw glow for each assigned CC based on their quadrant's pixels
+    for (const agent of mainCCs) {
+      const slot = stickyQuadrants.get(agent.id);
+      if (slot === undefined) continue;
+      const quadrantLit = SLOT_PIXELS[slot].some((i) => topPixels[i] !== "#000000");
+      if (!quadrantLit) continue;
       if (agent.state === "lounging" || agent.state === "departing") continue;
       const pos = deskMap.get(agent.id);
       if (!pos) continue;
