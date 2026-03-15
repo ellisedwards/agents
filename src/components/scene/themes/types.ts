@@ -131,6 +131,16 @@ export interface SceneTheme {
   // Pet type
   petType: "cat" | "sphynx" | "gecko" | "space-cat";
 
+  // Agent skins — override character sprites per theme
+  skins?: {
+    /** Main CC agent sprite (default: "clawd") */
+    agent?: string;
+    /** OpenClaw agent sprite (default: "claw") */
+    openclaw?: string;
+    /** Subagent sprite prefix — appended with color index (default: "mage") */
+    subagent?: string;
+  };
+
   // Desk
   desk: {
     topColor: string;

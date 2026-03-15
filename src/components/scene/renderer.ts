@@ -923,12 +923,14 @@ export function renderScene(
     if (agent.state === "departing") continue;
 
     let charType: CharacterType;
+    const skins = theme.skins;
     if (agent.subagentClass !== null && agent.subagentClass !== undefined) {
-      charType = `mage-${agent.subagentClass}` as CharacterType;
+      const prefix = skins?.subagent ?? "mage";
+      charType = `${prefix}-${agent.subagentClass}` as CharacterType;
     } else if (agent.source === "openclaw") {
-      charType = "claw";
+      charType = (skins?.openclaw ?? "claw") as CharacterType;
     } else {
-      charType = "clawd";
+      charType = (skins?.agent ?? "clawd") as CharacterType;
     }
 
     let drawX: number;
