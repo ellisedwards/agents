@@ -377,21 +377,25 @@ const MONOLITH_GAP = 1;    // 1px gap between dots
 const MONOLITH_PAD = 2;    // padding inside the slab
 const MONOLITH_PANEL_GAP = 3; // gap between panels
 
-function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: number, timeOverride?: TimeOfDay, materialize = 1) {
-  const { data, connected } = getPixelTowerData();
-  if (!connected) return;
-
+function monolithGeometry() {
   const dotStep = MONOLITH_DOT + MONOLITH_GAP;
   const panelW = MONOLITH_COLS * dotStep - MONOLITH_GAP;
   const panelH = MONOLITH_ROWS * dotStep - MONOLITH_GAP;
   const slabW = panelW + MONOLITH_PAD * 2;
   const slabH = 3 * panelH + 2 * MONOLITH_PANEL_GAP + MONOLITH_PAD * 2;
-
-  // Centered along back wall, towers above it
   const cx = Math.floor(BUILDING_X + BUILDING_W / 2) - 3;
   const ox = cx - Math.floor(slabW / 2);
-  const oy = BUILDING_Y - slabH + 29; // top extends above the back wall
+  const oy = BUILDING_Y - slabH + 29;
+  return { dotStep, panelW, panelH, slabW, slabH, cx, ox, oy };
+}
 
+/** Draw monolith surrounds (stones, ruins, ferns) — called before time-of-day tint */
+export function drawMonolithSurrounds(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
+  const { towerSize, towerVisible } = useAgentOfficeStore.getState();
+  if (!towerVisible || towerSize !== "monolith") return;
+  if (monolithTransition <= 0) return;
+
+  const { slabW, slabH, cx, ox, oy } = monolithGeometry();
 
   // Tropical island: worship stones around the base
   if (theme.id === "tropical-island") {
@@ -633,6 +637,14 @@ function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: n
   }
 
 
+}
+
+function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: number, timeOverride?: TimeOfDay, materialize = 1) {
+  const { data, connected } = getPixelTowerData();
+  if (!connected) return;
+
+  const { dotStep, panelW, panelH, slabW, slabH, cx, ox, oy } = monolithGeometry();
+
   // Stone base (slightly wider)
   ctx.fillStyle = "#222228";
   ctx.fillRect(ox - 1, oy + slabH, slabW + 2, 3);
@@ -852,7 +864,9 @@ export function renderScene(
 
   // 4. Draw environment
   const deskCenters = DESK_POSITIONS.map((d) => ({ x: d.x, y: d.y }));
-  drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride, theme);
+  drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride, theme, () => {
+    drawMonolithSurrounds(ctx, theme);
+  });
 
   // 4.5. Posters on the back wall
   const { statusPosterOn, healthPosterOn } = useAgentOfficeStore.getState();

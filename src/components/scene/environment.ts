@@ -1481,7 +1481,8 @@ export function drawEnvironment(
   occupiedDeskIndices: Set<number>,
   frame: number = 0,
   timeOverride?: TimeOfDay,
-  theme: SceneTheme = forestTheme
+  theme: SceneTheme = forestTheme,
+  beforeTint?: () => void
 ) {
   const tod = timeOverride ?? getTimeOfDay();
 
@@ -1510,6 +1511,8 @@ export function drawEnvironment(
   _pendingDeskFronts = { ctx, positions: deskPositions, occupied: occupiedDeskIndices, theme };
 
   drawSideTrees(ctx, theme);
+
+  if (beforeTint) beforeTint();
 
   const tint = theme.timeTints[tod];
   if (tint.opacity > 0) {
