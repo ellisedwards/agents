@@ -365,22 +365,22 @@ import type { SceneTheme } from "./themes/types";
 import { forestTheme } from "./themes/forest";
 import { getPixelTowerData } from "@/hooks/use-pixel-tower";
 
-const OBELISK_COLS = 5;
-const OBELISK_ROWS = 5;
-const OBELISK_DOT = 2;    // each pixel dot is 2x2 canvas pixels
-const OBELISK_GAP = 1;    // 1px gap between dots
-const OBELISK_PAD = 2;    // padding inside the slab
-const OBELISK_PANEL_GAP = 3; // gap between panels
+const MONOLITH_COLS = 5;
+const MONOLITH_ROWS = 5;
+const MONOLITH_DOT = 2;    // each pixel dot is 2x2 canvas pixels
+const MONOLITH_GAP = 1;    // 1px gap between dots
+const MONOLITH_PAD = 2;    // padding inside the slab
+const MONOLITH_PANEL_GAP = 3; // gap between panels
 
-function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: number, timeOverride?: TimeOfDay) {
+function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: number, timeOverride?: TimeOfDay) {
   const { data, connected } = getPixelTowerData();
   if (!connected) return;
 
-  const dotStep = OBELISK_DOT + OBELISK_GAP;
-  const panelW = OBELISK_COLS * dotStep - OBELISK_GAP;
-  const panelH = OBELISK_ROWS * dotStep - OBELISK_GAP;
-  const slabW = panelW + OBELISK_PAD * 2;
-  const slabH = 3 * panelH + 2 * OBELISK_PANEL_GAP + OBELISK_PAD * 2;
+  const dotStep = MONOLITH_DOT + MONOLITH_GAP;
+  const panelW = MONOLITH_COLS * dotStep - MONOLITH_GAP;
+  const panelH = MONOLITH_ROWS * dotStep - MONOLITH_GAP;
+  const slabW = panelW + MONOLITH_PAD * 2;
+  const slabH = 3 * panelH + 2 * MONOLITH_PANEL_GAP + MONOLITH_PAD * 2;
 
   // Centered along back wall, towers above it
   const cx = Math.floor(BUILDING_X + BUILDING_W / 2) - 3;
@@ -414,7 +414,7 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
     }
   }
 
-  // Golden Ruins: crumbling Egyptian temple blocks around the obelisk
+  // Golden Ruins: crumbling Egyptian temple blocks around the monolith
   if (theme.id === "golden-ruins") {
     const baseY = oy + slabH;
     const baseCX = cx;
@@ -446,7 +446,7 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
     ctx.fillRect(baseCX + 17, baseY - 10, 2, 2);
     ctx.fillRect(baseCX + 21, baseY - 9, 3, 1);
 
-    // Stepped platform / altar base beneath obelisk
+    // Stepped platform / altar base beneath monolith
     ctx.fillStyle = blockShadow;
     ctx.fillRect(baseCX - 14, baseY + 1, 28, 5);
     ctx.fillStyle = blockMid;
@@ -616,7 +616,7 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
       ctx.fillRect(baseCX + fl.dx, baseY + fl.dy, 1, 1);
     }
 
-    // Hanging vine tendrils down the obelisk sides
+    // Hanging vine tendrils down the monolith sides
     ctx.fillStyle = fern1;
     ctx.fillRect(ox - 1, baseY - 6, 1, 6);
     ctx.fillRect(ox - 2, baseY - 3, 1, 3);
@@ -658,8 +658,8 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
   const panels = [data.panels.top, data.panels.middle, data.panels.bottom];
   for (let p = 0; p < 3; p++) {
     const pixels = panels[p];
-    const panelY = oy + OBELISK_PAD + p * (panelH + OBELISK_PANEL_GAP);
-    const panelX = ox + OBELISK_PAD;
+    const panelY = oy + MONOLITH_PAD + p * (panelH + MONOLITH_PANEL_GAP);
+    const panelX = ox + MONOLITH_PAD;
 
     if (p === 0) {
       // Top panel: diffusion screen with 4 corner quadrants (2x2 each), no center dot
@@ -685,8 +685,8 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
       // Draw the 4 corner quadrant dots through diffusion
       for (const quad of quadrants) {
         for (const i of quad) {
-          const col = i % OBELISK_COLS;
-          const row = (OBELISK_ROWS - 1) - Math.floor(i / OBELISK_COLS);
+          const col = i % MONOLITH_COLS;
+          const row = (MONOLITH_ROWS - 1) - Math.floor(i / MONOLITH_COLS);
           const color = pixels[i];
           const dx = panelX + col * dotStep;
           const dy = panelY + row * dotStep;
@@ -700,11 +700,11 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
             // Diffused glow per dot
             ctx.globalAlpha = 0.25;
             ctx.fillStyle = bright;
-            ctx.fillRect(dx - 1, dy - 1, OBELISK_DOT + 2, OBELISK_DOT + 2);
+            ctx.fillRect(dx - 1, dy - 1, MONOLITH_DOT + 2, MONOLITH_DOT + 2);
             // Brighter core
             ctx.globalAlpha = 0.6;
             ctx.fillStyle = bright;
-            ctx.fillRect(dx, dy, OBELISK_DOT, OBELISK_DOT);
+            ctx.fillRect(dx, dy, MONOLITH_DOT, MONOLITH_DOT);
           }
         }
       }
@@ -721,8 +721,8 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
     } else {
       // Middle and bottom panels: individual dots
       for (let i = 0; i < pixels.length; i++) {
-        const col = i % OBELISK_COLS;
-        const row = (OBELISK_ROWS - 1) - Math.floor(i / OBELISK_COLS);
+        const col = i % MONOLITH_COLS;
+        const row = (MONOLITH_ROWS - 1) - Math.floor(i / MONOLITH_COLS);
         const color = pixels[i];
         const isLit = color !== "#000000";
 
@@ -732,10 +732,10 @@ function drawObelisk(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: nu
         if (isLit) {
           ctx.globalAlpha = 0.2;
           ctx.fillStyle = color;
-          ctx.fillRect(dx - 1, dy - 1, OBELISK_DOT + 2, OBELISK_DOT + 2);
+          ctx.fillRect(dx - 1, dy - 1, MONOLITH_DOT + 2, MONOLITH_DOT + 2);
           ctx.globalAlpha = 1;
           ctx.fillStyle = color;
-          ctx.fillRect(dx, dy, OBELISK_DOT, OBELISK_DOT);
+          ctx.fillRect(dx, dy, MONOLITH_DOT, MONOLITH_DOT);
         }
       }
     }
@@ -796,8 +796,8 @@ export function renderScene(
 
   // 4.6. Obelisk (in-scene pixel tower)
   const { towerSize, towerVisible } = useAgentOfficeStore.getState();
-  if (towerVisible && towerSize === "obelisk") {
-    drawObelisk(ctx, theme, frame, timeOverride);
+  if (towerVisible && towerSize === "monolith") {
+    drawMonolith(ctx, theme, frame, timeOverride);
   }
 
   // 4.7. Laptop glow — each CC agent mapped to its tower quadrant

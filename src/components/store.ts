@@ -25,7 +25,7 @@ export interface ClawHealth {
 }
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
-export type TowerSize = "small" | "medium" | "large" | "obelisk";
+export type TowerSize = "small" | "medium" | "large" | "monolith";
 export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base";
 
 interface TowerPrefs {
@@ -43,7 +43,9 @@ function loadTowerPrefs(): TowerPrefs {
   if (typeof window === "undefined") return defaults;
   try {
     const raw = localStorage.getItem(TOWER_STORAGE_KEY);
-    if (raw) return { ...defaults, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    if (parsed.size === "obelisk") parsed.size = "monolith";
+    if (raw) return { ...defaults, ...parsed };
   } catch {}
   return defaults;
 }

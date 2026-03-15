@@ -271,7 +271,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 <option value="small" className="bg-[#1e1e2e]">Small</option>
                 <option value="medium" className="bg-[#1e1e2e]">Medium</option>
                 <option value="large" className="bg-[#1e1e2e]">Large</option>
-                <option value="obelisk" className="bg-[#1e1e2e]">Obelisk</option>
+                <option value="monolith" className="bg-[#1e1e2e]">Monolith</option>
               </select>
             </div>
 

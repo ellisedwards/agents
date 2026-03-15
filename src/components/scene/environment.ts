@@ -914,9 +914,9 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
 
   // Guitar + amp (only in themes that have it)
   if (theme.hasGuitar) {
-    // Amp — aligned with obelisk base (by + 32 is obelisk stone base bottom)
+    // Amp — aligned with monolith base (by + 32 is monolith stone base bottom)
     const ampX = bx + bw - 22;
-    const ampY = by + 18; // bottom of amp aligns with obelisk base
+    const ampY = by + 18; // bottom of amp aligns with monolith base
     rect(ctx, ampX, ampY, 18, 14, "#1a1a1a");
     rect(ctx, ampX + 1, ampY + 1, 16, 12, "#222");
     rect(ctx, ampX + 1, ampY + 1, 16, 3, "#999");

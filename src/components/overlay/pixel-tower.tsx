@@ -121,8 +121,8 @@ export function PixelTower() {
     dragRef.current = null;
   }, []);
 
-  // Obelisk mode renders in the canvas scene, not as an overlay
-  if (!connected || !towerVisible || towerSize === "obelisk") return null;
+  // Monolith mode renders in the canvas scene, not as an overlay
+  if (!connected || !towerVisible || towerSize === "monolith") return null;
   const sizeConfig = SIZES[towerSize];
   if (!sizeConfig) return null;
 
