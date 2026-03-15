@@ -2,7 +2,7 @@ import { TEAM_COLORS, type AgentState } from "@/shared/types";
 import type { CharacterType } from "../characters/sprite-cache";
 import { getSprite, type buildSpriteCache } from "../characters/sprite-cache";
 import { assignDesks, DESK_POSITIONS } from "./desk-layout";
-import { drawEnvironment } from "./environment";
+import { drawEnvironment, drawDeskFronts } from "./environment";
 import { CANVAS_WIDTH } from "../canvas-transform";
 import {
   createWalkState,
@@ -89,6 +89,11 @@ const lastAgentState = new Map<string, string>();
 const knownAgentIds = new Set<string>();
 // Sticky quadrant assignment — each CC keeps its slot for the session
 const stickyQuadrants = new Map<string, number>();
+// Monolith materialize transition
+let monolithVisible = false;
+let monolithTransition = 0; // 0 = gone, 1 = fully materialized
+let monolithDelayFrames = 20; // wait before starting materialize on page load
+const MONOLITH_MATERIALIZE_FRAMES = 40;
 
 // Poof particle system
 interface Poof {
@@ -372,7 +377,7 @@ const MONOLITH_GAP = 1;    // 1px gap between dots
 const MONOLITH_PAD = 2;    // padding inside the slab
 const MONOLITH_PANEL_GAP = 3; // gap between panels
 
-function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: number, timeOverride?: TimeOfDay) {
+function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: number, timeOverride?: TimeOfDay, materialize = 1) {
   const { data, connected } = getPixelTowerData();
   if (!connected) return;
 
@@ -634,12 +639,27 @@ function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: n
   ctx.fillStyle = "#2a2a30";
   ctx.fillRect(ox - 1, oy + slabH, slabW + 2, 1);
 
+  // Materialize transition — clip and shimmer
+  const isMaterializing = materialize < 1;
+  if (isMaterializing) {
+    ctx.save();
+    // Reveal from bottom to top
+    const revealH = Math.floor(slabH * materialize);
+    const clipY = oy + slabH - revealH;
+    ctx.beginPath();
+    ctx.rect(ox - 2, clipY, slabW + 4, revealH + 4);
+    ctx.clip();
+    // Overall fade
+    ctx.globalAlpha = Math.min(1, materialize * 1.5);
+  }
+
   // Black obsidian slab
   ctx.fillStyle = "#0a0a10";
   ctx.fillRect(ox, oy, slabW, slabH);
   // Subtle edge highlights
-  ctx.fillStyle = "#1a1a22";
+  ctx.fillStyle = "#0e0e14";
   ctx.fillRect(ox, oy, slabW, 1);
+  ctx.fillStyle = "#111118";
   ctx.fillRect(ox, oy, 1, slabH);
   ctx.fillStyle = "#060608";
   ctx.fillRect(ox + slabW - 1, oy, 1, slabH);
@@ -711,9 +731,13 @@ function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: n
       ctx.globalAlpha = 1;
 
       if (litCount > 0) {
-        // Static white diffusion panel over the whole face when active
-        ctx.globalAlpha = 0.08;
+        // Static white diffusion panel with inset depth edge
         ctx.fillStyle = "#ffffff";
+        // Outer edge — softer
+        ctx.globalAlpha = 0.04;
+        ctx.fillRect(panelX - 1, panelY - 1, panelW + 2, panelH + 2);
+        // Inner fill — brighter
+        ctx.globalAlpha = 0.08;
         ctx.fillRect(panelX, panelY, panelW, panelH);
         ctx.globalAlpha = 1;
       }
@@ -740,6 +764,59 @@ function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: n
       }
     }
   }
+
+  // Particle effects during materialize/dematerialize
+  if (isMaterializing) {
+    const revealH = Math.floor(slabH * materialize);
+    const edgeY = oy + slabH - revealH;
+    const fx = theme.monolithEffect;
+    const intensity = 1 - materialize; // stronger when less materialized
+
+    // Glowing edge line
+    ctx.globalAlpha = 0.7 * intensity;
+    ctx.fillStyle = fx.color;
+    ctx.fillRect(ox - 1, edgeY - 1, slabW + 2, 2);
+    ctx.globalAlpha = 0.3 * intensity;
+    ctx.fillRect(ox - 2, edgeY - 2, slabW + 4, 1);
+
+    // Rising particles along both sides of the monolith
+    for (let i = 0; i < 14; i++) {
+      const seed = (i * 7919 + 31) | 0;
+      const side = i % 2 === 0 ? ox - 2 - (seed % 4) : ox + slabW + 1 + (seed % 4);
+      const rise = ((frame * 1.5 + i * 11) % (slabH + 10)) | 0;
+      const py = oy + slabH - rise;
+      if (py < oy - 5 || py > oy + slabH + 3) continue;
+      const fadeEdge = Math.min(1, rise / 10, (slabH + 10 - rise) / 10);
+      ctx.globalAlpha = 0.4 * intensity * fadeEdge;
+      ctx.fillStyle = fx.color;
+      ctx.fillRect(side, py, 1, 1);
+    }
+
+    // Floating particles around the edge zone
+    for (let i = 0; i < 20; i++) {
+      const seed = ((i * 3571 + frame * 17) | 0);
+      const px = ox - 3 + (Math.abs(seed * 37) % (slabW + 6));
+      const spread = 8 + Math.floor(intensity * 12);
+      const py = edgeY - spread + (Math.abs(seed * 53) % (spread * 2));
+      const flicker = ((frame + i * 3) % 4 < 3) ? 1 : 0;
+      ctx.globalAlpha = 0.25 * intensity * flicker * (0.5 + (i % 3) * 0.25);
+      ctx.fillStyle = i % 3 === 0 ? "#ffffff" : fx.color;
+      ctx.fillRect(px, py, 1, 1);
+    }
+
+    // Scanline static across the revealed portion
+    for (let row = 0; row < revealH; row += 2) {
+      const scanAlpha = Math.sin((row + frame * 2) * 0.3) * 0.5 + 0.5;
+      if (scanAlpha < 0.3) continue;
+      ctx.globalAlpha = 0.04 * intensity * scanAlpha;
+      ctx.fillStyle = fx.color;
+      ctx.fillRect(ox, edgeY + row, slabW, 1);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
 }
 
 export function renderScene(
@@ -794,10 +871,21 @@ export function renderScene(
     renderHealthPoster(ctx, clawHealth, theme, healthX);
   }
 
-  // 4.6. Obelisk (in-scene pixel tower)
+  // 4.6. Monolith (in-scene pixel tower) with materialize transition
   const { towerSize, towerVisible } = useAgentOfficeStore.getState();
-  if (towerVisible && towerSize === "monolith") {
-    drawMonolith(ctx, theme, frame, timeOverride);
+  const wantMonolith = towerVisible && towerSize === "monolith";
+  if (wantMonolith && !monolithVisible) monolithVisible = true;
+  if (!wantMonolith && monolithVisible && monolithTransition <= 0) monolithVisible = false;
+  // Delay on initial page load so the full animation is visible
+  if (monolithDelayFrames > 0) { monolithDelayFrames--; }
+  // Advance transition
+  if (wantMonolith && monolithTransition < 1 && monolithDelayFrames <= 0) {
+    monolithTransition = Math.min(1, monolithTransition + 1 / MONOLITH_MATERIALIZE_FRAMES);
+  } else if (!wantMonolith && monolithTransition > 0) {
+    monolithTransition = Math.max(0, monolithTransition - 1 / MONOLITH_MATERIALIZE_FRAMES);
+  }
+  if (monolithTransition > 0) {
+    drawMonolith(ctx, theme, frame, timeOverride, monolithTransition);
   }
 
   // 4.7. Laptop glow — each CC agent mapped to its tower quadrant
@@ -847,10 +935,11 @@ export function renderScene(
       const dy = pos.y;
       const isTool = agent.state === "reading" || agent.state === "typing" || agent.state === "waiting";
       if (isTool) {
-        // Hirst cycle — muted, slow
+        // Hirst cycle — jewel tones inspired by spot paintings
         const HIRST = [
-          "#cc5544", "#cc9944", "#aacc55", "#55aa77",
-          "#5599aa", "#5566cc", "#8855aa", "#aa5577",
+          "#5ea87a", "#d4a03c", "#4a9bc7", "#7b68ae",
+          "#cc7833", "#4daa8d", "#6b9e8a", "#8baa3c",
+          "#d46a4e", "#5c8dbf", "#5b9a7c", "#78b5a0",
         ];
         const color = HIRST[Math.floor(frame / 4) % HIRST.length];
         ctx.globalAlpha = 0.15;
@@ -1315,6 +1404,9 @@ export function renderScene(
       }
     }
   }
+
+  // 9. Draw desk fronts (tables + laptops) on top of agents
+  drawDeskFronts();
 
   // Draw and advance poof particles
   for (let i = activePoofs.length - 1; i >= 0; i--) {

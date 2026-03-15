@@ -82,6 +82,8 @@ export const tropicalIslandTheme: SceneTheme = {
   clock: null,
   plant: null,
 
+  monolithEffect: { style: "haze", color: "#88ddaa", speed: 5 },
+
   petType: "gecko",
 
   desk: {

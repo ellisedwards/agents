@@ -121,6 +121,13 @@ export interface SceneTheme {
     style: "potted" | "cactus" | "papyrus";
   } | null;
 
+  // Monolith shimmer effect
+  monolithEffect: {
+    style: "haze" | "glitch" | "pulse" | "none";
+    color: string;
+    speed: number; // frames per cycle step (higher = slower)
+  };
+
   // Pet type
   petType: "cat" | "sphynx" | "gecko" | "space-cat";
 

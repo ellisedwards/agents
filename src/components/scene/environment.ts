@@ -26,9 +26,10 @@ interface UfoState {
   frame: number;
   trailX: number;
   trailFrame: number;
+  zipDir: number; // 1 = right, -1 = left
 }
 function makeUfo(): UfoState {
-  return { phase: "idle", x: 0, y: 0, frame: 0, trailX: 0, trailFrame: 0 };
+  return { phase: "idle", x: 0, y: 0, frame: 0, trailX: 0, trailFrame: 0, zipDir: 1 };
 }
 const ufos: UfoState[] = [makeUfo()];
 let nextUfoFrame = 60 * 60 * (8 + Math.random() * 5); // 8-13 min
@@ -1036,6 +1037,41 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     px(ctx, ctX + 10, ctBottom - 14, "#b8955a");
     px(ctx, ctX + 10, ctBottom - 13, "#b8955a");
     px(ctx, ctX + 10, ctBottom - 12, "#ddaa44");
+
+  }
+
+  // Golden ruins — crumbled pillars and stones where guitar/amp area would be
+  if (theme.id === "golden-ruins" && !theme.hasGuitar) {
+    const ruX = bx + bw - 38;
+    const ruY = by + 18;
+    // Fallen column — horizontal
+    rect(ctx, ruX, ruY + 10, 14, 3, "#a08860");
+    rect(ctx, ruX, ruY + 10, 14, 1, "#b8a070");
+    rect(ctx, ruX + 1, ruY + 12, 12, 1, "#8a7050");
+    // Column segments (fluting detail)
+    for (let s = 0; s < 14; s += 3) {
+      px(ctx, ruX + s, ruY + 11, "#8a7050");
+    }
+    // Standing column stump
+    rect(ctx, ruX + 18, ruY + 4, 4, 9, "#a08860");
+    rect(ctx, ruX + 18, ruY + 4, 4, 1, "#b8a070");
+    rect(ctx, ruX + 17, ruY + 3, 6, 2, "#b8a070"); // capital
+    rect(ctx, ruX + 18, ruY + 12, 4, 1, "#8a7050"); // base
+    // Rubble stones
+    rect(ctx, ruX + 4, ruY + 13, 3, 2, "#8a7050");
+    rect(ctx, ruX + 9, ruY + 12, 2, 2, "#a08860");
+    rect(ctx, ruX + 24, ruY + 10, 3, 3, "#8a7050");
+    rect(ctx, ruX + 24, ruY + 10, 3, 1, "#a08860");
+    rect(ctx, ruX + 28, ruY + 11, 2, 2, "#6a5840");
+    // Broken tablet leaning against stump
+    rect(ctx, ruX + 15, ruY + 6, 3, 7, "#a08860");
+    rect(ctx, ruX + 15, ruY + 6, 3, 1, "#b8a070");
+    px(ctx, ruX + 16, ruY + 8, "#6a5840"); // carved mark
+    px(ctx, ruX + 16, ruY + 10, "#6a5840"); // carved mark
+    // Small scattered stones
+    px(ctx, ruX + 1, ruY + 13, "#6a5840");
+    px(ctx, ruX + 30, ruY + 12, "#8a7050");
+    px(ctx, ruX + 22, ruY + 13, "#6a5840");
   }
 
   // Tropical island decorations
@@ -1223,11 +1259,10 @@ function drawSideTrees(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
   }
 }
 
-function drawDesk(
+function drawDeskChair(
   ctx: CanvasRenderingContext2D,
   dx: number,
   dy: number,
-  hasLaptop: boolean,
   theme: SceneTheme
 ) {
   const d = theme.desk;
@@ -1236,6 +1271,16 @@ function drawDesk(
     rect(ctx, dx - 3, dy + 2, 6, 4, d.chairSeat);
     rect(ctx, dx - 2, dy + 3, 4, 2, d.chairLight);
   }
+}
+
+function drawDeskFront(
+  ctx: CanvasRenderingContext2D,
+  dx: number,
+  dy: number,
+  hasLaptop: boolean,
+  theme: SceneTheme
+) {
+  const d = theme.desk;
   rect(ctx, dx - 10, dy + 6, 20, 2, d.topColor);
   rect(ctx, dx - 10, dy + 6, 20, 1, d.topColor);
   rect(ctx, dx - 10, dy + 7, 20, 1, d.legColor);
@@ -1249,6 +1294,17 @@ function drawDesk(
     px(ctx, dx + 3, dy + 2, "#e8e8f0");
     rect(ctx, dx + 1, dy + 6, 7, 1, "rgba(150,170,200,0.12)");
   }
+}
+
+function drawDesk(
+  ctx: CanvasRenderingContext2D,
+  dx: number,
+  dy: number,
+  hasLaptop: boolean,
+  theme: SceneTheme
+) {
+  drawDeskChair(ctx, dx, dy, theme);
+  drawDeskFront(ctx, dx, dy, hasLaptop, theme);
 }
 
 function updateAndDrawShootingStars(ctx: CanvasRenderingContext2D) {
@@ -1311,7 +1367,7 @@ function updateSingleUfo(ctx: CanvasRenderingContext2D, ufo: UfoState): boolean 
       ufo.trailX = ufo.x;
     }
   } else if (ufo.phase === "zipping") {
-    ufo.x += 25;
+    ufo.x += 25 * ufo.zipDir;
     drawUfoSprite(ctx, Math.floor(ufo.x), uy, Math.max(0, 1 - ufo.frame / 10), ufo.frame);
     if (ufo.frame >= 10) {
       ufo.phase = "trail";
@@ -1319,12 +1375,14 @@ function updateSingleUfo(ctx: CanvasRenderingContext2D, ufo: UfoState): boolean 
     }
   } else if (ufo.phase === "trail") {
     const alpha = Math.max(0, 1 - ufo.frame / 120);
-    const trailLen = Math.min(ufo.x - ufo.trailX, W);
+    const trailLen = Math.min(Math.abs(ufo.x - ufo.trailX), W);
+    const startX = ufo.zipDir > 0 ? ufo.trailX : ufo.x;
     for (let t = 0; t < trailLen; t += 2) {
-      const tx = ufo.trailX + t;
+      const tx = startX + t;
       const fade = t / trailLen;
-      ctx.globalAlpha = alpha * (0.1 + fade * 0.5);
-      ctx.fillStyle = fade > 0.7 ? "#ffffff" : "#88ddff";
+      const dirFade = ufo.zipDir > 0 ? fade : 1 - fade;
+      ctx.globalAlpha = alpha * (0.1 + dirFade * 0.5);
+      ctx.fillStyle = dirFade > 0.7 ? "#ffffff" : "#88ddff";
       ctx.fillRect(Math.floor(tx), uy + 2, 2, 1);
     }
     ctx.globalAlpha = 1;
@@ -1347,6 +1405,7 @@ function updateAndDrawUfos(ctx: CanvasRenderingContext2D, autoSpawn: boolean) {
       idle.x = 30 + Math.random() * (W - 80);
       idle.y = 3 + Math.random() * 6;
       idle.frame = 0;
+      idle.zipDir = Math.random() < 0.5 ? 1 : -1;
       nextUfoFrame = 60 * 60 * (8 + Math.random() * 5);
     }
   }
@@ -1386,6 +1445,23 @@ function drawUfoSprite(ctx: CanvasRenderingContext2D, x: number, y: number, alph
   ctx.globalAlpha = 1;
 }
 
+// Deferred desk fronts — drawn by renderer after agents
+let _pendingDeskFronts: {
+  ctx: CanvasRenderingContext2D;
+  positions: Array<{ x: number; y: number }>;
+  occupied: Set<number>;
+  theme: SceneTheme;
+} | null = null;
+
+export function drawDeskFronts() {
+  if (!_pendingDeskFronts) return;
+  const { ctx, positions, occupied, theme } = _pendingDeskFronts;
+  for (let i = 0; i < positions.length; i++) {
+    drawDeskFront(ctx, positions[i].x, positions[i].y, occupied.has(i), theme);
+  }
+  _pendingDeskFronts = null;
+}
+
 /** Trigger a UFO to appear (supports up to 20 simultaneous) */
 export function triggerUfo(): boolean {
   if (ufos.length >= 20 && !ufos.some((u) => u.phase === "idle")) return false;
@@ -1395,6 +1471,7 @@ export function triggerUfo(): boolean {
   idle.x = 30 + Math.random() * (W - 80);
   idle.y = 3 + Math.random() * 6;
   idle.frame = 0;
+  idle.zipDir = Math.random() < 0.5 ? 1 : -1;
   return true;
 }
 
@@ -1425,9 +1502,12 @@ export function drawEnvironment(
   drawBackgroundTrees(ctx, theme);
   drawBuilding(ctx, frame, theme);
 
+  // Draw chairs (behind agents)
   for (let i = 0; i < deskPositions.length; i++) {
-    drawDesk(ctx, deskPositions[i].x, deskPositions[i].y, occupiedDeskIndices.has(i), theme);
+    drawDeskChair(ctx, deskPositions[i].x, deskPositions[i].y, theme);
   }
+  // Tables + laptops drawn later by renderer (in front of agents)
+  _pendingDeskFronts = { ctx, positions: deskPositions, occupied: occupiedDeskIndices, theme };
 
   drawSideTrees(ctx, theme);
 

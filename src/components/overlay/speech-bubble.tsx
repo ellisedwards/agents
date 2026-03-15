@@ -28,18 +28,18 @@ export function SpeechBubbles({ transform }: SpeechBubblesProps) {
         return (
           <div
             key={agent.id}
-            className="absolute bg-white text-neutral-800 font-mono rounded px-2 py-0.5 pointer-events-none"
+            className="absolute bg-[#2a2a3a]/90 text-amber-300/80 font-mono rounded px-1.5 py-0.5 pointer-events-none border border-white/10"
             style={{
               left: domPos.x,
-              top: domPos.y - 24 * transform.scale,
+              top: domPos.y - 20 * transform.scale,
               transform: "translateX(-50%)",
-              fontSize: `${Math.max(8, 9 * transform.scale)}px`,
+              fontSize: `${Math.max(6, 7 * transform.scale)}px`,
             }}
           >
             needs input
             <div
-              className="absolute w-2 h-2 bg-white rotate-45"
-              style={{ bottom: -3, left: "calc(50% - 4px)" }}
+              className="absolute w-1.5 h-1.5 bg-[#2a2a3a]/90 rotate-45 border-r border-b border-white/10"
+              style={{ bottom: -3, left: "calc(50% - 3px)" }}
             />
           </div>
         );

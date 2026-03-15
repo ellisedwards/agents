@@ -81,6 +81,8 @@ export const goldenRuinsTheme: SceneTheme = {
 
   plant: null,
 
+  monolithEffect: { style: "haze", color: "#ffcc66", speed: 8 },
+
   petType: "sphynx",
 
   desk: {

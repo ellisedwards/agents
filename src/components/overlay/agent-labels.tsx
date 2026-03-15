@@ -276,6 +276,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             </div>
 
             {/* Tower opacity */}
+            {towerSize !== "monolith" && (
             <div className="space-y-1">
               <span className="font-mono text-[10px] text-white/50 block">Tower Opacity</span>
               <input
@@ -287,6 +288,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 className="w-full h-1 accent-white/50"
               />
             </div>
+            )}
 
             {/* Triggers */}
             <div className="pt-1 border-t border-white/5 space-y-1">

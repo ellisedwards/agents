@@ -95,6 +95,8 @@ export const forestTheme: SceneTheme = {
     style: "potted",
   },
 
+  monolithEffect: { style: "haze", color: "#aaccff", speed: 6 },
+
   petType: "cat",
 
   desk: {

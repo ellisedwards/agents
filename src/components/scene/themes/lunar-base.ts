@@ -73,6 +73,8 @@ export const lunarBaseTheme: SceneTheme = {
   clock: null,
   plant: null,
 
+  monolithEffect: { style: "haze", color: "#ccddff", speed: 10 },
+
   petType: "space-cat",
 
   desk: {
