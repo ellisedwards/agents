@@ -30,6 +30,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const agents = useAgentOfficeStore((s) => s.agents);
   const labelsOn = useAgentOfficeStore((s) => s.labelsOn);
   const setLabelsOn = useAgentOfficeStore((s) => s.setLabelsOn);
+  const debugOn = useAgentOfficeStore((s) => s.debugOn);
+  const setDebugOn = useAgentOfficeStore((s) => s.setDebugOn);
   const timeMode = useAgentOfficeStore((s) => s.timeMode);
   const setTimeMode = useAgentOfficeStore((s) => s.setTimeMode);
   const themeId = useAgentOfficeStore((s) => s.themeId);
@@ -153,6 +155,23 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 <span
                   className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
                     labelsOn ? "left-[13px]" : "left-[3px]"
+                  }`}
+                />
+              </button>
+            </label>
+
+            {/* Debug toggle */}
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <span className="font-mono text-[10px] text-white/50">Debug</span>
+              <button
+                onClick={() => setDebugOn(!debugOn)}
+                className={`w-7 h-4 rounded-full transition-colors relative ${
+                  debugOn ? "bg-green-500/70" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
+                    debugOn ? "left-[13px]" : "left-[3px]"
                   }`}
                 />
               </button>

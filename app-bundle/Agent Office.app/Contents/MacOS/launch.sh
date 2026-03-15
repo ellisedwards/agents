@@ -1,27 +1,2 @@
 #!/bin/bash
-APP_DIR="/Users/ellisedwards/Code/workspace/agentoffice"
-PORT=4747
-PID_FILE="/tmp/.agent-office.pid"
-
-# Kill existing instance if running
-if [ -f "$PID_FILE" ]; then
-  kill "$(cat "$PID_FILE")" 2>/dev/null
-  rm -f "$PID_FILE"
-fi
-
-cd "$APP_DIR"
-npm run build > /tmp/agent-office-build.log 2>&1
-node dist/server.js &
-echo $! > "$PID_FILE"
-
-# Wait for server to be ready
-for i in $(seq 1 20); do
-  curl -s "http://localhost:$PORT" > /dev/null 2>&1 && break
-  sleep 0.25
-done
-
-open -a "Google Chrome" "http://localhost:$PORT"
-
-# Keep app alive, clean up on quit
-trap 'kill "$(cat "$PID_FILE")" 2>/dev/null; rm -f "$PID_FILE"' EXIT
-wait
+exec /Users/ellisedwards/Code/workspace/agentoffice/scripts/start.sh

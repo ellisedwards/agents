@@ -79,6 +79,7 @@ interface AgentOfficeStore {
   relayMessages: RelayMessage[];
   relaySeenCount: number;
   labelsOn: boolean;
+  debugOn: boolean;
   timeMode: TimeMode;
   themeId: ThemeId;
   towerSize: TowerSize;
@@ -96,6 +97,7 @@ interface AgentOfficeStore {
   setRelayMessages: (messages: RelayMessage[]) => void;
   markRelaySeen: () => void;
   setLabelsOn: (on: boolean) => void;
+  setDebugOn: (on: boolean) => void;
   setTimeMode: (mode: TimeMode) => void;
   setThemeId: (id: ThemeId) => void;
   setTowerSize: (size: TowerSize) => void;
@@ -119,6 +121,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   relayMessages: [],
   relaySeenCount: (() => { try { return parseInt(localStorage.getItem("relay-seen") || "0", 10); } catch { return 0; } })(),
   labelsOn: false,
+  debugOn: false,
   timeMode: "auto",
   themeId: loadThemeId(),
   towerSize: initialTower.size,
@@ -162,6 +165,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
     try { localStorage.setItem("relay-seen", String(count)); } catch {}
   },
   setLabelsOn: (labelsOn) => set({ labelsOn }),
+  setDebugOn: (debugOn) => set({ debugOn }),
   setTimeMode: (timeMode) => set({ timeMode }),
   setThemeId: (themeId) => {
     set({ themeId });

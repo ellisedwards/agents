@@ -796,11 +796,17 @@ export function renderScene(
     drawObelisk(ctx, theme, frame, timeOverride);
   }
 
-  // 4.7. Laptop glow synced to claw_activity (500ms poll, same as tower)
+  // 4.7. Laptop glow — gold when any tower quadrant is lit
   const towerInfo = getPixelTowerData();
-  if (towerInfo.connected && towerInfo.data.clawActivity === "thinking") {
-    for (const agent of agents) {
+  if (towerInfo.connected) {
+    const topPixels = towerInfo.data.panels.top;
+    const anyQuadrantLit = [0, 1, 5, 6, 3, 4, 8, 9, 15, 16, 20, 21, 18, 19, 23, 24].some(
+      (i) => topPixels[i] !== "#000000"
+    );
+    if (anyQuadrantLit) {
+      for (const agent of agents) {
         if (agent.source !== "cc") continue;
+        if (agent.state === "reading" || agent.state === "typing" || agent.state === "waiting") continue;
         if (agent.subagentClass !== null && agent.subagentClass !== undefined) continue;
         const pos = deskMap.get(agent.id);
         if (!pos) continue;
@@ -817,6 +823,7 @@ export function renderScene(
         ctx.fillRect(dx + 3, dy + 2, 2, 2);
         ctx.globalAlpha = 1;
       }
+    }
   }
 
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)

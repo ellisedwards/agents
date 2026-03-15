@@ -18,7 +18,7 @@ interface ShootingStar {
 const shootingStars: ShootingStar[] = [];
 let nextShootingStarFrame = 120; // first one after 2 sec
 
-// --- Lunar UFO ---
+// --- UFO system (multi-UFO) ---
 interface UfoState {
   phase: "idle" | "materializing" | "hovering" | "zipping" | "trail";
   x: number;
@@ -27,7 +27,10 @@ interface UfoState {
   trailX: number;
   trailFrame: number;
 }
-const ufo: UfoState = { phase: "idle", x: 0, y: 0, frame: 0, trailX: 0, trailFrame: 0 };
+function makeUfo(): UfoState {
+  return { phase: "idle", x: 0, y: 0, frame: 0, trailX: 0, trailFrame: 0 };
+}
+const ufos: UfoState[] = [makeUfo()];
 let nextUfoFrame = 60 * 60 * (8 + Math.random() * 5); // 8-13 min
 
 export type TimeOfDay = "day" | "dawn" | "night";
@@ -887,16 +890,16 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
       // Carpet covering entire floor
       const cx = bx + 3;
       const cw = bw - 6;
-      rect(ctx, cx, fy, cw, fh, "#5e586e");
+      rect(ctx, cx, fy, cw, fh, "#6e6880");
 
       // Top edge highlight
-      rect(ctx, cx, fy, cw, 2, "#666080");
-      rect(ctx, cx, fy, cw, 1, "#6a6484");
+      rect(ctx, cx, fy, cw, 2, "#767090");
+      rect(ctx, cx, fy, cw, 1, "#7a7494");
 
       // Subtle color flecks throughout
       let fleckSeed = 12345;
       const nextFleck = () => { fleckSeed = (fleckSeed * 16807 + 11) & 0x7fffffff; return fleckSeed; };
-      const fleckColors = ["#6a6482", "#625c76", "#5a5470", "#685e7e", "#564e68", "#6e657a"];
+      const fleckColors = ["#7a7492", "#726c86", "#6a6480", "#786e8e", "#665e78", "#7e758a"];
       for (let y = fy + 2; y < fy + fh; y++) {
         for (let x = cx; x < cx + cw; x++) {
           const r = nextFleck();
@@ -909,29 +912,11 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     }
   }
 
-  // Guitar (only in themes that have it)
+  // Guitar + amp (only in themes that have it)
   if (theme.hasGuitar) {
-    const guitarX = bx + bw - 18;
-    const guitarY = by + 3;
-    rect(ctx, guitarX + 2, guitarY, 3, 2, "#555");
-    rect(ctx, guitarX + 1, guitarY + 1, 5, 3, "#111");
-    rect(ctx, guitarX + 1, guitarY + 1, 5, 1, "#222");
-    px(ctx, guitarX, guitarY + 2, "#888");
-    px(ctx, guitarX + 6, guitarY + 2, "#888");
-    rect(ctx, guitarX + 3, guitarY + 4, 1, 12, "#664422");
-    for (let f = 0; f < 5; f++) {
-      px(ctx, guitarX + 3, guitarY + 5 + f * 2, "#887766");
-    }
-    rect(ctx, guitarX + 1, guitarY + 16, 5, 8, "#ddee00");
-    rect(ctx, guitarX, guitarY + 17, 7, 6, "#ddee00");
-    rect(ctx, guitarX + 1, guitarY + 17, 4, 4, "#eeff33");
-    rect(ctx, guitarX + 5, guitarY + 15, 2, 2, "#ccdd00");
-    rect(ctx, guitarX + 1, guitarY + 19, 4, 1, "#fff");
-    rect(ctx, guitarX + 1, guitarY + 21, 4, 1, "#fff");
-    rect(ctx, guitarX - 1, guitarY + 14, 9, 12, "rgba(220,238,0,0.04)");
-
-    const ampX = guitarX - 5;
-    const ampY = fy + 2;
+    // Amp — aligned with obelisk base (by + 32 is obelisk stone base bottom)
+    const ampX = bx + bw - 22;
+    const ampY = by + 18; // bottom of amp aligns with obelisk base
     rect(ctx, ampX, ampY, 18, 14, "#1a1a1a");
     rect(ctx, ampX + 1, ampY + 1, 16, 12, "#222");
     rect(ctx, ampX + 1, ampY + 1, 16, 3, "#999");
@@ -950,13 +935,107 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     rect(ctx, ampX + 10, ampY + 6, 5, 5, "#181818");
     px(ctx, ampX + 5, ampY + 8, "#252525");
     px(ctx, ampX + 12, ampY + 8, "#252525");
+
+    // Cable behind guitar (drawn first so guitar covers it)
+    const guitarX = ampX - 12; // moved left by ~4 more
+    const guitarH = 24;
+    const guitarY = ampY + 14 - guitarH;
     ctx.strokeStyle = "#333";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(guitarX + 3, guitarY + 24);
-    ctx.lineTo(guitarX + 3, fy);
-    ctx.lineTo(ampX + 9, ampY);
+    ctx.lineTo(guitarX + 3, ampY + 14);
+    ctx.lineTo(ampX, ampY + 12);
     ctx.stroke();
+
+    // Guitar — to the left of the amp, bottom aligned
+    // Headstock (narrow)
+    rect(ctx, guitarX + 2, guitarY, 2, 2, "#555");
+    rect(ctx, guitarX + 2, guitarY + 1, 3, 2, "#111");
+    rect(ctx, guitarX + 2, guitarY + 1, 3, 1, "#222");
+    px(ctx, guitarX + 1, guitarY + 2, "#888");
+    px(ctx, guitarX + 5, guitarY + 2, "#888");
+    // Neck
+    rect(ctx, guitarX + 3, guitarY + 4, 1, 12, "#664422");
+    for (let f = 0; f < 5; f++) {
+      px(ctx, guitarX + 3, guitarY + 5 + f * 2, "#887766");
+    }
+    // Body
+    rect(ctx, guitarX + 1, guitarY + 16, 5, 8, "#ddee00");
+    rect(ctx, guitarX, guitarY + 17, 7, 6, "#ddee00");
+    rect(ctx, guitarX + 1, guitarY + 17, 4, 4, "#eeff33");
+    rect(ctx, guitarX + 5, guitarY + 15, 2, 2, "#ccdd00");
+    rect(ctx, guitarX + 1, guitarY + 19, 4, 1, "#fff");
+    rect(ctx, guitarX + 1, guitarY + 21, 4, 1, "#fff");
+    rect(ctx, guitarX - 1, guitarY + 14, 9, 12, "rgba(220,238,0,0.04)");
+
+    // Pedalboard — in front of the amp (on the floor)
+    const pbX = ampX - 2;
+    const pbY = ampY + 15;
+    // Board frame (silver rails like a Pedaltrain)
+    rect(ctx, pbX, pbY, 20, 8, "#3a3a3a");
+    rect(ctx, pbX + 1, pbY, 18, 1, "#555");
+    rect(ctx, pbX + 1, pbY + 7, 18, 1, "#2a2a2a");
+    // Top row of pedals — Morningstar controller + smaller pedals
+    rect(ctx, pbX + 1, pbY + 1, 6, 3, "#222"); // morningstar (dark, wide)
+    px(ctx, pbX + 2, pbY + 2, "#3388ff"); // blue LED
+    px(ctx, pbX + 4, pbY + 2, "#33ff88"); // green LED
+    px(ctx, pbX + 6, pbY + 2, "#ff3333"); // red LED
+    rect(ctx, pbX + 8, pbY + 1, 3, 3, "#aa2222"); // red pedal (blood/mood)
+    rect(ctx, pbX + 12, pbY + 1, 3, 3, "#22aa66"); // green pedal
+    rect(ctx, pbX + 16, pbY + 1, 3, 3, "#6666aa"); // context reverb (blue-ish)
+    // Bottom row — HX stomp (big screen) + expression + small pedals
+    rect(ctx, pbX + 1, pbY + 4, 7, 3, "#333"); // HX Stomp
+    rect(ctx, pbX + 2, pbY + 4, 5, 2, "#556677"); // screen
+    px(ctx, pbX + 3, pbY + 5, "#88aacc"); // screen highlight
+    rect(ctx, pbX + 9, pbY + 4, 4, 3, "#444"); // expression pedal
+    rect(ctx, pbX + 9, pbY + 4, 4, 1, "#666"); // exp top highlight
+    rect(ctx, pbX + 14, pbY + 4, 2, 3, "#885522"); // small brown pedal
+    rect(ctx, pbX + 17, pbY + 4, 2, 3, "#224488"); // small blue pedal
+    // Patch cables between pedals (subtle)
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pbX + 7, pbY + 3);
+    ctx.lineTo(pbX + 8, pbY + 3);
+    ctx.moveTo(pbX + 11, pbY + 3);
+    ctx.lineTo(pbX + 12, pbY + 3);
+    ctx.moveTo(pbX + 15, pbY + 3);
+    ctx.lineTo(pbX + 16, pbY + 3);
+    ctx.stroke();
+
+    // Cat tree — to the left of the guitar with spacing
+    const ctX = guitarX - 19;
+    const ctBottom = ampY + 14; // align with back wall line
+    // Base platform
+    rect(ctx, ctX, ctBottom - 4, 10, 4, "#666");
+    rect(ctx, ctX, ctBottom - 4, 10, 1, "#777");
+    // Left post (sisal)
+    rect(ctx, ctX + 1, ctBottom - 16, 2, 12, "#b8955a");
+    rect(ctx, ctX + 1, ctBottom - 16, 1, 12, "#c8a56a");
+    // Right post (sisal)
+    rect(ctx, ctX + 7, ctBottom - 14, 2, 10, "#b8955a");
+    rect(ctx, ctX + 7, ctBottom - 14, 1, 10, "#c8a56a");
+    // Middle platform
+    rect(ctx, ctX - 1, ctBottom - 16, 12, 3, "#666");
+    rect(ctx, ctX - 1, ctBottom - 16, 12, 1, "#777");
+    // Bowl/basket on middle platform
+    rect(ctx, ctX + 5, ctBottom - 15, 4, 2, "#555");
+    rect(ctx, ctX + 6, ctBottom - 15, 2, 1, "#5a5a5a");
+    // Cubby hole below middle platform
+    rect(ctx, ctX + 2, ctBottom - 13, 5, 4, "#555");
+    rect(ctx, ctX + 3, ctBottom - 12, 3, 3, "#2a2a2a"); // dark interior
+    // Tall post to top perch (sisal)
+    rect(ctx, ctX + 4, ctBottom - 26, 2, 10, "#b8955a");
+    rect(ctx, ctX + 4, ctBottom - 26, 1, 10, "#c8a56a");
+    // Top perch (oval cushion)
+    rect(ctx, ctX + 1, ctBottom - 28, 8, 3, "#666");
+    rect(ctx, ctX + 2, ctBottom - 28, 6, 1, "#777");
+    rect(ctx, ctX + 2, ctBottom - 27, 6, 2, "#5a5a5a");
+    // Dangling toy from middle platform
+    px(ctx, ctX + 10, ctBottom - 14, "#b8955a");
+    px(ctx, ctX + 10, ctBottom - 13, "#b8955a");
+    px(ctx, ctX + 10, ctBottom - 12, "#ddaa44");
   }
 
   // Tropical island decorations
@@ -1004,9 +1083,9 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     ctx.fillRect(skx + 2, sky + 4, 1, 1);
     ctx.globalAlpha = 1;
 
-    // Shipwreck on the water — lower right
+    // Shipwreck on the water — middle right shoreline
     const swx = bx + bw + 12;
-    const swy = fy + fh + 4;
+    const swy = fy + Math.floor(fh / 2);
     // Hull
     ctx.fillStyle = "#5a3a1a";
     ctx.fillRect(swx, swy + 2, 14, 4);
@@ -1209,25 +1288,14 @@ function updateAndDrawShootingStars(ctx: CanvasRenderingContext2D) {
   }
 }
 
-function updateAndDrawUfo(ctx: CanvasRenderingContext2D) {
-  if (ufo.phase === "idle") {
-    nextUfoFrame--;
-    if (nextUfoFrame <= 0) {
-      ufo.phase = "materializing";
-      ufo.x = 30 + Math.random() * (W - 80);
-      ufo.y = 3 + Math.random() * 6;
-      ufo.frame = 0;
-      nextUfoFrame = 60 * 60 * (8 + Math.random() * 5);
-    }
-    return;
-  }
+function updateSingleUfo(ctx: CanvasRenderingContext2D, ufo: UfoState): boolean {
+  if (ufo.phase === "idle") return false; // nothing to draw
 
   ufo.frame++;
   const ux = Math.floor(ufo.x);
   const uy = Math.floor(ufo.y);
 
   if (ufo.phase === "materializing") {
-    // Fade in over 60 frames
     const alpha = Math.min(1, ufo.frame / 60);
     drawUfoSprite(ctx, ux, uy, alpha, ufo.frame);
     if (ufo.frame >= 60) {
@@ -1235,7 +1303,6 @@ function updateAndDrawUfo(ctx: CanvasRenderingContext2D) {
       ufo.frame = 0;
     }
   } else if (ufo.phase === "hovering") {
-    // Hover for ~10 sec with slight bob
     const bob = Math.sin(ufo.frame * 0.05) * 0.5;
     drawUfoSprite(ctx, ux, Math.floor(ufo.y + bob), 1, ufo.frame);
     if (ufo.frame >= 600) {
@@ -1244,7 +1311,6 @@ function updateAndDrawUfo(ctx: CanvasRenderingContext2D) {
       ufo.trailX = ufo.x;
     }
   } else if (ufo.phase === "zipping") {
-    // Zip off to the right ultra-fast over 10 frames
     ufo.x += 25;
     drawUfoSprite(ctx, Math.floor(ufo.x), uy, Math.max(0, 1 - ufo.frame / 10), ufo.frame);
     if (ufo.frame >= 10) {
@@ -1252,11 +1318,8 @@ function updateAndDrawUfo(ctx: CanvasRenderingContext2D) {
       ufo.frame = 0;
     }
   } else if (ufo.phase === "trail") {
-    // Lingering tracer trail for ~2 sec
     const alpha = Math.max(0, 1 - ufo.frame / 120);
     const trailLen = Math.min(ufo.x - ufo.trailX, W);
-    ctx.globalAlpha = alpha * 0.6;
-    // Gradient trail
     for (let t = 0; t < trailLen; t += 2) {
       const tx = ufo.trailX + t;
       const fade = t / trailLen;
@@ -1268,6 +1331,28 @@ function updateAndDrawUfo(ctx: CanvasRenderingContext2D) {
     if (ufo.frame >= 120) {
       ufo.phase = "idle";
     }
+  }
+  return true;
+}
+
+function updateAndDrawUfos(ctx: CanvasRenderingContext2D, autoSpawn: boolean) {
+  // Auto-spawn countdown (only in certain themes)
+  if (autoSpawn) {
+    nextUfoFrame--;
+    if (nextUfoFrame <= 0) {
+      // Find or create an idle UFO
+      let idle = ufos.find((u) => u.phase === "idle");
+      if (!idle) { idle = makeUfo(); ufos.push(idle); }
+      idle.phase = "materializing";
+      idle.x = 30 + Math.random() * (W - 80);
+      idle.y = 3 + Math.random() * 6;
+      idle.frame = 0;
+      nextUfoFrame = 60 * 60 * (8 + Math.random() * 5);
+    }
+  }
+  // Update and draw all active UFOs
+  for (const u of ufos) {
+    updateSingleUfo(ctx, u);
   }
 }
 
@@ -1301,13 +1386,15 @@ function drawUfoSprite(ctx: CanvasRenderingContext2D, x: number, y: number, alph
   ctx.globalAlpha = 1;
 }
 
-/** Trigger the UFO to appear */
+/** Trigger a UFO to appear (supports up to 20 simultaneous) */
 export function triggerUfo(): boolean {
-  if (ufo.phase !== "idle") return false;
-  ufo.phase = "materializing";
-  ufo.x = 30 + Math.random() * (W - 80);
-  ufo.y = 3 + Math.random() * 6;
-  ufo.frame = 0;
+  if (ufos.length >= 20 && !ufos.some((u) => u.phase === "idle")) return false;
+  let idle = ufos.find((u) => u.phase === "idle");
+  if (!idle) { idle = makeUfo(); ufos.push(idle); }
+  idle.phase = "materializing";
+  idle.x = 30 + Math.random() * (W - 80);
+  idle.y = 3 + Math.random() * 6;
+  idle.frame = 0;
   return true;
 }
 
@@ -1326,13 +1413,13 @@ export function drawEnvironment(
     drawBackgroundFeature(ctx, feat.cx, feat.peak, feat.base, feat.halfWidth, feat.bodyColor, feat.capColor, feat.shape);
   }
 
-  // Sky effects — shooting stars (lunar only) and UFO (lunar + desert)
+  // Sky effects — shooting stars (lunar only)
   if (theme.id === "lunar-base") {
     updateAndDrawShootingStars(ctx);
   }
-  if (theme.id === "lunar-base" || theme.id === "golden-ruins") {
-    updateAndDrawUfo(ctx);
-  }
+  // UFOs draw in all scenes, auto-spawn only in lunar + desert
+  const ufoAutoSpawn = theme.id === "lunar-base" || theme.id === "golden-ruins";
+  updateAndDrawUfos(ctx, ufoAutoSpawn);
 
   drawGround(ctx, theme);
   drawBackgroundTrees(ctx, theme);

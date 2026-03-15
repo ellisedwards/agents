@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { execFile } from "child_process";
 import { loadConfig, clawBaseUrl } from "./config";
@@ -42,6 +43,18 @@ const claw = clawBaseUrl(config);
 const watcher = createWatcher(claw);
 
 const app = express();
+
+// --- Build ID (for stale-build detection) ---
+// Read from disk so rebuilds are detected without restarting the server
+const buildIdFile = path.join(__dirname, ".build-id");
+app.get("/api/build-id", (_req, res) => {
+  try {
+    const buildId = fs.readFileSync(buildIdFile, "utf-8").trim();
+    res.json({ buildId });
+  } catch {
+    res.json({ buildId: "unknown" });
+  }
+});
 
 // --- SSE endpoint ---
 app.get("/api/agents", (req, res) => {
@@ -195,14 +208,31 @@ app.get("/api/uptime-kuma", async (_req, res) => {
 
 // --- Static files (production) ---
 const clientDir = path.join(__dirname, "client");
-app.use(express.static(clientDir, { etag: false, maxAge: 0 }));
+app.use(express.static(clientDir, {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".html")) {
+      res.setHeader("Cache-Control", "no-store");
+    }
+  },
+}));
 app.get("*", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   res.sendFile(path.join(clientDir, "index.html"));
 });
 
 // --- Start ---
 watcher.start();
 checkAndAutoRecover(claw);
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`Agent Office running at http://localhost:${config.port}`);
+});
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`Port ${config.port} already in use. Kill the other process and retry.`);
+  } else {
+    console.error("Server error:", err.message);
+  }
+  process.exit(1);
 });

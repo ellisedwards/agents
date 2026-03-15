@@ -42,6 +42,31 @@ export function StatusBar() {
     fetch("/api/agents/clear", { method: "POST" }).catch(() => {});
   };
 
+  // Stale build detection — check every 30s, auto-reload once, then show warning
+  const [staleBuild, setStaleBuild] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const check = () => {
+      fetch("/api/build-id")
+        .then((r) => r.json())
+        .then((d) => {
+          if (!active || !d.buildId || d.buildId === __BUILD_ID__) return;
+          // Try auto-reload once, then give up and show warning
+          const key = "stale_reload_" + d.buildId;
+          if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, "1");
+            window.location.replace("/?t=" + Date.now());
+          } else {
+            setStaleBuild(true);
+          }
+        })
+        .catch(() => {});
+    };
+    check();
+    const id = setInterval(check, 30000);
+    return () => { active = false; clearInterval(id); };
+  }, []);
+
   const [resetting, setResetting] = useState(false);
 
   const handleReset = useCallback(() => {
@@ -67,6 +92,9 @@ export function StatusBar() {
 
   return (
     <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#08080e]/95 flex items-center px-3 gap-4 font-mono text-[10px]">
+      {staleBuild && (
+        <span className="text-yellow-400 animate-pulse">stale build — restart app</span>
+      )}
       <span className="text-neutral-500">
         {status === "connecting" && "Scanning for agents..."}
         {status === "disconnected" && (

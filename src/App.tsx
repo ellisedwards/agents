@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useDemoAgents } from "@/hooks/use-demo-agents";
 import { useAgentSSE } from "@/hooks/use-agent-sse";
 import { useAgentOfficeStore } from "@/components/store";
@@ -8,14 +8,36 @@ import { StatusBar } from "@/components/overlay/status-bar";
 import { AgentLabels } from "@/components/overlay/agent-labels";
 import { SpeechBubbles } from "@/components/overlay/speech-bubble";
 import { PixelTower } from "@/components/overlay/pixel-tower";
+import { DebugPanel } from "@/components/overlay/debug-panel";
 
 export function App() {
   const isDemo = new URLSearchParams(window.location.search).get("demo") === "true";
   const agents = useAgentOfficeStore((s) => s.agents);
   const clawDetailOpen = useAgentOfficeStore((s) => s.clawDetailOpen);
   const clawHealth = useAgentOfficeStore((s) => s.clawHealth);
+  const debugOn = useAgentOfficeStore((s) => s.debugOn);
   const toggleClawDetail = useAgentOfficeStore((s) => s.toggleClawDetail);
   const [transform, setTransform] = useState<CanvasTransform>({ scale: 1, offsetX: 0, offsetY: 0 });
+  const [diagPos, setDiagPos] = useState({ x: 12, y: 12 });
+  const diagDrag = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const onDiagMouseDown = useCallback((e: React.MouseEvent) => {
+    diagDrag.current = { startX: e.clientX, startY: e.clientY, origX: diagPos.x, origY: diagPos.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!diagDrag.current) return;
+      setDiagPos({
+        x: diagDrag.current.origX + (ev.clientX - diagDrag.current.startX),
+        y: diagDrag.current.origY + (ev.clientY - diagDrag.current.startY),
+      });
+    };
+    const onUp = () => {
+      diagDrag.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [diagPos]);
 
   useDemoAgents(isDemo);
   useAgentSSE(!isDemo);
@@ -27,18 +49,19 @@ export function App() {
       <SpeechBubbles transform={transform} />
       <PixelTower />
       <StatusBar />
+      {debugOn && <DebugPanel />}
 
-      {/* Claw health detail panel */}
+      {/* Claw health detail panel — draggable */}
       {clawDetailOpen && clawHealth && (
-        <div
-          className="absolute inset-0 z-40"
-          onClick={toggleClawDetail}
-        >
           <div
-            className="absolute top-12 left-12 bg-[#12121e]/95 border border-white/10 rounded-md p-3 min-w-[200px] font-mono text-[10px] space-y-2 z-50"
-            onClick={(e) => e.stopPropagation()}
+            className="absolute bg-[#12121e]/95 border border-white/10 rounded-md p-3 min-w-[200px] font-mono text-[10px] space-y-2 z-50 select-none"
+            style={{ left: diagPos.x, top: diagPos.y }}
+            onMouseDown={onDiagMouseDown}
           >
-            <div className="text-white/50 text-[9px] border-b border-white/10 pb-1 mb-1">Claw Server Diagnostics</div>
+            <div className="flex justify-between items-center border-b border-white/10 pb-1 mb-1">
+              <span className="text-white/50 text-[9px]">Claw Server Diagnostics</span>
+              <button onClick={toggleClawDetail} className="text-neutral-500 hover:text-white text-[9px] ml-4">x</button>
+            </div>
             <div className="flex justify-between">
               <span className="text-neutral-400">Server</span>
               <span className={clawHealth.reachable ? "text-green-400" : "text-red-400"}>
@@ -83,7 +106,6 @@ export function App() {
               Auto-recovery: active | Polling: 5s
             </div>
           </div>
-        </div>
       )}
 
       {isDemo && (

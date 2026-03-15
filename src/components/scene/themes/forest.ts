@@ -42,9 +42,9 @@ export const forestTheme: SceneTheme = {
   },
 
   building: {
-    wallColor: "#555068",
-    wallDark: "#444058",
-    wallAccent: "#4a4560",
+    wallColor: "#e8e6ee",
+    wallDark: "#d0cdd8",
+    wallAccent: "#dcdae4",
     floorColor1: "#6e6880",
     floorColor2: "#666078",
     floorEdge1: "#565070",
