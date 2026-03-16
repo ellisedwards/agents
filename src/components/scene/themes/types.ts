@@ -137,7 +137,7 @@ export interface SceneTheme {
   };
 
   // Pet type
-  petType: "cat" | "sphynx" | "gecko" | "space-cat" | "jigglypuff";
+  petType: "cat" | "sphynx" | "gecko" | "space-cat" | "jigglypuff" | "none";
 
   // Agent skins — override character sprites per theme
   skins?: {

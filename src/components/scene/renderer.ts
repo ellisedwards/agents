@@ -89,6 +89,26 @@ const lastAgentState = new Map<string, string>();
 const knownAgentIds = new Set<string>();
 // Sticky quadrant assignment — each CC keeps its slot for the session
 const stickyQuadrants = new Map<string, number>();
+// Sticky starter assignment — round-robin charmander/squirtle/bulbasaur, no dupes until all 3 used
+const STARTERS: CharacterType[] = ["charmander", "squirtle", "bulbasaur"];
+const stickyStarters = new Map<string, CharacterType>();
+function assignStarter(agentId: string, agents: AgentState[]): CharacterType {
+  // Return existing assignment if still active
+  if (stickyStarters.has(agentId)) return stickyStarters.get(agentId)!;
+  // Clean up departed agents
+  const activeIds = new Set(agents.map(a => a.id));
+  for (const id of stickyStarters.keys()) {
+    if (!activeIds.has(id)) stickyStarters.delete(id);
+  }
+  // Find which starters are already in use
+  const used = new Set(stickyStarters.values());
+  // Pick the first unused starter, or fall back to round-robin if all 3 are taken
+  let pick = STARTERS.find(s => !used.has(s));
+  if (!pick) pick = STARTERS[stickyStarters.size % STARTERS.length];
+  stickyStarters.set(agentId, pick);
+  return pick;
+}
+
 // Monolith materialize transition
 let monolithVisible = false;
 let monolithTransition = 0; // 0 = gone, 1 = fully materialized
@@ -1008,8 +1028,7 @@ export function renderScene(
     } else {
       const agentSkin = skins?.agent ?? "clawd";
       if (agentSkin === "starter") {
-        const starters: CharacterType[] = ["charmander", "squirtle", "bulbasaur"];
-        charType = starters[agent.teamColor % starters.length];
+        charType = assignStarter(agent.id, agents);
       } else {
         charType = agentSkin as CharacterType;
       }
@@ -1139,7 +1158,8 @@ export function renderScene(
     });
   }
 
-  // Cat
+  // Cat / Pet — skip entirely if no pet
+  if (theme.petType !== "none") {
   if (!catWalkState) {
     catWalkState = createWalkState(CAT_HOME_X + 8, CAT_HOME_Y);
   }
@@ -1218,6 +1238,7 @@ export function renderScene(
       source: "cat",
     });
   }
+  } // end petType !== "none"
 
   // Sort all entities by Y for z-ordering
   entities.sort((a, b) => a.y - b.y);
