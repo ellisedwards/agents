@@ -27,6 +27,7 @@ export interface ClawHealth {
 export type TimeMode = "auto" | "day" | "dawn" | "night";
 export type TowerSize = "small" | "medium" | "large" | "monolith";
 export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base" | "pallet-town";
+export type EditMode = "none" | "background" | "tower-decor" | "lounge" | "posters";
 
 interface TowerPrefs {
   visible: boolean;
@@ -88,6 +89,7 @@ interface AgentOfficeStore {
   towerVisible: boolean;
   towerPos: { x: number; y: number };
   towerOpacity: number;
+  editMode: EditMode;
   setAgents: (agents: AgentState[]) => void;
   selectAgent: (id: string | null) => void;
   setConnectionStatus: (status: AgentOfficeStore["connectionStatus"]) => void;
@@ -106,6 +108,7 @@ interface AgentOfficeStore {
   setTowerVisible: (visible: boolean) => void;
   setTowerPos: (pos: { x: number; y: number }) => void;
   setTowerOpacity: (opacity: number) => void;
+  setEditMode: (mode: EditMode) => void;
 }
 
 const initialTower = loadTowerPrefs();
@@ -130,6 +133,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   towerVisible: initialTower.visible,
   towerPos: { x: initialTower.x, y: initialTower.y },
   towerOpacity: initialTower.opacity,
+  editMode: "none",
   setAgents: (incoming) => {
     const now = Date.now();
     const prev = get().agents;
@@ -193,4 +197,5 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
     const s = get();
     saveTowerPrefs({ visible: s.towerVisible, size: s.towerSize, x: s.towerPos.x, y: s.towerPos.y, opacity });
   },
+  setEditMode: (editMode) => set({ editMode }),
 }));

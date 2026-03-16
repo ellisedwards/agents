@@ -74,9 +74,9 @@ export const palletTownTheme: SceneTheme = {
 
   posterMount: {
     style: "wooden-sign",
-    color: "#8a6a44",
-    colorLight: "#a08050",
-    colorDark: "#6a4a28",
+    color: "#a08858",
+    colorLight: "#b09868",
+    colorDark: "#6e5434",
   },
 
   hasGuitar: false,

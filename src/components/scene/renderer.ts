@@ -3,7 +3,7 @@ import type { CharacterType } from "../characters/sprite-cache";
 import { getSprite, type buildSpriteCache } from "../characters/sprite-cache";
 import { assignDesks, DESK_POSITIONS } from "./desk-layout";
 import { drawEnvironment, drawDeskFronts } from "./environment";
-import { CANVAS_WIDTH } from "../canvas-transform";
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../canvas-transform";
 import {
   createWalkState,
   updateWalkState,
@@ -11,7 +11,8 @@ import {
   type WalkState,
   type AvoidZone,
 } from "./walking";
-import { useAgentOfficeStore, type MonitorStatus, type ClawHealth } from "../store";
+import { useAgentOfficeStore, type MonitorStatus, type ClawHealth, type EditMode } from "../store";
+import { loadDecoPixels } from "../overlay/pixel-editor";
 
 // Walk states persist across frames
 const walkStates = new Map<string, WalkState>();
@@ -170,6 +171,78 @@ export function getHealthPosterBounds(): { x: number; y: number; w: number; h: n
   return { x: px - pad - 1, y: BUILDING_Y + 3 + 5 - pad - 1, w: totalW, h: totalH };
 }
 
+function drawWoodSign(
+  ctx: CanvasRenderingContext2D,
+  mx: number, my: number, totalW: number, totalH: number,
+  mount: { color: string; colorLight: string; colorDark: string }
+) {
+  const r = parseInt(mount.color.slice(1, 3), 16);
+  const g = parseInt(mount.color.slice(3, 5), 16);
+  const b = parseInt(mount.color.slice(5, 7), 16);
+  const woodShades = [
+    mount.color,
+    mount.colorLight,
+    `rgb(${Math.max(0,r-18)},${Math.max(0,g-14)},${Math.max(0,b-10)})`,
+    `rgb(${Math.min(255,r+10)},${Math.min(255,g+8)},${Math.min(255,b+3)})`,
+    `rgb(${Math.max(0,r-8)},${Math.max(0,g-6)},${Math.max(0,b-8)})`,
+    `rgb(${Math.min(255,r+5)},${Math.min(255,g+12)},${Math.min(255,b+6)})`,
+    `rgb(${Math.max(0,r-24)},${Math.max(0,g-18)},${Math.max(0,b-14)})`,
+    mount.colorDark,
+  ];
+
+  // Scrambled hash for less patterned look
+  function woodHash(x: number, y: number): number {
+    let h = x * 2654435761 ^ y * 2246822519;
+    h = ((h >> 16) ^ h) * 0x45d9f3b;
+    return Math.abs(h);
+  }
+
+  // Posts with speckle
+  for (const postX of [mx + 1, mx + totalW - 3]) {
+    for (let py = my - 2; py < my + totalH + 4; py++) {
+      const h0 = woodHash(postX, py);
+      ctx.fillStyle = woodShades[h0 % 6]; // lighter shades only
+      ctx.fillRect(postX, py, 1, 1);
+      ctx.fillStyle = woodShades[(h0 >> 4) % 4 + 2]; // darker face
+      ctx.fillRect(postX + 1, py, 1, 1);
+    }
+  }
+
+  // Sign board — speckled fill with horizontal slat banding
+  const slatHeight = Math.max(2, Math.floor(totalH / 3));
+  for (let py = 0; py < totalH; py++) {
+    const slatEdge = py % slatHeight === 0 && py > 0;
+    for (let px = 0; px < totalW; px++) {
+      const h = woodHash(mx + px, my + py);
+      if (slatEdge) {
+        // Dark slat seam
+        ctx.fillStyle = mount.colorDark;
+      } else {
+        // Per-pixel variation — bias toward mid tones
+        ctx.fillStyle = woodShades[h % woodShades.length];
+      }
+      ctx.fillRect(mx + px, my + py, 1, 1);
+    }
+  }
+
+  // Dark border on all edges
+  ctx.fillStyle = mount.colorDark;
+  ctx.fillRect(mx, my, totalW, 1);
+  ctx.fillRect(mx, my + totalH - 1, totalW, 1);
+  ctx.fillRect(mx, my, 1, totalH);
+  ctx.fillRect(mx + totalW - 1, my, 1, totalH);
+
+  // Subtle inner highlight on top-left
+  ctx.fillStyle = mount.colorLight;
+  ctx.fillRect(mx + 1, my + 1, totalW - 2, 1);
+  ctx.fillRect(mx + 1, my + 1, 1, totalH - 2);
+
+  // Rope lashings
+  ctx.fillStyle = mount.colorDark;
+  ctx.fillRect(mx + 1, my - 1, 2, 2);
+  ctx.fillRect(mx + totalW - 3, my - 1, 2, 2);
+}
+
 // Status poster — on the back wall near the fireplace
 const STATUS_UP = "#22c55e";
 const STATUS_DOWN = "#ef4444";
@@ -215,20 +288,7 @@ function renderStatusPoster(
     ctx.fillStyle = mount.colorLight;
     ctx.fillRect(mx, my + totalH + 2, totalW, 1);
   } else if (mount.style === "wooden-sign") {
-    // Wooden sign on two posts
-    // Posts
-    ctx.fillStyle = mount.colorDark;
-    ctx.fillRect(mx + 1, my - 2, 2, totalH + 6);
-    ctx.fillRect(mx + totalW - 3, my - 2, 2, totalH + 6);
-    // Sign board
-    ctx.fillStyle = mount.color;
-    ctx.fillRect(mx, my, totalW, totalH);
-    ctx.fillStyle = mount.colorLight;
-    ctx.fillRect(mx, my, totalW, 1);
-    // Rope lashings at top
-    ctx.fillStyle = mount.colorDark;
-    ctx.fillRect(mx + 1, my - 1, 2, 2);
-    ctx.fillRect(mx + totalW - 3, my - 1, 2, 2);
+    drawWoodSign(ctx, mx, my, totalW, totalH, mount);
   } else if (mount.style === "metal-panel") {
     // Metal panel on a thin post
     // Post
@@ -323,16 +383,7 @@ function renderHealthPoster(
     ctx.fillStyle = mount.colorLight;
     ctx.fillRect(mx, my + totalH + 2, totalW, 1);
   } else if (mount.style === "wooden-sign") {
-    ctx.fillStyle = mount.colorDark;
-    ctx.fillRect(mx + 1, my - 2, 2, totalH + 6);
-    ctx.fillRect(mx + totalW - 3, my - 2, 2, totalH + 6);
-    ctx.fillStyle = mount.color;
-    ctx.fillRect(mx, my, totalW, totalH);
-    ctx.fillStyle = mount.colorLight;
-    ctx.fillRect(mx, my, totalW, 1);
-    ctx.fillStyle = mount.colorDark;
-    ctx.fillRect(mx + 1, my - 1, 2, 2);
-    ctx.fillRect(mx + totalW - 3, my - 1, 2, 2);
+    drawWoodSign(ctx, mx, my, totalW, totalH, mount);
   } else if (mount.style === "metal-panel") {
     ctx.fillStyle = mount.colorDark;
     ctx.fillRect(mx + Math.floor(totalW / 2), my + totalH, 2, 6);
@@ -413,8 +464,10 @@ function monolithGeometry() {
 export function drawMonolithSurrounds(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
   const { towerSize, towerVisible } = useAgentOfficeStore.getState();
   if (!towerVisible || towerSize !== "monolith") return;
-  if (monolithTransition <= 0) return;
+  const surroundAlpha = Math.max(0, (monolithTransition - 0.4) / 0.6);
+  if (surroundAlpha <= 0) return;
 
+  ctx.globalAlpha = surroundAlpha;
   const { slabW, slabH, cx, ox, oy } = monolithGeometry();
 
   // Tropical island: worship stones around the base
@@ -656,61 +709,74 @@ export function drawMonolithSurrounds(ctx: CanvasRenderingContext2D, theme: Scen
     ctx.fillRect(ox + slabW, baseY - 7, 1, 3);
   }
 
-  // Pallet Town: tall grass and sign post around the monolith
+  // Pallet Town: bush + hedge decoration around monolith base
   if (theme.id === "pallet-town") {
     const baseY = oy + slabH;
     const baseCX = cx;
-    const grassDk = "#3a8833";
-    const grassMd = "#44aa44";
-    const grassLt = "#55cc55";
 
-    // Tall grass patches — left side
+    // Bush palette — matched to pallet-town scene bushes
+    const bushColors = ["#264a30", "#325a3a", "#2e4d35", "#3e6a45", "#2a3e2e", "#486b44"];
+    const bushHighlight = "#5a8a50";
+    const bushShadow = "#1a3024";
+
     const grassPatches = [
       { dx: -16, dy: 2, w: 6, h: 4 },
       { dx: -20, dy: 4, w: 5, h: 3 },
       { dx: -12, dy: 5, w: 4, h: 3 },
-      // Right side
-      { dx: 12, dy: 2, w: 6, h: 4 },
-      { dx: 18, dy: 4, w: 5, h: 3 },
-      { dx: 10, dy: 5, w: 4, h: 3 },
+      // Right side (trimmed to avoid house overlap)
+      { dx: 10, dy: 2, w: 5, h: 4 },
+      { dx: 8, dy: 5, w: 4, h: 3 },
       // Front
       { dx: -6, dy: 7, w: 4, h: 3 },
       { dx: 4, dy: 8, w: 5, h: 3 },
     ];
-    for (const g of grassPatches) {
+    for (let gi = 0; gi < grassPatches.length; gi++) {
+      const g = grassPatches[gi];
       const gx = baseCX + g.dx;
       const gy = baseY + g.dy;
-      ctx.fillStyle = grassDk;
+      ctx.fillStyle = bushShadow;
       ctx.fillRect(gx, gy, g.w, g.h);
-      ctx.fillStyle = grassMd;
-      ctx.fillRect(gx, gy, g.w, g.h - 1);
-      // Grass tips
-      for (let t = 0; t < g.w; t += 2) {
-        ctx.fillStyle = grassLt;
-        ctx.fillRect(gx + t, gy - 1, 1, 1);
+      for (let py = 0; py < g.h; py++) {
+        for (let px = 0; px < g.w; px++) {
+          const hash = (gx + px) * 7 + (gy + py) * 13 + gi * 3;
+          ctx.fillStyle = bushColors[hash % bushColors.length];
+          ctx.fillRect(gx + px, gy + py, 1, 1);
+        }
+      }
+      for (let t = 0; t < g.w; t++) {
+        const hash = (gx + t) * 11 + gi * 5;
+        if (hash % 3 === 0) {
+          ctx.fillStyle = bushHighlight;
+          ctx.fillRect(gx + t, gy, 1, 1);
+        }
+        if (hash % 4 === 0) {
+          ctx.fillStyle = bushColors[(hash + 2) % bushColors.length];
+          ctx.fillRect(gx + t, gy - 1, 1, 1);
+        }
+      }
+      for (let t = 0; t < g.w; t++) {
+        if ((gx + t + gi) % 3 === 0) {
+          ctx.fillStyle = bushShadow;
+          ctx.fillRect(gx + t, gy + g.h - 1, 1, 1);
+        }
       }
     }
 
-    // Wooden sign post — right of monolith
-    const signX = baseCX + 22;
-    const signY = baseY - 2;
-    // Post
-    ctx.fillStyle = "#665533";
-    ctx.fillRect(signX + 2, signY, 2, 10);
-    ctx.fillStyle = "#776644";
-    ctx.fillRect(signX + 2, signY, 1, 10);
-    // Sign board
-    ctx.fillStyle = "#aa9060";
-    ctx.fillRect(signX, signY - 4, 6, 4);
-    ctx.fillStyle = "#bba070";
-    ctx.fillRect(signX, signY - 4, 6, 1);
-    // Text lines on sign
-    ctx.fillStyle = "#665533";
-    ctx.fillRect(signX + 1, signY - 3, 4, 1);
-    ctx.fillRect(signX + 1, signY - 1, 3, 1);
+    // Hedge around monolith base
+    ctx.fillStyle = "#2c625d";
+    ctx.fillRect(baseCX - 10, baseY + 3, 20, 1);
+    ctx.fillRect(baseCX - 10, baseY + 4, 19, 1);
+    ctx.fillRect(baseCX - 8, baseY + 5, 17, 1);
+    ctx.fillRect(baseCX - 8, baseY + 6, 7, 1);
+    ctx.fillRect(baseCX - 2, baseY + 6, 11, 1);
+    ctx.fillRect(baseCX - 8, baseY + 7, 2, 1);
+    ctx.fillRect(baseCX - 2, baseY + 7, 10, 1);
+    ctx.fillRect(baseCX - 9, baseY + 8, 3, 1);
+    ctx.fillRect(baseCX - 2, baseY + 8, 6, 1);
+    ctx.fillRect(baseCX - 9, baseY + 9, 13, 1);
   }
 
-
+  ctx.globalAlpha = 1;
 }
 
 function drawMonolith(ctx: CanvasRenderingContext2D, theme: SceneTheme, frame: number, timeOverride?: TimeOfDay, materialize = 1) {
@@ -958,10 +1024,53 @@ export function renderScene(
   const allAvoidZones = [...deskAvoidZones, ...seatedAgentZones];
 
   // 4. Draw environment
+  const { editMode } = useAgentOfficeStore.getState();
   const deskCenters = DESK_POSITIONS.map((d) => ({ x: d.x, y: d.y + oY }));
   drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride, theme, () => {
+    // Draw background decoration pixels (behind agents, before tint)
+    const bgPixels = loadDecoPixels(theme.id, "background");
+    for (const p of bgPixels) {
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, 1, 1);
+    }
+    // Pallet Town hardcoded BG decorations
+    if (theme.id === "pallet-town") {
+      // Vertical edge line (house border)
+      ctx.fillStyle = "#3f8f81";
+      ctx.fillRect(247, 44, 1, 22);
+      // Horizontal ground line
+      ctx.fillStyle = "#3e8e80";
+      ctx.fillRect(172, 66, 5, 1);   // 172-176
+      ctx.fillRect(178, 66, 71, 1);  // 178-248
+      ctx.fillRect(217, 67, 1, 1);
+      // Corner detail
+      ctx.fillStyle = "#2f7c6b";
+      ctx.fillRect(145, 52, 1, 2);
+      ctx.fillRect(146, 53, 1, 1);
+      ctx.fillStyle = "#408c79";
+      ctx.fillRect(144, 53, 1, 1);
+    }
+    // Draw lounge decoration pixels (guitar/fireplace area)
+    const loungePixels = loadDecoPixels(theme.id, "lounge");
+    for (const p of loungePixels) {
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, 1, 1);
+    }
     drawMonolithSurrounds(ctx, theme);
-  });
+    // Draw tower decoration pixels (only when monolith is visible)
+    const { towerSize: _ts, towerVisible: _tv } = useAgentOfficeStore.getState();
+    // Decoration fades in after the monolith is ~40% materialized (~0.5s delay)
+    const decorAlpha = Math.max(0, (monolithTransition - 0.4) / 0.6);
+    if (_tv && _ts === "monolith" && decorAlpha > 0) {
+      ctx.globalAlpha = decorAlpha;
+      const towerPixels = loadDecoPixels(theme.id, "tower-decor");
+      for (const p of towerPixels) {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }, editMode !== "none");
 
   // 4.5. Posters on the back wall
   const { statusPosterOn, healthPosterOn } = useAgentOfficeStore.getState();
@@ -978,6 +1087,13 @@ export function renderScene(
   if (healthPosterOn && clawHealth) {
     const healthX = showStatusPoster ? posterBaseX + posterTotalW + 4 : posterBaseX;
     renderHealthPoster(ctx, clawHealth, theme, healthX);
+  }
+
+  // 4.55. Poster decoration pixels (on top of posters, on back wall)
+  const posterPixels = loadDecoPixels(theme.id, "posters");
+  for (const p of posterPixels) {
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 1, 1);
   }
 
   // 4.6. Monolith (in-scene pixel tower) with materialize transition
@@ -1583,4 +1699,5 @@ export function renderScene(
   for (const id of knownAgentIds) {
     if (!activeIds.has(id)) knownAgentIds.delete(id);
   }
+
 }

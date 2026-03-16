@@ -9,6 +9,7 @@ import { AgentLabels } from "@/components/overlay/agent-labels";
 import { SpeechBubbles } from "@/components/overlay/speech-bubble";
 import { PixelTower } from "@/components/overlay/pixel-tower";
 import { DebugPanel } from "@/components/overlay/debug-panel";
+import { PixelEditor } from "@/components/overlay/pixel-editor";
 
 export function App() {
   const isDemo = new URLSearchParams(window.location.search).get("demo") === "true";
@@ -18,6 +19,7 @@ export function App() {
   const debugOn = useAgentOfficeStore((s) => s.debugOn);
   const toggleClawDetail = useAgentOfficeStore((s) => s.toggleClawDetail);
   const [transform, setTransform] = useState<CanvasTransform>({ scale: 1, offsetX: 0, offsetY: 0 });
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [diagPos, setDiagPos] = useState({ x: 12, y: 12 });
   const diagDrag = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
@@ -44,8 +46,9 @@ export function App() {
 
   return (
     <div className="relative w-full h-screen bg-[#08080e] flex items-center justify-center">
-      <OfficeCanvas onTransformChange={setTransform} />
+      <OfficeCanvas onTransformChange={setTransform} canvasRef={canvasRef} />
       <AgentLabels transform={transform} />
+      <PixelEditor canvasRef={canvasRef} />
       <SpeechBubbles transform={transform} />
       <PixelTower />
       <StatusBar />

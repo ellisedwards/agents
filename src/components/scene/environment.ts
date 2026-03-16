@@ -1796,7 +1796,8 @@ export function drawEnvironment(
   frame: number = 0,
   timeOverride?: TimeOfDay,
   theme: SceneTheme = forestTheme,
-  beforeTint?: () => void
+  beforeTint?: () => void,
+  skipTint?: boolean
 ) {
   const tod = timeOverride ?? getTimeOfDay();
 
@@ -1809,6 +1810,9 @@ export function drawEnvironment(
   if (useBgImage) {
     // Draw PNG on top — transparent sky lets the procedural sky show through
     ctx.drawImage(palletTownBg!, 0, 1, W, H);
+  } else if (theme.id === "pallet-town") {
+    // Pallet Town without PNG loaded — just show sky, skip everything
+    return;
   } else {
     for (const feat of theme.backgroundFeatures) {
       drawBackgroundFeature(ctx, feat.cx, feat.peak, feat.base, feat.halfWidth, feat.bodyColor, feat.capColor, feat.shape);
@@ -1841,7 +1845,7 @@ export function drawEnvironment(
   if (beforeTint) beforeTint();
 
   const tint = theme.timeTints[tod];
-  if (tint.opacity > 0) {
+  if (tint.opacity > 0 && !skipTint) {
     ctx.globalAlpha = tint.opacity;
     rect(ctx, 0, 0, W, H, tint.color);
     ctx.globalAlpha = 1;

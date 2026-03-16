@@ -1,7 +1,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useAgentOfficeStore } from "../store";
-import type { TimeMode, TowerSize, ThemeId } from "../store";
+import type { TimeMode, TowerSize, ThemeId, EditMode } from "../store";
 import { ALL_THEMES } from "../scene/themes";
 import {
   canvasToDOM,
@@ -46,6 +46,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const setHealthPosterOn = useAgentOfficeStore((s) => s.setHealthPosterOn);
   const towerOpacity = useAgentOfficeStore((s) => s.towerOpacity);
   const setTowerOpacity = useAgentOfficeStore((s) => s.setTowerOpacity);
+  const editMode = useAgentOfficeStore((s) => s.editMode);
+  const setEditMode = useAgentOfficeStore((s) => s.setEditMode);
   const deskMap = assignDesks(agents.map((a) => a.id));
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -289,6 +291,22 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
               />
             </div>
             )}
+
+            {/* Pixel Editor */}
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] text-white/50 block">Edit</span>
+              <select
+                value={editMode}
+                onChange={(e) => setEditMode(e.target.value as EditMode)}
+                className="w-full bg-white/10 text-white/70 font-mono text-[10px] rounded px-1.5 py-1 border border-white/10 outline-none"
+              >
+                <option value="none" className="bg-[#1e1e2e]">Off</option>
+                <option value="background" className="bg-[#1e1e2e]">Background</option>
+                <option value="tower-decor" className="bg-[#1e1e2e]">Tower Decor</option>
+                <option value="lounge" className="bg-[#1e1e2e]">Lounge</option>
+                <option value="posters" className="bg-[#1e1e2e]">Posters</option>
+              </select>
+            </div>
 
             {/* Triggers */}
             <div className="pt-1 border-t border-white/5 space-y-1">

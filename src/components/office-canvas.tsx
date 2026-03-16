@@ -17,10 +17,12 @@ import { getThemeById } from "./scene/themes";
 
 interface OfficeCanvasProps {
   onTransformChange?: (t: CanvasTransform) => void;
+  canvasRef?: React.RefObject<HTMLCanvasElement | null>;
 }
 
-export function OfficeCanvas({ onTransformChange }: OfficeCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+export function OfficeCanvas({ onTransformChange, canvasRef: externalCanvasRef }: OfficeCanvasProps) {
+  const internalCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = externalCanvasRef ?? internalCanvasRef;
   const containerRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<CanvasTransform>({
     scale: 1,
