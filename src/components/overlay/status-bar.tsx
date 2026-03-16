@@ -10,7 +10,8 @@ export function StatusBar() {
   const markRelaySeen = useAgentOfficeStore((s) => s.markRelaySeen);
   const relayUnread = relayMessages.length - relaySeenCount;
 
-  const ccCount = agents.filter((a) => a.source === "cc").length;
+  const ccMain = agents.filter((a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)).length;
+  const ccSub = agents.filter((a) => a.source === "cc" && a.subagentClass !== null && a.subagentClass !== undefined).length;
   const ocCount = agents.filter((a) => a.source === "openclaw").length;
 
   const [brightness, setBrightness] = useState<number | null>(null);
@@ -103,10 +104,16 @@ export function StatusBar() {
         {status === "connected" &&
           (agents.length === 0 ? "No active agents" : `${agents.length} agents`)}
       </span>
-      {status === "connected" && ccCount > 0 && (
+      {status === "connected" && ccMain > 0 && (
         <span className="text-[#c4856c] flex items-center gap-1">
           <span className="w-1.5 h-1.5 rounded-full bg-[#c4856c] inline-block" />
-          CC: {ccCount}
+          CC: {ccMain}
+        </span>
+      )}
+      {status === "connected" && ccSub > 0 && (
+        <span className="text-[#c4856c]/60 flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#c4856c]/60 inline-block" />
+          sub: {ccSub}
         </span>
       )}
       {status === "connected" && ocCount > 0 && (
@@ -115,7 +122,7 @@ export function StatusBar() {
           OC: {ocCount}
         </span>
       )}
-      {status === "connected" && ccCount > 0 && (
+      {status === "connected" && ccMain > 0 && (
         <button
           onClick={handleClear}
           className="text-neutral-500 hover:text-neutral-300 transition-colors"

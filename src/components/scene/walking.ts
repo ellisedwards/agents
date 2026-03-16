@@ -67,6 +67,18 @@ function hitsZone(x: number, y: number, zones: AvoidZone[]): boolean {
   return false;
 }
 
+function pathCrossesZone(x1: number, y1: number, x2: number, y2: number, zones: AvoidZone[]): boolean {
+  // Sample a few points along the path to check for zone crossings
+  const steps = 5;
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const mx = x1 + (x2 - x1) * t;
+    const my = y1 + (y2 - y1) * t;
+    if (hitsZone(mx, my, zones)) return true;
+  }
+  return false;
+}
+
 function pickTarget(
   state: WalkState,
   homeX: number,
@@ -74,8 +86,21 @@ function pickTarget(
   wanderRadius: number,
   avoidZones: AvoidZone[]
 ): void {
-  // Try a few times to find a target that doesn't land on a desk
-  for (let attempt = 0; attempt < 8; attempt++) {
+  // Try to find a target that doesn't land on a desk AND doesn't cross through one
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const tx = homeX + (Math.random() - 0.5) * wanderRadius * 2;
+    const ty = homeY + (Math.random() - 0.5) * wanderRadius * 2;
+    if (!hitsZone(tx, ty, avoidZones) &&
+        !pathCrossesZone(state.currentX, state.currentY, tx, ty, avoidZones)) {
+      state.targetX = tx;
+      state.targetY = ty;
+      state.isMoving = true;
+      state.frameCounter = 0;
+      return;
+    }
+  }
+  // Fallback: any non-zone target (may cross a zone but will slide around)
+  for (let attempt = 0; attempt < 4; attempt++) {
     const tx = homeX + (Math.random() - 0.5) * wanderRadius * 2;
     const ty = homeY + (Math.random() - 0.5) * wanderRadius * 2;
     if (!hitsZone(tx, ty, avoidZones)) {
@@ -86,7 +111,7 @@ function pickTarget(
       return;
     }
   }
-  // Fallback: just go home
+  // Last resort: go home
   state.targetX = homeX;
   state.targetY = homeY;
   state.isMoving = true;
@@ -160,9 +185,24 @@ export function updateWalkState(
         } else if (!hitsZone(state.currentX, nextY, avoidZones)) {
           state.currentY = nextY;
         } else {
-          // Fully blocked — pick a new target immediately
+          // Fully blocked — nudge away from the nearest zone center to escape
+          let nearestDx = 0, nearestDy = 0, nearestDist = Infinity;
+          for (const z of avoidZones) {
+            const zdx = state.currentX - z.x;
+            const zdy = state.currentY - z.y;
+            const zd = zdx * zdx + zdy * zdy;
+            if (zd < nearestDist) {
+              nearestDist = zd;
+              nearestDx = zdx;
+              nearestDy = zdy;
+            }
+          }
+          // Push away from zone center
+          const nd = Math.sqrt(nearestDist) || 1;
+          state.currentX += (nearestDx / nd) * speed;
+          state.currentY += (nearestDy / nd) * speed;
           state.isMoving = false;
-          state.idleFramesRemaining = 1;
+          state.idleFramesRemaining = 10;
         }
       } else {
         state.currentX = nextX;

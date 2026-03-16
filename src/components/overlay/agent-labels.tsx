@@ -9,7 +9,7 @@ import {
   type CanvasTransform,
 } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
-import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds } from "../scene/renderer";
+import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, getAgentSlot } from "../scene/renderer";
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
 
@@ -48,7 +48,11 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const setTowerOpacity = useAgentOfficeStore((s) => s.setTowerOpacity);
   const editMode = useAgentOfficeStore((s) => s.editMode);
   const setEditMode = useAgentOfficeStore((s) => s.setEditMode);
-  const deskMap = assignDesks(agents.map((a) => a.id));
+  const deskEligible = agents.filter((a) =>
+    a.state !== "lounging" && a.state !== "departing" &&
+    (a.subagentClass === null || a.subagentClass === undefined)
+  );
+  const deskMap = assignDesks(deskEligible.map((a) => a.id));
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -382,19 +386,28 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
               </div>
             )}
             {/* Name tag — below character, on hover or always if labels on */}
-            {(isHovered || labelsOn) && (
+            {(isHovered || labelsOn || debugOn) && (
               <div
-                className="absolute font-mono whitespace-nowrap pointer-events-none transition-opacity duration-150"
+                className="absolute font-mono font-bold whitespace-nowrap pointer-events-none transition-opacity duration-150 flex flex-col items-center"
                 style={{
                   left: domPos.x,
-                  top: domPos.y + 10 * transform.scale,
+                  top: domPos.y + 16 * transform.scale,
                   transform: "translateX(-50%)",
-                  fontSize: "10px",
-                  color: agent.source === "openclaw" ? "#cc3333" : teamHex,
-                  opacity: isHovered ? 1 : labelsOn ? 0.5 : 0,
+                  opacity: isHovered ? 1 : (labelsOn || debugOn) ? 0.7 : 0,
+                  textShadow: "0 1px 3px rgba(0,0,0,0.8)",
                 }}
               >
-                {agent.name}
+                <span style={{
+                  fontSize: "13px",
+                  color: agent.source === "openclaw" ? "#cc3333" : teamHex,
+                }}>
+                  {agent.name}
+                </span>
+                {(labelsOn || debugOn) && (() => {
+                  const slot = getAgentSlot(agent.id);
+                  const deskIdx = deskEligible.indexOf(agent);
+                  return <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>d{deskIdx}{slot !== undefined ? ` s${slot}` : ""}</span>;
+                })()}
               </div>
             )}
           </div>

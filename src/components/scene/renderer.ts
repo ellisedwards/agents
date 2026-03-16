@@ -90,6 +90,13 @@ const lastAgentState = new Map<string, string>();
 const knownAgentIds = new Set<string>();
 // Sticky quadrant assignment — each CC keeps its slot for the session
 const stickyQuadrants = new Map<string, number>();
+
+// Trainer blink state — random blinking for openclaw "trainer" characters
+const blinkTimers = new Map<string, number>(); // frames until next blink
+const blinkActive = new Map<string, number>(); // frames remaining in blink
+export function getAgentSlot(agentId: string): number | undefined {
+  return stickyQuadrants.get(agentId);
+}
 // Sticky starter assignment — round-robin charmander/squirtle/bulbasaur, no dupes until all 3 used
 const STARTERS: CharacterType[] = ["charmander", "squirtle", "bulbasaur"];
 const stickyStarters = new Map<string, CharacterType>();
@@ -1173,7 +1180,11 @@ export function renderScene(
       const homeX = BUILDING_X + BUILDING_W / 2;
       const homeY = FLOOR_Y + FLOOR_H / 2 + oY;
       if (!walkStates.has(agent.id)) {
-        walkStates.set(agent.id, createWalkState(homeX, homeY));
+        // Offset spawn position so simultaneous subagents don't stack
+        const spawnHash = hashForPhase(agent.id);
+        const spawnOffsetX = ((spawnHash % 30) - 15);
+        const spawnOffsetY = ((spawnHash * 7 % 20) - 10);
+        walkStates.set(agent.id, createWalkState(homeX + spawnOffsetX, homeY + spawnOffsetY));
       }
       const ws = walkStates.get(agent.id)!;
       updateWalkState(ws, false, homeX, homeY, 40, allAvoidZones);
@@ -1412,6 +1423,24 @@ export function renderScene(
     }
   }
 
+  // 7.5. Draw sub-agent connection lines behind all entities
+  for (const entity of entities) {
+    if (entity.parentId) {
+      const parentEntity = entities.find((e) => e.agentId === entity.parentId);
+      if (parentEntity) {
+        const tc = TEAM_COLORS[entity.teamColor] ?? "#c4856c";
+        ctx.strokeStyle = tc + "88";
+        ctx.setLineDash([2, 2]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(entity.x, entity.y);
+        ctx.lineTo(parentEntity.x, parentEntity.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
   // 8. Draw all entities
   for (const entity of entities) {
     // Hide sprite during teleport beam
@@ -1431,10 +1460,32 @@ export function renderScene(
       }
     }
 
+    // Trainer blink — swap to blink sprite randomly
+    let effectiveSpriteState = entity.spriteState;
+    if (entity.spriteKey === "trainer" && !entity.isUnreachable) {
+      if (!blinkTimers.has(entity.agentId)) {
+        blinkTimers.set(entity.agentId, 60 + Math.floor(Math.random() * 150));
+      }
+      const active = blinkActive.get(entity.agentId) ?? 0;
+      if (active > 0) {
+        effectiveSpriteState = "blink";
+        blinkActive.set(entity.agentId, active - 1);
+      } else {
+        let timer = blinkTimers.get(entity.agentId)!;
+        timer--;
+        if (timer <= 0) {
+          blinkActive.set(entity.agentId, 3 + Math.floor(Math.random() * 3));
+          blinkTimers.set(entity.agentId, 60 + Math.floor(Math.random() * 180));
+        } else {
+          blinkTimers.set(entity.agentId, timer);
+        }
+      }
+    }
+
     const sprite = getSprite(
       spriteCache,
       entity.spriteKey,
-      entity.spriteState as any
+      effectiveSpriteState as any
     ) ?? getSprite(spriteCache, entity.spriteKey, "idle");
     if (!sprite) continue;
 
@@ -1543,21 +1594,6 @@ export function renderScene(
       }
     }
 
-    // Sub-agent connection line
-    if (entity.parentId) {
-      const parentEntity = entities.find((e) => e.agentId === entity.parentId);
-      if (parentEntity) {
-        const tc = TEAM_COLORS[entity.teamColor] ?? "#c4856c";
-        ctx.strokeStyle = tc + "88";
-        ctx.setLineDash([2, 2]);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(entity.x, entity.y);
-        ctx.lineTo(parentEntity.x, parentEntity.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    }
   }
 
   // 9. Draw desk fronts (tables + laptops) on top of agents
@@ -1682,8 +1718,21 @@ export function renderScene(
     ctx.globalAlpha = 1;
   }
 
-  // Clean up walk states and poof tracking for agents that no longer exist
+  // Clean up agents that no longer exist — poof any that vanished without departing
   const activeIds = new Set(agents.map((a) => a.id));
+  for (const id of knownAgentIds) {
+    if (!activeIds.has(id) && !poofedIds.has(id)) {
+      // Agent vanished without "departing" — spawn poof at last known position
+      const sp = smoothPos.get(id);
+      const ws = walkStates.get(id);
+      if (sp || ws) {
+        const px = sp ? sp.x : ws!.currentX;
+        const py = sp ? sp.y : ws!.currentY;
+        activePoofs.push({ x: px, y: py, frame: 0, color: POOF_COLORS[Math.floor(Math.random() * POOF_COLORS.length)] });
+      }
+    }
+    if (!activeIds.has(id)) knownAgentIds.delete(id);
+  }
   for (const id of walkStates.keys()) {
     if (!activeIds.has(id)) walkStates.delete(id);
   }
@@ -1695,9 +1744,6 @@ export function renderScene(
   }
   for (const id of lastAgentState.keys()) {
     if (!activeIds.has(id)) lastAgentState.delete(id);
-  }
-  for (const id of knownAgentIds) {
-    if (!activeIds.has(id)) knownAgentIds.delete(id);
   }
 
 }

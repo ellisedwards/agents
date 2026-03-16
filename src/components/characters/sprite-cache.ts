@@ -17,7 +17,7 @@ import { SPACE_CAT_WIDTH, SPACE_CAT_HEIGHT, SPACE_CAT_IDLE, SPACE_CAT_WALK1, SPA
 import { CHARMANDER_SPRITES, CHARMANDER_WIDTH, CHARMANDER_HEIGHT } from "./charmander";
 import { SQUIRTLE_SPRITES, SQUIRTLE_WIDTH, SQUIRTLE_HEIGHT } from "./squirtle";
 import { BULBASAUR_SPRITES, BULBASAUR_WIDTH, BULBASAUR_HEIGHT } from "./bulbasaur";
-import { TRAINER_SPRITES, TRAINER_WIDTH, TRAINER_HEIGHT } from "./trainer";
+import { TRAINER_SPRITES, TRAINER_BLINK, TRAINER_WIDTH, TRAINER_HEIGHT } from "./trainer";
 import { PIKACHU_SPRITES, PIKACHU_WIDTH, PIKACHU_HEIGHT, PIKACHU_WALK1, PIKACHU_WALK2 } from "./pikachu";
 import { JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT, JIGGLYPUFF_IDLE, JIGGLYPUFF_WALK1, JIGGLYPUFF_WALK2, JIGGLYPUFF_SLEEP, JIGGLYPUFF_STARTLED } from "./jigglypuff";
 
@@ -132,6 +132,7 @@ export function buildSpriteCache(): Map<string, CachedSprite> {
   registerAgentSprites(cache, "squirtle", SQUIRTLE_SPRITES, SQUIRTLE_WIDTH, SQUIRTLE_HEIGHT);
   registerAgentSprites(cache, "bulbasaur", BULBASAUR_SPRITES, BULBASAUR_WIDTH, BULBASAUR_HEIGHT);
   registerAgentSprites(cache, "trainer", TRAINER_SPRITES, TRAINER_WIDTH, TRAINER_HEIGHT);
+  cache.set("trainer:blink", renderToOffscreen(TRAINER_BLINK, TRAINER_WIDTH, TRAINER_HEIGHT));
   registerAgentSprites(cache, "pikachu", PIKACHU_SPRITES, PIKACHU_WIDTH, PIKACHU_HEIGHT);
 
   // Pikachu walk frames (for subagent wandering)

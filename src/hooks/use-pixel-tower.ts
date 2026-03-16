@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 
 const PIXEL_ENDPOINT = "/api/pixels";
-const POLL_INTERVAL = 500; // 500ms for smooth updates
+const POLL_INTERVAL = 100; // 100ms for smooth canvas rendering
+const REACT_UPDATE_INTERVAL = 250; // React state updates for HTML overlay
 
 export interface PixelTowerData {
   panels: {
@@ -41,31 +42,43 @@ export function usePixelTower() {
   useEffect(() => {
     let active = true;
 
-    async function poll() {
-      try {
-        const res = await fetch(PIXEL_ENDPOINT);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (active && json.panels) {
-          setData(json);
-          setConnected(true);
-          _latestData = json;
-          _latestConnected = true;
+    let lastReactUpdate = 0;
+    let consecutiveFailures = 0;
+
+    async function loop() {
+      while (active) {
+        try {
+          const res = await fetch(PIXEL_ENDPOINT, { signal: AbortSignal.timeout(2000) });
+          if (res.ok) {
+            const json = await res.json();
+            if (active && json.panels) {
+              _latestData = json;
+              _latestConnected = true;
+              consecutiveFailures = 0;
+              const now = Date.now();
+              if (now - lastReactUpdate > REACT_UPDATE_INTERVAL) {
+                setData(json);
+                setConnected(true);
+                lastReactUpdate = now;
+              }
+            }
+          } else {
+            consecutiveFailures++;
+          }
+        } catch {
+          consecutiveFailures++;
         }
-      } catch {
-        if (active) {
-          setConnected(false);
+        // Only mark disconnected after 5 consecutive failures (~0.5s of no data)
+        if (consecutiveFailures >= 5 && active) {
           _latestConnected = false;
+          setConnected(false);
         }
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL));
       }
     }
 
-    poll();
-    const interval = setInterval(poll, POLL_INTERVAL);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
+    loop();
+    return () => { active = false; };
   }, []);
 
   return { data, connected };
