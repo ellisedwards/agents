@@ -1411,9 +1411,9 @@ export function renderScene(
       const parentEntity = entities.find((e) => e.agentId === entity.parentId);
       if (parentEntity) {
         const tc = TEAM_COLORS[entity.teamColor] ?? "#c4856c";
-        ctx.strokeStyle = tc + "44";
+        ctx.strokeStyle = tc + "88";
         ctx.setLineDash([2, 2]);
-        ctx.lineWidth = 0.5;
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(entity.x, entity.y);
         ctx.lineTo(parentEntity.x, parentEntity.y);

@@ -330,13 +330,12 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       </div>
 
       {agents.map((agent) => {
-        const pos = deskMap.get(agent.id);
-        if (!pos) return null;
-
-        // Use walk position if agent is moving, otherwise desk position
+        // Use actual rendered position from the scene
         const walkPos = getAgentPosition(agent.id);
-        const charX = walkPos ? walkPos.x : pos.characterX;
-        const charY = walkPos ? walkPos.y : pos.characterY;
+        const pos = deskMap.get(agent.id);
+        if (!walkPos && !pos) return null;
+        const charX = walkPos ? walkPos.x : pos!.characterX;
+        const charY = walkPos ? walkPos.y : pos!.characterY;
 
         const domPos = canvasToDOM(transform, charX, charY);
 
@@ -352,7 +351,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 className="absolute font-mono font-bold px-2 py-1 bg-[#181825]/90 rounded whitespace-nowrap pointer-events-none transition-opacity duration-150"
                 style={{
                   left: domPos.x,
-                  top: domPos.y - 21 * transform.scale,
+                  top: domPos.y - 14 * transform.scale,
                   transform: "translateX(-50%)",
                   fontSize: "15px",
                   color: teamHex,
@@ -370,7 +369,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 className="absolute font-mono whitespace-nowrap pointer-events-none transition-opacity duration-150"
                 style={{
                   left: domPos.x,
-                  top: domPos.y + 16 * transform.scale,
+                  top: domPos.y + 10 * transform.scale,
                   transform: "translateX(-50%)",
                   fontSize: "10px",
                   color: agent.source === "openclaw" ? "#cc3333" : teamHex,

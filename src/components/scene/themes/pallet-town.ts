@@ -94,7 +94,7 @@ export const palletTownTheme: SceneTheme = {
     subagent: "pikachu",
   },
 
-  petType: "jigglypuff",
+  petType: "cat",
 
   desk: {
     topColor: "#c8b888",
