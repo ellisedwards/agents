@@ -13,16 +13,16 @@ export interface DeskPosition {
   characterY: number;
 }
 
-// 3x3 grid of desks inside the building floor area, pushed toward the front
+// 2x3 grid of desks inside the building floor area, centered vertically
 const dLeft = BUILDING_X + 18;
 const dRight = BUILDING_X + BUILDING_W - 22;
 const dW = dRight - dLeft;
 const dSpX = Math.floor(dW / 3);
-const DESK_TOP_OFFSET = 22; // push desks down from FLOOR_Y
-const dSpY = Math.floor((FLOOR_H - DESK_TOP_OFFSET - 4) / 3);
+const DESK_TOP_OFFSET = 43; // push desks down to center 2 rows in the floor
+const dSpY = Math.floor((FLOOR_H - DESK_TOP_OFFSET - 4) / 2);
 
 const DESK_POSITIONS: DeskPosition[] = [];
-for (let row = 0; row < 3; row++) {
+for (let row = 0; row < 2; row++) {
   for (let col = 0; col < 3; col++) {
     const x = dLeft + Math.floor(dSpX / 2) + col * dSpX;
     const y = FLOOR_Y + DESK_TOP_OFFSET + row * dSpY;
@@ -38,7 +38,7 @@ for (let row = 0; row < 3; row++) {
 export { DESK_POSITIONS };
 
 export function getOverflowPosition(index: number): DeskPosition {
-  const x = 30 + (index % 9) * 32;
+  const x = 30 + (index % 6) * 32;
   const y = CANVAS_HEIGHT - 30;
   return { x, y, characterX: x - 7, characterY: y - 4 };
 }
@@ -71,8 +71,8 @@ export function assignDesks(
     if (activeIds.has(id)) taken.add(deskIdx);
   }
 
-  // Reserve bottom-right desk (index 8) for openclaw
-  const OPENCLAW_DESK = 8;
+  // Reserve bottom-right desk (index 5) for openclaw
+  const OPENCLAW_DESK = 5;
   if (activeIds.has("openclaw-main") && !stickyDesks.has("openclaw-main")) {
     stickyDesks.set("openclaw-main", OPENCLAW_DESK);
     taken.add(OPENCLAW_DESK);

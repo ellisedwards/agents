@@ -1,10 +1,25 @@
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../canvas-transform";
 import type { SceneTheme } from "./themes/types";
 import { forestTheme } from "./themes/forest";
+import palletTownBgUrl from "../../assets/pallet-town-bg.png";
 
 const W = CANVAS_WIDTH;
 const H = CANVAS_HEIGHT;
 const BORDER = 22;
+
+// Preloaded background images
+let palletTownBg: HTMLImageElement | null = null;
+let palletTownBgLoading = false;
+function getPalletTownBg(): HTMLImageElement | null {
+  if (palletTownBg) return palletTownBg;
+  if (!palletTownBgLoading) {
+    palletTownBgLoading = true;
+    const img = new Image();
+    img.src = palletTownBgUrl;
+    img.onload = () => { palletTownBg = img; };
+  }
+  return null;
+}
 
 // --- Lunar shooting stars ---
 interface ShootingStar {
@@ -464,6 +479,135 @@ function drawGround(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
       rect(ctx, Math.floor(srand() * W), 20 + Math.floor(srand() * (H - 20)), 1, g.decorHeight, g.decorColor);
     }
   }
+
+  // GBA-style sand clearing — organic sand shape cut into the grass
+  if (g.sandClearing) {
+    const sc = g.sandClearing;
+    const [inTop, inRight, inBot, inLeft] = Array.isArray(sc.inset)
+      ? sc.inset : [sc.inset, sc.inset, sc.inset, sc.inset];
+    const cx = BUILDING_X + inLeft;
+    const cy = BUILDING_Y + inTop;
+    const cw = BUILDING_W - inLeft - inRight;
+    const ch = BUILDING_H - inTop - inBot;
+    const margin = 6; // max edge wobble
+
+    // Build seeded edge offsets — chunky 4-8px steps, small range
+    let es = 6789;
+    const nextE = () => { es = (es * 16807 + 11) & 0x7fffffff; return es; };
+
+    const makeEdge = (len: number): number[] => {
+      const edge: number[] = [];
+      let i = 0;
+      while (i < len) {
+        const chunk = 4 + (nextE() % 5);
+        const off = (nextE() % 7) - 2; // range -2 to +4
+        for (let c = 0; c < chunk && i < len; c++, i++) edge.push(off);
+      }
+      return edge;
+    };
+
+    const topEdge = makeEdge(cw);
+    const botEdge = makeEdge(cw);
+    const leftEdge = makeEdge(ch);
+    const rightEdge = makeEdge(ch);
+
+    // isSand test — checks if (px,py) is inside the organic clearing
+    const isSand = (px: number, py: number): boolean => {
+      const rx = px - cx;
+      const ry = py - cy;
+      // Core rect
+      if (rx >= 0 && rx < cw && ry >= 0 && ry < ch) {
+        // Check if edge retracts inward
+        if (ry < margin && topEdge[Math.min(rx, cw - 1)] < -ry) return false;
+        if (ry >= ch - margin && botEdge[Math.min(rx, cw - 1)] < -(ch - 1 - ry)) return false;
+        if (rx < margin && leftEdge[Math.min(ry, ch - 1)] < -rx) return false;
+        if (rx >= cw - margin && rightEdge[Math.min(ry, ch - 1)] < -(cw - 1 - rx)) return false;
+        return true;
+      }
+      // Outside core — check edge extensions
+      if (ry < 0 && ry >= -margin && rx >= 0 && rx < cw)
+        return ry >= -(topEdge[Math.min(rx, cw - 1)]);
+      if (ry >= ch && ry < ch + margin && rx >= 0 && rx < cw)
+        return ry < ch + botEdge[Math.min(rx, cw - 1)];
+      if (rx < 0 && rx >= -margin && ry >= 0 && ry < ch)
+        return rx >= -(leftEdge[Math.min(ry, ch - 1)]);
+      if (rx >= cw && rx < cw + margin && ry >= 0 && ry < ch)
+        return rx < cw + rightEdge[Math.min(ry, ch - 1)];
+      return false;
+    };
+
+    // 1. Fill sand — solid color, fast rect fills
+    rect(ctx, cx, cy, cw, ch, sc.sandColor1);
+
+    // Fill edge extensions with solid sand
+    for (let x = 0; x < cw; x++) {
+      const te = topEdge[x];
+      if (te > 0) rect(ctx, cx + x, cy - te, 1, te, sc.sandColor1);
+      const be = botEdge[x];
+      if (be > 0) rect(ctx, cx + x, cy + ch, 1, be, sc.sandColor1);
+    }
+    for (let y = 0; y < ch; y++) {
+      const le = leftEdge[y];
+      if (le > 0) rect(ctx, cx - le, cy + y, le, 1, sc.sandColor1);
+      const re = rightEdge[y];
+      if (re > 0) rect(ctx, cx + cw, cy + y, re, 1, sc.sandColor1);
+    }
+
+    // Erase sand where edge retracts inward (redraw grass)
+    for (let x = 0; x < cw; x++) {
+      const te = topEdge[x];
+      if (te < 0) {
+        const col = (Math.floor((cx + x) / g.tileSize) + Math.floor(cy / g.tileSize)) % 2 === 0 ? g.baseColor1 : g.baseColor2;
+        rect(ctx, cx + x, cy, 1, -te, col);
+      }
+      const be = botEdge[x];
+      if (be < 0) {
+        const col = (Math.floor((cx + x) / g.tileSize) + Math.floor((cy + ch + be) / g.tileSize)) % 2 === 0 ? g.baseColor1 : g.baseColor2;
+        rect(ctx, cx + x, cy + ch + be, 1, -be, col);
+      }
+    }
+    for (let y = 0; y < ch; y++) {
+      const le = leftEdge[y];
+      if (le < 0) {
+        const col = (Math.floor(cx / g.tileSize) + Math.floor((cy + y) / g.tileSize)) % 2 === 0 ? g.baseColor1 : g.baseColor2;
+        rect(ctx, cx, cy + y, -le, 1, col);
+      }
+      const re = rightEdge[y];
+      if (re < 0) {
+        const col = (Math.floor((cx + cw + re) / g.tileSize) + Math.floor((cy + y) / g.tileSize)) % 2 === 0 ? g.baseColor1 : g.baseColor2;
+        rect(ctx, cx + cw + re, cy + y, -re, 1, col);
+      }
+    }
+
+    // 2. Sparse subtle sand marks (like GBA footprint marks)
+    let ms = 4321;
+    const nextM = () => { ms = (ms * 16807 + 11) & 0x7fffffff; return ms; };
+    for (let i = 0; i < 8; i++) {
+      const mx = cx + 10 + (nextM() % (cw - 20));
+      const my = cy + 10 + (nextM() % (ch - 20));
+      ctx.fillStyle = sc.sandColor2;
+      ctx.fillRect(mx, my, 2, 1);
+      ctx.fillRect(mx + 1, my + 1, 1, 1);
+    }
+
+    // 3. Dark border — 2px thick on grass side
+    const scanR = margin + 2;
+    for (let y = cy - scanR; y < cy + ch + scanR; y++) {
+      for (let x = cx - scanR; x < cx + cw + scanR; x++) {
+        if (isSand(x, y)) continue;
+        // Check if any of the 8 neighbors is sand
+        if (
+          isSand(x - 1, y) || isSand(x + 1, y) ||
+          isSand(x, y - 1) || isSand(x, y + 1) ||
+          isSand(x - 1, y - 1) || isSand(x + 1, y - 1) ||
+          isSand(x - 1, y + 1) || isSand(x + 1, y + 1)
+        ) {
+          ctx.fillStyle = sc.borderColor;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+  }
 }
 
 function drawForestTree(ctx: CanvasRenderingContext2D, x: number, gy: number, variant: number, theme: SceneTheme) {
@@ -764,6 +908,9 @@ function drawFireVessel(ctx: CanvasRenderingContext2D, fpx: number, fpy: number,
     const cyanGlow = 0.03 + 0.02 * Math.sin(frame * 0.06);
     rect(ctx, fpx - 2, fpy + 22, 28, 6, `rgba(34,170,204,${cyanGlow.toFixed(3)})`);
     return; // skip the default orange glow below
+  } else if (fv.style === "fire-pit" && theme.id === "pallet-town") {
+    // Pallet town: flames only, no stone — fire pit is in the bg image
+    drawFlames(ctx, fpx - 1, fpy + 2, frame);
   } else {
     // Fire pit — stone ring on ground
     rect(ctx, fpx + 3, fpy + 14, 18, 10, fv.stoneColor);
@@ -974,16 +1121,17 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     px(ctx, ampX + 5, ampY + 8, "#252525");
     px(ctx, ampX + 12, ampY + 8, "#252525");
 
-    // Cable behind guitar (drawn first so guitar covers it)
+    // Cable from guitar to front of amp (drawn first so guitar covers it)
     const guitarX = ampX - 12; // moved left by ~4 more
     const guitarH = 24;
     const guitarY = ampY + 14 - guitarH;
-    ctx.strokeStyle = "#333";
+    ctx.strokeStyle = "#111111";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(guitarX + 3, guitarY + 24);
-    ctx.lineTo(guitarX + 3, ampY + 14);
-    ctx.lineTo(ampX, ampY + 12);
+    ctx.moveTo(guitarX + 3, guitarY + 24);  // bottom of guitar
+    ctx.lineTo(guitarX + 3, ampY + 12);     // hang down to floor level
+    ctx.lineTo(ampX + 3, ampY + 12);        // along floor to front of amp
+    ctx.lineTo(ampX + 3, ampY + 6);         // up to front input jack
     ctx.stroke();
 
     // Guitar — to the left of the amp, bottom aligned
@@ -1030,8 +1178,8 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
     rect(ctx, pbX + 9, pbY + 4, 4, 1, "#666"); // exp top highlight
     rect(ctx, pbX + 14, pbY + 4, 2, 3, "#885522"); // small brown pedal
     rect(ctx, pbX + 17, pbY + 4, 2, 3, "#224488"); // small blue pedal
-    // Patch cables between pedals (subtle)
-    ctx.strokeStyle = "#222";
+    // Patch cables between pedals
+    ctx.strokeStyle = "#111111";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(pbX + 7, pbY + 3);
@@ -1113,52 +1261,7 @@ function drawBuilding(ctx: CanvasRenderingContext2D, frame: number, theme: Scene
 
   // Pallet Town — Pokemon GBA-style outdoor scene
   if (theme.id === "pallet-town") {
-    const grassBright = "#55cc55";
-    const grassMid = "#44bb44";
-    const sandColor = "#d8c8a0";
-    const sandEdge = "#c0b080";
-
-    // Sandy carpet — central clearing where agents work
-    // Draw a large sandy rect with irregular grass edges
-    const sandPad = 8;
-    const sx1 = bx + sandPad;
-    const sy1 = fy + sandPad;
-    const sw = bw - sandPad * 2;
-    const sh = fh - sandPad * 2;
-    // Base sand
-    rect(ctx, sx1, sy1, sw, sh, sandColor);
-    rect(ctx, sx1 + 1, sy1 + 1, sw - 2, sh - 2, "#ddd0a8");
-    // Sand texture dots
-    for (let ty = 0; ty < sh; ty += 4) {
-      for (let tx = 0; tx < sw; tx += 5) {
-        px(ctx, sx1 + tx + (ty % 2) * 2, sy1 + ty, sandEdge);
-      }
-    }
-    // Irregular grass-to-sand border — grass nibbles into sand
-    // Top edge
-    for (let gx = sx1; gx < sx1 + sw; gx += 2) {
-      const depth = 2 + Math.floor(Math.sin(gx * 0.2) * 2 + Math.cos(gx * 0.35) * 1.5);
-      rect(ctx, gx, sy1 - 1, 2, depth, grassMid);
-      rect(ctx, gx, sy1 - 1, 2, depth - 1, grassBright);
-    }
-    // Bottom edge
-    for (let gx = sx1; gx < sx1 + sw; gx += 2) {
-      const depth = 2 + Math.floor(Math.sin(gx * 0.25 + 1) * 2 + Math.cos(gx * 0.15) * 1.5);
-      rect(ctx, gx, sy1 + sh - depth + 1, 2, depth, grassMid);
-      rect(ctx, gx, sy1 + sh - depth + 2, 2, depth - 1, grassBright);
-    }
-    // Left edge
-    for (let gy = sy1; gy < sy1 + sh; gy += 2) {
-      const depth = 2 + Math.floor(Math.sin(gy * 0.2) * 2);
-      rect(ctx, sx1 - 1, gy, depth, 2, grassMid);
-      rect(ctx, sx1 - 1, gy, depth - 1, 2, grassBright);
-    }
-    // Right edge
-    for (let gy = sy1; gy < sy1 + sh; gy += 2) {
-      const depth = 2 + Math.floor(Math.cos(gy * 0.18) * 2);
-      rect(ctx, sx1 + sw - depth + 1, gy, depth, 2, grassMid);
-      rect(ctx, sx1 + sw - depth + 2, gy, depth - 1, 2, grassBright);
-    }
+    const grassBright = "#78c878";
 
     // Houses on the back wall
     // Right house (teal roof)
@@ -1465,12 +1568,45 @@ function drawDeskFront(
     rect(ctx, dx + 7, dy + 8, 2, 3, d.legColor);
   }
   if (hasLaptop) {
-    rect(ctx, dx + 0, dy + 0, 9, 6, "#bbbbc4");
-    rect(ctx, dx + 1, dy + 0, 7, 1, "#ccccd4");
-    rect(ctx, dx + 0, dy + 5, 9, 1, "#aaaab4");
-    rect(ctx, dx + 3, dy + 2, 2, 2, "#dddde8");
-    px(ctx, dx + 3, dy + 2, "#e8e8f0");
-    rect(ctx, dx + 1, dy + 6, 7, 1, "rgba(150,170,200,0.12)");
+    if (theme.id === "pallet-town") {
+      // Pokeball — 7x7 centered at dx+3, dy-1
+      const bx = dx + 1;
+      const by = dy - 1;
+      // Outline circle (7x7 with clipped corners)
+      //  .XXXXX.
+      //  XXXXXXX
+      //  XXXXXXX
+      //  XXXXXXX
+      //  XXXXXXX
+      //  XXXXXXX
+      //  .XXXXX.
+      const BK = "#222222";
+      // Top/bottom rows (clipped corners)
+      rect(ctx, bx + 1, by, 5, 1, BK);
+      rect(ctx, bx + 1, by + 6, 5, 1, BK);
+      // Left/right edges
+      rect(ctx, bx, by + 1, 1, 5, BK);
+      rect(ctx, bx + 6, by + 1, 1, 5, BK);
+      // Red top half (rows 1-2)
+      rect(ctx, bx + 1, by + 1, 5, 2, "#cc2222");
+      // Highlight on red
+      rect(ctx, bx + 2, by + 1, 3, 1, "#dd3333");
+      // White bottom half (rows 4-5)
+      rect(ctx, bx + 1, by + 4, 5, 2, "#e8e0d8");
+      // Slight shadow on bottom white
+      rect(ctx, bx + 1, by + 5, 3, 1, "#d0c8c0");
+      // Black middle band (row 3)
+      rect(ctx, bx + 1, by + 3, 5, 1, BK);
+      // Center button (white dot) — this is the glow target
+      px(ctx, bx + 3, by + 3, "#f0f0f0");
+    } else {
+      rect(ctx, dx + 0, dy + 0, 9, 6, "#bbbbc4");
+      rect(ctx, dx + 1, dy + 0, 7, 1, "#ccccd4");
+      rect(ctx, dx + 0, dy + 5, 9, 1, "#aaaab4");
+      rect(ctx, dx + 3, dy + 2, 2, 2, "#dddde8");
+      px(ctx, dx + 3, dy + 2, "#e8e8f0");
+      rect(ctx, dx + 1, dy + 6, 7, 1, "rgba(150,170,200,0.12)");
+    }
   }
 }
 
@@ -1664,22 +1800,32 @@ export function drawEnvironment(
 ) {
   const tod = timeOverride ?? getTimeOfDay();
 
+  // Pallet Town: use preloaded background image if available
+  const useBgImage = theme.id === "pallet-town" && getPalletTownBg();
+
+  // Always draw sky first — bg image has transparent sky so it shows through
   drawSky(ctx, tod, theme);
-  for (const feat of theme.backgroundFeatures) {
-    drawBackgroundFeature(ctx, feat.cx, feat.peak, feat.base, feat.halfWidth, feat.bodyColor, feat.capColor, feat.shape);
-  }
 
-  // Sky effects — shooting stars (lunar only)
-  if (theme.id === "lunar-base") {
-    updateAndDrawShootingStars(ctx);
-  }
-  // UFOs draw in all scenes, auto-spawn only in lunar + desert
-  const ufoAutoSpawn = theme.id === "lunar-base" || theme.id === "golden-ruins";
-  updateAndDrawUfos(ctx, ufoAutoSpawn);
+  if (useBgImage) {
+    // Draw PNG on top — transparent sky lets the procedural sky show through
+    ctx.drawImage(palletTownBg!, 0, 1, W, H);
+  } else {
+    for (const feat of theme.backgroundFeatures) {
+      drawBackgroundFeature(ctx, feat.cx, feat.peak, feat.base, feat.halfWidth, feat.bodyColor, feat.capColor, feat.shape);
+    }
 
-  drawGround(ctx, theme);
-  drawBackgroundTrees(ctx, theme);
-  drawBuilding(ctx, frame, theme);
+    // Sky effects — shooting stars (lunar only)
+    if (theme.id === "lunar-base") {
+      updateAndDrawShootingStars(ctx);
+    }
+    // UFOs draw in all scenes, auto-spawn only in lunar + desert
+    const ufoAutoSpawn = theme.id === "lunar-base" || theme.id === "golden-ruins";
+    updateAndDrawUfos(ctx, ufoAutoSpawn);
+
+    drawGround(ctx, theme);
+    drawBackgroundTrees(ctx, theme);
+    drawBuilding(ctx, frame, theme);
+  }
 
   // Draw chairs (behind agents)
   for (let i = 0; i < deskPositions.length; i++) {
@@ -1688,7 +1834,9 @@ export function drawEnvironment(
   // Tables + laptops drawn later by renderer (in front of agents)
   _pendingDeskFronts = { ctx, positions: deskPositions, occupied: occupiedDeskIndices, theme };
 
-  drawSideTrees(ctx, theme);
+  if (!useBgImage) {
+    drawSideTrees(ctx, theme);
+  }
 
   if (beforeTint) beforeTint();
 

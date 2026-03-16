@@ -894,30 +894,51 @@ export function renderScene(
   timeOverride?: TimeOfDay,
   theme: SceneTheme = forestTheme
 ) {
+  // Ensure pixel-perfect rendering every frame
+  ctx.imageSmoothingEnabled = false;
+
+  // 0. Per-theme vertical offset for agents and desks
+  const oY = theme.floorOffsetY ?? 0;
+
   // 1. Desk avoid zones — shared by all walkers
   const deskAvoidZones: AvoidZone[] = DESK_POSITIONS.map((d) => ({
     x: d.x,
-    y: d.y,
+    y: d.y + oY,
     hw: 14,
     hh: 10,
   }));
 
-  // 2. Assign desks only to non-lounging agents
-  const deskEligible = agents.filter((a) => a.state !== "lounging" && a.state !== "departing");
-  const deskMap = assignDesks(deskEligible.map((a) => a.id));
+  // 2. Assign desks only to main agents (not subagents, lounging, or departing)
+  const deskEligible = agents.filter((a) =>
+    a.state !== "lounging" && a.state !== "departing" &&
+    (a.subagentClass === null || a.subagentClass === undefined)
+  );
+  const rawDeskMap = assignDesks(deskEligible.map((a) => a.id));
+  const deskMap = new Map<string, { x: number; y: number; characterX: number; characterY: number }>();
+  for (const [id, pos] of rawDeskMap) {
+    deskMap.set(id, { x: pos.x, y: pos.y + oY, characterX: pos.characterX, characterY: pos.characterY + oY });
+  }
 
-  // 3. Determine which desk indices have laptops (main agents only, not subagents/mages)
+  // 3. Determine which desk indices have laptops
   const occupiedDeskIndices = new Set<number>();
   for (const agent of deskEligible) {
-    if (agent.subagentClass !== null && agent.subagentClass !== undefined) continue;
-    const pos = deskMap.get(agent.id);
-    if (!pos) continue;
-    const idx = DESK_POSITIONS.indexOf(pos);
+    const rawPos = rawDeskMap.get(agent.id);
+    if (!rawPos) continue;
+    const idx = DESK_POSITIONS.indexOf(rawPos);
     if (idx >= 0) occupiedDeskIndices.add(idx);
   }
 
+  // 3b. Build avoid zones for seated agents (walkers should steer around them)
+  const seatedAgentZones: AvoidZone[] = [];
+  for (const agent of deskEligible) {
+    const pos = deskMap.get(agent.id);
+    if (!pos) continue;
+    seatedAgentZones.push({ x: pos.characterX, y: pos.characterY, hw: 5, hh: 5 });
+  }
+  const allAvoidZones = [...deskAvoidZones, ...seatedAgentZones];
+
   // 4. Draw environment
-  const deskCenters = DESK_POSITIONS.map((d) => ({ x: d.x, y: d.y }));
+  const deskCenters = DESK_POSITIONS.map((d) => ({ x: d.x, y: d.y + oY }));
   drawEnvironment(ctx, deskCenters, occupiedDeskIndices, frame, timeOverride, theme, () => {
     drawMonolithSurrounds(ctx, theme);
   });
@@ -957,8 +978,8 @@ export function renderScene(
   }
 
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)
-  const loungeFireplace = { x: BUILDING_X + 18, y: FLOOR_Y + 12 };
-  const loungeGuitar = { x: BUILDING_X + BUILDING_W - 20, y: FLOOR_Y + 12 };
+  const loungeFireplace = { x: BUILDING_X + 18, y: FLOOR_Y + 12 + oY };
+  const loungeGuitar = { x: BUILDING_X + BUILDING_W - 20, y: FLOOR_Y + 12 + oY };
 
   // 6. Build drawable entities
   const entities: DrawableEntity[] = [];
@@ -1006,25 +1027,21 @@ export function renderScene(
         walkStates.set(agent.id, createWalkState(loungeHome.x, loungeHome.y));
       }
       const ws = walkStates.get(agent.id)!;
-      updateWalkState(ws, false, loungeHome.x, loungeHome.y, 18, deskAvoidZones);
+      updateWalkState(ws, false, loungeHome.x, loungeHome.y, 18, allAvoidZones);
       drawX = ws.currentX;
       drawY = ws.currentY;
       flipX = ws.facingRight;
       const walkSprite = getWalkSpriteState(ws);
       spriteState = walkSprite ?? "idle";
     } else if (agent.subagentClass !== null && agent.subagentClass !== undefined) {
-      // Subagents walk near their desk — avoid other desks but not their own
-      const pos = deskMap.get(agent.id);
-      const homeX = pos ? pos.characterX : BUILDING_X + BUILDING_W / 2;
-      const homeY = pos ? pos.characterY : FLOOR_Y + FLOOR_H / 2;
+      // Subagents roam freely around the floor center — avoid all desks
+      const homeX = BUILDING_X + BUILDING_W / 2;
+      const homeY = FLOOR_Y + FLOOR_H / 2 + oY;
       if (!walkStates.has(agent.id)) {
         walkStates.set(agent.id, createWalkState(homeX, homeY));
       }
       const ws = walkStates.get(agent.id)!;
-      const otherDesks = pos
-        ? deskAvoidZones.filter((z) => z.x !== pos.x || z.y !== pos.y)
-        : deskAvoidZones;
-      updateWalkState(ws, false, homeX, homeY, 20, otherDesks);
+      updateWalkState(ws, false, homeX, homeY, 40, allAvoidZones);
       drawX = ws.currentX;
       drawY = ws.currentY;
       flipX = ws.facingRight;
@@ -1176,7 +1193,7 @@ export function renderScene(
     if (catWalkState.startledFrames > 0) {
       catWalkState.startledFrames--;
     } else {
-      updateWalkState(catWalkState, true, CAT_HOME_X, CAT_HOME_Y, 60, deskAvoidZones);
+      updateWalkState(catWalkState, true, CAT_HOME_X, CAT_HOME_Y, 60, allAvoidZones);
     }
     const catWalkSprite = getWalkSpriteState(catWalkState);
     let catSprite = catWalkState.startledFrames > 0 ? "startled" : (catWalkSprite ?? "idle");
@@ -1289,18 +1306,20 @@ export function renderScene(
       ctx.filter = "grayscale(1)";
     }
 
+    // Round all coords to integers to prevent subpixel smearing on pixel-art sprites
+    const rx = Math.round(entity.x);
+    const ry = Math.round(entity.y);
+    const hw = (sprite.width / 2) | 0;
+    const hh = (sprite.height / 2) | 0;
+
     if (entity.flipX) {
       ctx.save();
-      ctx.translate(entity.x, entity.y - sprite.height / 2);
+      ctx.translate(rx, ry - hh);
       ctx.scale(-1, 1);
-      ctx.drawImage(sprite.canvas, -sprite.width / 2, 0);
+      ctx.drawImage(sprite.canvas, -hw, 0);
       ctx.restore();
     } else {
-      ctx.drawImage(
-        sprite.canvas,
-        entity.x - sprite.width / 2,
-        entity.y - sprite.height / 2
-      );
+      ctx.drawImage(sprite.canvas, rx - hw, ry - hh);
     }
 
     if (entity.isUnreachable) {

@@ -36,6 +36,14 @@ export interface SceneTheme {
     decorColor: string;
     decorCount: number;
     decorHeight: number;
+    /** GBA-style sand clearing cut into the grass with organic edges */
+    sandClearing?: {
+      sandColor1: string;
+      sandColor2: string;
+      borderColor: string;
+      /** Inset in px from the building rect — [top, right, bottom, left] or single number */
+      inset: number | [number, number, number, number];
+    };
     /** If set, ground is water with an island shape around the building */
     island?: {
       waterColor1: string;
@@ -140,6 +148,9 @@ export interface SceneTheme {
     /** Subagent sprite prefix — appended with color index (default: "mage") */
     subagent?: string;
   };
+
+  // Floor offset — shifts agents and desks down by N px (theme-specific tweak)
+  floorOffsetY?: number;
 
   // Desk
   desk: {

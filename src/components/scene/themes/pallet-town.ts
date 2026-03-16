@@ -5,27 +5,33 @@ export const palletTownTheme: SceneTheme = {
   name: "Pallet Town",
 
   timeTints: {
-    day: { color: "", opacity: 0, skyColors: ["#88bbee", "#99ccee", "#aaddee"] },
-    dawn: { color: "#ff8844", opacity: 0.12, skyColors: ["#cc8866", "#dd9977", "#eeaa88"] },
-    night: { color: "#112244", opacity: 0.3, skyColors: ["#1a2244", "#222a4e", "#2a3358"] },
+    day: { color: "", opacity: 0, skyColors: ["#90c0e8", "#a0cce8", "#b0d4e8"] },
+    dawn: { color: "#ff8844", opacity: 0.12, skyColors: ["#c08868", "#d09878", "#dca888"] },
+    night: { color: "#0a1830", opacity: 0.45, skyColors: ["#0a1428", "#121e38", "#1a2848"] },
   },
 
   drawStarsAtNight: true,
   starCount: 10,
 
   backgroundFeatures: [
-    { cx: 60, peak: 10, base: 26, halfWidth: 55, bodyColor: "#5a9a55", capColor: null, shape: "mountain" },
-    { cx: 160, peak: 8, base: 26, halfWidth: 65, bodyColor: "#4a8a48", capColor: null, shape: "mountain" },
-    { cx: 260, peak: 12, base: 26, halfWidth: 50, bodyColor: "#5a9a55", capColor: null, shape: "mountain" },
+    { cx: 60, peak: 10, base: 26, halfWidth: 55, bodyColor: "#60b898", capColor: null, shape: "mountain" },
+    { cx: 160, peak: 8, base: 26, halfWidth: 65, bodyColor: "#50a888", capColor: null, shape: "mountain" },
+    { cx: 260, peak: 12, base: 26, halfWidth: 50, bodyColor: "#60b898", capColor: null, shape: "mountain" },
   ],
 
   ground: {
-    baseColor1: "#55bb55",
-    baseColor2: "#4aaa4a",
+    baseColor1: "#88d8a8",
+    baseColor2: "#78c898",
     tileSize: 8,
-    decorColor: "#66cc60",
-    decorCount: 100,
+    decorColor: "#98e0b8",
+    decorCount: 0,
     decorHeight: 2,
+    sandClearing: {
+      sandColor1: "#d8c890",
+      sandColor2: "#d0c088",
+      borderColor: "#70a890",
+      inset: [50, 8, 8, 8],
+    },
   },
 
   vegetation: {
@@ -33,10 +39,10 @@ export const palletTownTheme: SceneTheme = {
     colors: {
       trunk: "#665533",
       trunkLight: "#776644",
-      leaf1: "#2a7733",
-      leaf2: "#339933",
-      leaf3: "#44bb44",
-      leaf4: "#55cc55",
+      leaf1: "#408858",
+      leaf2: "#50a068",
+      leaf3: "#60b878",
+      leaf4: "#70c888",
     },
     density: 1.8,
   },
@@ -68,15 +74,17 @@ export const palletTownTheme: SceneTheme = {
 
   posterMount: {
     style: "wooden-sign",
-    color: "#aa9060",
-    colorLight: "#bba070",
-    colorDark: "#887040",
+    color: "#8a6a44",
+    colorLight: "#a08050",
+    colorDark: "#6a4a28",
   },
 
   hasGuitar: false,
 
   clock: null,
   plant: null,
+
+  floorOffsetY: 5,
 
   monolithEffect: { style: "haze", color: "#44cc66", speed: 6 },
 

@@ -152,7 +152,7 @@ export function updateWalkState(
     } else {
       const nextX = state.currentX + (dx / dist) * speed;
       const nextY = state.currentY + (dy / dist) * speed;
-      // Cats ignore avoid zones — they walk wherever they want
+      // Cats only avoid desks gently — they walk through agents
       if (!isCat && hitsZone(nextX, nextY, avoidZones)) {
         // Try sliding along just X or Y to go around
         if (!hitsZone(nextX, state.currentY, avoidZones)) {
