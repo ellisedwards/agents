@@ -45,6 +45,8 @@ export class ClaudeCodeWatcher extends EventEmitter {
 
   start() {
     this.scan();
+    // Mark exp tracker warm after initial log replay — only new events earn exp
+    this.expTracker.markWarm();
     this.scanInterval = setInterval(() => this.scan(), SCAN_INTERVAL_MS);
   }
 

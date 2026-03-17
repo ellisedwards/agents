@@ -44,14 +44,21 @@ export class ExpTracker {
   private enabled: boolean;
   private savePending = false;
   private lastSaveTime = 0;
-  private static readonly SAVE_INTERVAL_MS = 5000; // debounce saves to every 5s
+  private warm = false; // false during initial log replay, true after first full scan
+  private static readonly SAVE_INTERVAL_MS = 5000;
 
   constructor() {
     // Restore game mode state from previous server run
     try { this.enabled = fs.readFileSync(STATE_FILE, "utf-8").trim() === "true"; }
     catch { this.enabled = false; }
-    // Restore exp data
+    // Restore exp data — skip re-awarding during log replay
     if (this.enabled) this.loadFromDisk();
+  }
+
+  /** Call after initial log scan is complete to start awarding new exp */
+  markWarm(): void {
+    this.warm = true;
+    console.log("[exp-tracker] warm — awarding new exp only");
   }
 
   setEnabled(on: boolean) {
@@ -155,7 +162,7 @@ export class ExpTracker {
   }
 
   onToolUse(agentId: string, toolName: string | null, allAgents: AgentState[]): void {
-    if (!this.enabled || !toolName) return;
+    if (!this.enabled || !toolName || !this.warm) return;
 
     // Don't award for lounging/departing agents
     const agent = allAgents.find(a => a.id === agentId);
@@ -220,7 +227,7 @@ export class ExpTracker {
   private static readonly THINKING_COOLDOWN_MS = 30_000; // 30s between thinking exp
 
   onThinking(agentId: string, allAgents: AgentState[]): void {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.warm) return;
     const agent = allAgents.find(a => a.id === agentId);
     if (agent && (agent.state === "lounging" || agent.state === "departing")) return;
     const now = Date.now();
