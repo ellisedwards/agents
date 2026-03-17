@@ -6,8 +6,8 @@ import { parseTranscriptLine } from "./transcript-parser";
 import type { AgentState, AgentActivityState, MageColorIndex } from "../../shared/types";
 
 const CLAUDE_DIR = path.join(os.homedir(), ".claude", "projects");
-const STALE_MS = 5 * 60 * 1000; // 5 minutes
-const SUBAGENT_STALE_MS = 2 * 60 * 1000; // 2 minutes
+const STALE_MS = 15 * 60 * 1000; // 15 minutes
+const SUBAGENT_STALE_MS = 30 * 60 * 1000; // 30 minutes — MCP tool calls don't update JSONL mtime
 const LOUNGE_MS = 2 * 60 * 1000; // 2 minutes idle → lounging
 const SCAN_INTERVAL_MS = 3_000;
 const WATCH_INTERVAL_MS = 500;
@@ -54,8 +54,13 @@ export class ClaudeCodeWatcher extends EventEmitter {
 
     // Clean up stale sessions and departed paths
     for (const [filePath, session] of this.sessions) {
-      const staleLimit = session.subagentClass !== null ? SUBAGENT_STALE_MS : STALE_MS;
-      if (now - session.lastActivity > staleLimit) {
+      if (session.subagentClass !== null) {
+        // Subagents: only remove if parent session is gone (they end via turn_end)
+        if (session.parentId && !this.sessions.has(session.parentId)) {
+          fs.unwatchFile(filePath);
+          this.sessions.delete(filePath);
+        }
+      } else if (now - session.lastActivity > STALE_MS) {
         fs.unwatchFile(filePath);
         this.sessions.delete(filePath);
       }
@@ -72,12 +77,18 @@ export class ClaudeCodeWatcher extends EventEmitter {
     if (!fs.existsSync(CLAUDE_DIR)) return;
 
     const projectDirs = this.getProjectDirs();
+    let totalFound = 0;
     for (const dir of projectDirs) {
       const jsonlFiles = this.findJsonlFiles(dir, now);
+      totalFound += jsonlFiles.length;
       for (const filePath of jsonlFiles) {
         if (this.sessions.has(filePath)) continue;
-        if (this.departedPaths.has(filePath)) continue;
+        if (this.departedPaths.has(filePath)) {
+          console.log(`[cc-watcher] skipping departed: ${path.basename(filePath)}`);
+          continue;
+        }
         if (this.sessions.size >= MAX_WATCHED) break;
+        console.log(`[cc-watcher] new session: ${path.basename(filePath)} (from ${path.basename(dir)})`);
         this.startWatching(filePath, now);
       }
     }
@@ -105,6 +116,8 @@ export class ClaudeCodeWatcher extends EventEmitter {
             const full = path.join(d, f);
             try {
               const stat = fs.statSync(full);
+              // Subagents: include if modified within parent session window (they end via turn_end)
+              // Main agents: filter by mtime staleness
               const limit = d.includes("/subagents/") ? SUBAGENT_STALE_MS : STALE_MS;
               if (now - stat.mtimeMs < limit) results.push(full);
             } catch {}
@@ -291,9 +304,14 @@ export class ClaudeCodeWatcher extends EventEmitter {
     const agents: AgentState[] = [];
     for (const [filePath, session] of this.sessions) {
       // Main agents (not subagents) idle for 2+ min → lounging
+      // But don't lounge if this agent has active subagents running
+      const hasActiveSubagents = [...this.sessions.values()].some(
+        (s) => s.parentId === filePath && now - s.lastActivity < SUBAGENT_STALE_MS
+      );
       const isLounging =
         session.subagentClass === null &&
         session.state === "idle" &&
+        !hasActiveSubagents &&
         now - session.lastActivity > LOUNGE_MS;
 
       agents.push({

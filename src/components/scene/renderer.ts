@@ -2,7 +2,7 @@ import { TEAM_COLORS, type AgentState } from "@/shared/types";
 import type { CharacterType } from "../characters/sprite-cache";
 import { getSprite, type buildSpriteCache } from "../characters/sprite-cache";
 import { assignDesks, DESK_POSITIONS } from "./desk-layout";
-import { drawEnvironment, drawDeskFronts } from "./environment";
+import { drawEnvironment, drawDeskFronts, getPalletTownBg } from "./environment";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../canvas-transform";
 import {
   createWalkState,
@@ -769,17 +769,28 @@ export function drawMonolithSurrounds(ctx: CanvasRenderingContext2D, theme: Scen
       }
     }
 
+    // Grey corner accents on monolith base
+    ctx.fillStyle = "#5a5a5e";
+    ctx.fillRect(baseCX - 10, baseY - 2, 1, 2);
+    ctx.fillRect(baseCX + 9, baseY - 2, 1, 2);
+
     // Hedge around monolith base
     ctx.fillStyle = "#2c625d";
+    // Row +3: 147-166
     ctx.fillRect(baseCX - 10, baseY + 3, 20, 1);
-    ctx.fillRect(baseCX - 10, baseY + 4, 19, 1);
+    // Row +4: 147-166
+    ctx.fillRect(baseCX - 10, baseY + 4, 20, 1);
+    // Row +5: 149-165
     ctx.fillRect(baseCX - 8, baseY + 5, 17, 1);
-    ctx.fillRect(baseCX - 8, baseY + 6, 7, 1);
-    ctx.fillRect(baseCX - 2, baseY + 6, 11, 1);
+    // Row +6: 149-154 + 151-165 (filled: 149-165)
+    ctx.fillRect(baseCX - 8, baseY + 6, 18, 1);
+    // Row +7: 149-150 + 155-164
     ctx.fillRect(baseCX - 8, baseY + 7, 2, 1);
     ctx.fillRect(baseCX - 2, baseY + 7, 10, 1);
+    // Row +8: 148-150 + 155-160
     ctx.fillRect(baseCX - 9, baseY + 8, 3, 1);
     ctx.fillRect(baseCX - 2, baseY + 8, 6, 1);
+    // Row +9: 148-160
     ctx.fillRect(baseCX - 9, baseY + 9, 13, 1);
   }
 
@@ -990,6 +1001,9 @@ export function renderScene(
   // Ensure pixel-perfect rendering every frame
   ctx.imageSmoothingEnabled = false;
 
+  // Pallet Town: don't render anything until the background PNG is loaded
+  if (theme.id === "pallet-town" && !getPalletTownBg()) return;
+
   // 0. Per-theme vertical offset for agents and desks
   const oY = theme.floorOffsetY ?? 0;
 
@@ -1042,14 +1056,55 @@ export function renderScene(
     }
     // Pallet Town hardcoded BG decorations
     if (theme.id === "pallet-town") {
-      // Vertical edge line (house border)
+      // Dark vertical lines (fence posts / shadows)
+      ctx.fillStyle = "#182f38";
+      ctx.fillRect(245, 28, 1, 25);   // x=245 y=28-52
+      ctx.fillRect(190, 51, 1, 10);   // x=190 y=51-60
+      ctx.fillRect(201, 58, 1, 5);    // x=201 y=58-62
+      // Dark horizontal accents
+      ctx.fillRect(173, 61, 2, 1);    // 173-174
+      ctx.fillRect(203, 61, 2, 1);    // 203-204
+      ctx.fillRect(216, 61, 2, 1);    // 216-217
+      ctx.fillRect(243, 61, 2, 1);    // 243-244
+
+      // Left vertical edge line
+      ctx.fillStyle = "#3d8f82";
+      ctx.fillRect(170, 39, 1, 17);   // x=170 y=39-55
+
+      // Right vertical edge line (house border)
       ctx.fillStyle = "#3f8f81";
-      ctx.fillRect(247, 44, 1, 22);
+      ctx.fillRect(247, 44, 1, 22);   // x=247 y=44-65
+
+      // Teal vertical accent
+      ctx.fillStyle = "#2c625d";
+      ctx.fillRect(245, 55, 1, 7);    // x=245 y=55-61
+      ctx.fillRect(172, 61, 1, 4);    // x=172 y=61-64
+
       // Horizontal ground line
       ctx.fillStyle = "#3e8e80";
-      ctx.fillRect(172, 66, 5, 1);   // 172-176
-      ctx.fillRect(178, 66, 71, 1);  // 178-248
+      ctx.fillRect(172, 66, 5, 1);    // 172-176
+      ctx.fillRect(178, 66, 71, 1);   // 178-248
       ctx.fillRect(217, 67, 1, 1);
+
+      // Bush/hedge patches along ground (y=61-64)
+      ctx.fillStyle = "#2c625d";
+      ctx.fillRect(175, 61, 15, 1);   // 175-189
+      ctx.fillRect(184, 62, 3, 1);    // 184-186
+      ctx.fillRect(189, 62, 1, 2);    // 189 y=62-63
+      ctx.fillRect(193, 61, 1, 3);    // 193 y=61-63
+      ctx.fillRect(188, 63, 1, 2);    // 188 y=63-64
+      ctx.fillRect(190, 63, 3, 1);    // 190-192
+      ctx.fillRect(194, 63, 1, 1);
+      ctx.fillRect(195, 62, 5, 1);    // 195-199
+      ctx.fillRect(199, 63, 4, 1);    // 199-202
+      ctx.fillRect(202, 62, 5, 1);    // 202-206
+      ctx.fillRect(205, 61, 6, 1);    // 205-210
+      ctx.fillRect(212, 61, 4, 1);    // 212-215
+      ctx.fillRect(218, 61, 9, 1);    // 218-226
+      ctx.fillRect(227, 62, 1, 1);
+      ctx.fillRect(228, 63, 4, 1);    // 228-231
+      ctx.fillRect(231, 61, 12, 1);   // 231-242
+
       // Corner detail
       ctx.fillStyle = "#2f7c6b";
       ctx.fillRect(145, 52, 1, 2);
@@ -1546,6 +1601,21 @@ export function renderScene(
       const zx = entity.x + 5;
       const zy = entity.y - sprite.height / 2 - 2;
       ctx.globalAlpha = 0.6;
+      ctx.fillText("z", zx, zy);
+      if (zPhase >= 1) ctx.fillText("z", zx + 3, zy - 3);
+      if (zPhase >= 2) ctx.fillText("z", zx + 6, zy - 5);
+      ctx.globalAlpha = 1;
+    }
+
+    // Idle CC agent "zzz" — shows agent is sleeping/waiting
+    if (entity.activityState === "idle" && entity.source === "cc" && !entity.isUnreachable
+        && entity.agentId !== "__cat__" && entity.agentId !== "__cat_float__") {
+      const zPhase = Math.floor((frame + hashForPhase(entity.agentId)) / 40) % 3;
+      ctx.fillStyle = "#8888aa";
+      ctx.font = "3px monospace";
+      const zx = entity.x + 5;
+      const zy = entity.y - sprite.height / 2 - 2;
+      ctx.globalAlpha = 0.5;
       ctx.fillText("z", zx, zy);
       if (zPhase >= 1) ctx.fillText("z", zx + 3, zy - 3);
       if (zPhase >= 2) ctx.fillText("z", zx + 6, zy - 5);

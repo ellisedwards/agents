@@ -10,7 +10,7 @@ const BORDER = 22;
 // Preloaded background images
 let palletTownBg: HTMLImageElement | null = null;
 let palletTownBgLoading = false;
-function getPalletTownBg(): HTMLImageElement | null {
+export function getPalletTownBg(): HTMLImageElement | null {
   if (palletTownBg) return palletTownBg;
   if (!palletTownBgLoading) {
     palletTownBgLoading = true;

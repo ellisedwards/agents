@@ -85,15 +85,15 @@ export function assignDesks(
       continue;
     }
 
-    // New agent — find a desk starting from its hash preference
-    let deskIdx = hashId(id) % DESK_POSITIONS.length;
-    let attempts = 0;
-    while (taken.has(deskIdx) && attempts < DESK_POSITIONS.length) {
-      deskIdx = (deskIdx + 1) % DESK_POSITIONS.length;
-      attempts++;
+    // New agent — fill desks front row first (indices 3,4,5 then 0,1,2)
+    let deskIdx = -1;
+    const fillOrder = [3, 4, 5, 0, 1, 2];
+    for (const i of fillOrder) {
+      if (!taken.has(i)) { deskIdx = i; break; }
     }
+    if (deskIdx === -1) deskIdx = DESK_POSITIONS.length; // overflow
 
-    if (!taken.has(deskIdx)) {
+    if (deskIdx < DESK_POSITIONS.length && !taken.has(deskIdx)) {
       taken.add(deskIdx);
       stickyDesks.set(id, deskIdx);
       assignments.set(id, DESK_POSITIONS[deskIdx]);

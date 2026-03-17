@@ -40,7 +40,9 @@ export function StatusBar() {
   }, []);
 
   const handleClear = () => {
-    fetch("/api/agents/clear", { method: "POST" }).catch(() => {});
+    fetch("/api/agents/clear", { method: "POST" })
+      .then(() => window.location.replace("/?t=" + Date.now()))
+      .catch(() => {});
   };
 
   // Stale build detection — check every 30s, auto-reload once, then show warning
@@ -122,11 +124,11 @@ export function StatusBar() {
           OC: {ocCount}
         </span>
       )}
-      {status === "connected" && ccMain > 0 && (
+      {status === "connected" && agents.length > 0 && (
         <button
           onClick={handleClear}
           className="text-neutral-500 hover:text-neutral-300 transition-colors"
-          title="Clear stale agents"
+          title="Reset agent tracking"
         >
           clr
         </button>

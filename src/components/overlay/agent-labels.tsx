@@ -55,19 +55,24 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const deskMap = assignDesks(deskEligible.map((a) => a.id));
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const editPanelRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
   useEffect(() => {
-    if (!settingsOpen) return;
+    if (!settingsOpen && !editOpen) return;
     function handleClick(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      if (settingsOpen && panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setSettingsOpen(false);
+      }
+      if (editOpen && editPanelRef.current && !editPanelRef.current.contains(e.target as Node)) {
+        setEditOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [settingsOpen]);
+  }, [settingsOpen, editOpen]);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -138,10 +143,47 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       onClick={handleClick}
       style={{ pointerEvents: "auto" }}
     >
-      {/* Settings button + popup */}
-      <div className="absolute top-2 right-2 z-30" ref={panelRef}>
+      {/* Edit + Settings buttons */}
+      <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
+        {/* Edit button + dropdown */}
+        <div ref={editPanelRef} className="relative">
+          <button
+            onClick={() => { setEditOpen((v) => !v); setSettingsOpen(false); }}
+            className={`font-mono text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+              editMode !== "none" ? "text-white/50" : "text-white/20 hover:text-white/50"
+            }`}
+          >
+            edit
+          </button>
+          {editOpen && (
+            <div className="absolute top-6 right-0 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[110px]">
+              {([
+                ["none", "Off"],
+                ["background", "Background"],
+                ["tower-decor", "Tower Decor"],
+                ["lounge", "Lounge"],
+                ["posters", "Posters"],
+              ] as [string, string][]).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => { setEditMode(value as EditMode); setEditOpen(false); }}
+                  className={`block w-full text-left font-mono text-[10px] px-3 py-1 transition-colors ${
+                    editMode === value
+                      ? "text-white/90 bg-white/10"
+                      : "text-white/50 hover:bg-white/10 hover:text-white/80"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Settings button + popup */}
+        <div ref={panelRef} className="relative">
         <button
-          onClick={() => setSettingsOpen((v) => !v)}
+          onClick={() => { setSettingsOpen((v) => !v); setEditOpen(false); }}
           className="font-mono text-[10px] px-1.5 py-0.5 rounded text-white/20 hover:text-white/50 transition-colors"
         >
           settings
@@ -296,21 +338,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             </div>
             )}
 
-            {/* Pixel Editor */}
-            <div className="space-y-1">
-              <span className="font-mono text-[10px] text-white/50 block">Edit</span>
-              <select
-                value={editMode}
-                onChange={(e) => setEditMode(e.target.value as EditMode)}
-                className="w-full bg-white/10 text-white/70 font-mono text-[10px] rounded px-1.5 py-1 border border-white/10 outline-none"
-              >
-                <option value="none" className="bg-[#1e1e2e]">Off</option>
-                <option value="background" className="bg-[#1e1e2e]">Background</option>
-                <option value="tower-decor" className="bg-[#1e1e2e]">Tower Decor</option>
-                <option value="lounge" className="bg-[#1e1e2e]">Lounge</option>
-                <option value="posters" className="bg-[#1e1e2e]">Posters</option>
-              </select>
-            </div>
+
 
             {/* Triggers */}
             <div className="pt-1 border-t border-white/5 space-y-1">
@@ -349,6 +377,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {agents.map((agent) => {
