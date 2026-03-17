@@ -204,17 +204,42 @@ export function SpriteEditor() {
   const shiftPixels = useCallback((dx: number, dy: number) => {
     if (!selected) return;
     pushUndo();
-    const newPixels = new Map<string, string>();
-    for (const [key, c] of pixels) {
-      const { x, y } = parsePixelKey(key);
-      const nx = x + dx;
-      const ny = y + dy;
-      if (nx >= 0 && nx < selected.width && ny >= 0 && ny < selected.height) {
-        newPixels.set(pixelKey(nx, ny), c);
+
+    if (selection && selectedPixels.size > 0) {
+      // Move only selected pixels
+      const newPixels = new Map(pixels);
+      // Remove selected pixels from old positions
+      for (const [key] of selectedPixels) {
+        newPixels.delete(key);
       }
+      // Place at new positions
+      const newSelected = new Map<string, string>();
+      for (const [key, c] of selectedPixels) {
+        const { x, y } = parsePixelKey(key);
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && nx < selected.width && ny >= 0 && ny < selected.height) {
+          newPixels.set(pixelKey(nx, ny), c);
+          newSelected.set(pixelKey(nx, ny), c);
+        }
+      }
+      setPixels(newPixels);
+      setSelectedPixels(newSelected);
+      setSelection(prev => prev ? { ...prev, x: prev.x + dx, y: prev.y + dy } : null);
+    } else {
+      // Move all pixels
+      const newPixels = new Map<string, string>();
+      for (const [key, c] of pixels) {
+        const { x, y } = parsePixelKey(key);
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && nx < selected.width && ny >= 0 && ny < selected.height) {
+          newPixels.set(pixelKey(nx, ny), c);
+        }
+      }
+      setPixels(newPixels);
     }
-    setPixels(newPixels);
-  }, [selected, pixels, pushUndo]);
+  }, [selected, pixels, pushUndo, selection, selectedPixels]);
 
   // Clear current frame
   const clearFrame = useCallback(() => {
