@@ -226,16 +226,18 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       {/* Play / Edit / Settings buttons */}
       <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
         {/* Play/Stop game button */}
-        <button
-          onClick={() => setGameModeOn(!gameModeOn)}
-          className={`font-mono text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-            gameModeOn
-              ? "text-yellow-300/70 hover:text-yellow-300"
-              : "text-white/20 hover:text-white/50"
-          }`}
-        >
-          {gameModeOn ? "stop" : "play"}
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setGameModeOn(!gameModeOn)}
+            className={`font-mono text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+              gameModeOn
+                ? "text-yellow-300/70 hover:text-yellow-300"
+                : "text-white/20 hover:text-white/50"
+            }`}
+          >
+            {gameModeOn ? "stop" : "play"}
+          </button>
+        </div>
 
         {/* Edit button + dropdown */}
         <div ref={editPanelRef} className="relative">
