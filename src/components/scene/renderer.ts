@@ -1948,6 +1948,51 @@ export function renderScene(
     }
   }
 
+  // Game mode: EXP bar below pokeball for desk-bound agents
+  if (useAgentOfficeStore.getState().gameModeOn) {
+    for (const agent of agents) {
+      if (agent.level === undefined || agent.exp === undefined) continue;
+      if (agent.state === "lounging" || agent.state === "departing") continue;
+      const pos = deskMap.get(agent.id);
+      if (!pos) continue;
+
+      const totalExp = agent.exp + (agent.expToNext ?? 100);
+      if (totalExp <= 0) continue;
+
+      const barX = pos.x + 1;
+      const barY = pos.y + 6;
+      const barW = 7;
+      const fill = (agent.exp ?? 0) / (agent.expToNext ?? 100);
+      const teamHex = TEAM_COLORS[agent.teamColor] ?? "#88cc88";
+
+      // Background (unfilled) — 20% opacity
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = teamHex;
+      ctx.fillRect(barX, barY, barW, 1);
+
+      // Filled portion
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(barX, barY, Math.max(1, Math.floor(barW * fill)), 1);
+      ctx.globalAlpha = 1;
+
+      // Streak flame
+      if (agent.streak) {
+        const flameX = barX + Math.floor(barW / 2);
+        const flameY = barY - 1;
+        const flicker = Math.floor(frame / 8) % 2;
+        ctx.fillStyle = "#ff8844";
+        ctx.fillRect(flameX, flameY, 1, 1);
+        if (flicker === 0) {
+          ctx.fillRect(flameX - 1, flameY, 1, 1);
+        } else {
+          ctx.fillRect(flameX + 1, flameY, 1, 1);
+        }
+        ctx.fillStyle = "#ffcc44";
+        ctx.fillRect(flameX, flameY - 1, 1, 1);
+      }
+    }
+  }
+
   // Draw and advance poof particles
   for (let i = activePoofs.length - 1; i >= 0; i--) {
     const p = activePoofs[i];
