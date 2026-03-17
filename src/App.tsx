@@ -10,8 +10,12 @@ import { SpeechBubbles } from "@/components/overlay/speech-bubble";
 import { PixelTower } from "@/components/overlay/pixel-tower";
 import { DebugPanel } from "@/components/overlay/debug-panel";
 import { PixelEditor } from "@/components/overlay/pixel-editor";
+import { SpriteEditor } from "@/components/sprite-editor/SpriteEditor";
 
 export function App() {
+  const isSpriteEditor = new URLSearchParams(window.location.search).get("sprite-editor") === "true";
+  if (isSpriteEditor) return <SpriteEditor />;
+
   const isDemo = new URLSearchParams(window.location.search).get("demo") === "true";
   const agents = useAgentOfficeStore((s) => s.agents);
   const clawDetailOpen = useAgentOfficeStore((s) => s.clawDetailOpen);
