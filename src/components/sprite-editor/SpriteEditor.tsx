@@ -272,6 +272,10 @@ export function SpriteEditor() {
   // Clipboard for copy/paste frames
   const clipboardRef = useRef<Map<string, string> | null>(null);
 
+  // Evolution overlay — ghost of previous form + A/B/C compare
+  const [evoOverlayOn, setEvoOverlayOn] = useState(false);
+  const [evoCompareIdx, setEvoCompareIdx] = useState<number | null>(null); // index into evolution chain
+
   // Alt-eyedropper and cursor highlight
   const [altHeld, setAltHeld] = useState(false);
   const [hoverPixel, setHoverPixel] = useState<{ x: number; y: number } | null>(null);
@@ -292,6 +296,37 @@ export function SpriteEditor() {
   const [dirtySprites, setDirtySprites] = useState<Set<string>>(new Set());
 
   const selected = allSprites.find(s => s.id === selectedId) ?? null;
+
+  // Evolution chain for the current sprite
+  const evoChain = useMemo(() => {
+    if (!selected) return [];
+    // Find all sprites in the same evolution chain
+    const rootId = selected.evolutionOf ?? selected.id;
+    return allSprites
+      .filter(s => s.id === rootId || s.evolutionOf === rootId)
+      .sort((a, b) => (a.evolutionStage ?? 0) - (b.evolutionStage ?? 0));
+  }, [selected, allSprites]);
+
+  // Get overlay pixels from a different evolution stage (for ghost overlay)
+  const evoOverlayPixels = useMemo(() => {
+    if (!evoOverlayOn || !selected || evoChain.length < 2) return null;
+    // Find the previous evolution form
+    const currentStage = selected.evolutionStage ?? 0;
+    const prev = evoChain.find(s => (s.evolutionStage ?? 0) === currentStage - 1);
+    if (!prev) return null;
+    const idleFrame = prev.frames.find(f => f.name === "idle") ?? prev.frames[0];
+    if (!idleFrame) return null;
+    return { pixels: pixelRectsToMap(idleFrame.pixels), width: prev.width, height: prev.height };
+  }, [evoOverlayOn, selected, evoChain]);
+
+  // A/B/C compare pixels — show a different evo's idle frame at 1:1
+  const evoComparePixels = useMemo(() => {
+    if (evoCompareIdx === null || !evoChain[evoCompareIdx]) return null;
+    const sprite = evoChain[evoCompareIdx];
+    const idleFrame = sprite.frames.find(f => f.name === (selected?.frames[frameIndex]?.name ?? "idle")) ?? sprite.frames[0];
+    if (!idleFrame) return null;
+    return { pixels: pixelRectsToMap(idleFrame.pixels), width: sprite.width, height: sprite.height };
+  }, [evoCompareIdx, evoChain, selected, frameIndex]);
 
   // Load frame pixels when selection changes
   useEffect(() => {
@@ -1084,8 +1119,12 @@ export function SpriteEditor() {
     ? allSprites
     : allSprites.filter(s => s.category === categoryFilter);
 
-  const canvasWidth = (selected?.width ?? 16) * zoom;
-  const canvasHeight = (selected?.height ?? 16) * zoom;
+  // When comparing evolutions, use the compare sprite's dimensions
+  const displayWidth = evoComparePixels ? evoComparePixels.width : (selected?.width ?? 16);
+  const displayHeight = evoComparePixels ? evoComparePixels.height : (selected?.height ?? 16);
+  const displayPixels = evoComparePixels ? evoComparePixels.pixels : pixels;
+  const canvasWidth = displayWidth * zoom;
+  const canvasHeight = displayHeight * zoom;
 
   // Animation preview pixels
   const animPixels = useMemo(() => {
@@ -1361,16 +1400,58 @@ export function SpriteEditor() {
           style={{ backgroundColor: canvasBg }}
           onClick={e => { if (e.target === e.currentTarget) clearSelection(); }}
         >
-          {/* Canvas info label */}
+          {/* Canvas info label + evolution controls */}
           {selected && (
-            <div className="absolute top-3 left-3 font-mono text-[10px] text-black/30 pointer-events-none z-10">
-              <span className="font-semibold">{selected.name}</span>
-              <span className="mx-1.5">·</span>
-              <span>{selected.category}</span>
-              <span className="mx-1.5">·</span>
-              <span>{selected.width}×{selected.height}</span>
-              {selected.evolutionStage !== undefined && selected.evolutionStage > 0 && (
-                <span className="ml-1.5 text-purple-500/50">evo {selected.evolutionStage + 1}</span>
+            <div className="absolute top-3 left-3 z-10 font-mono">
+              <div className="text-[10px] text-black/30 pointer-events-none">
+                <span className="font-semibold">{selected.name}</span>
+                <span className="mx-1.5">·</span>
+                <span>{selected.category}</span>
+                <span className="mx-1.5">·</span>
+                <span>{selected.width}×{selected.height}</span>
+                {selected.evolutionStage !== undefined && selected.evolutionStage > 0 && (
+                  <span className="ml-1.5 text-purple-500/50">evo {selected.evolutionStage + 1}</span>
+                )}
+              </div>
+              {/* Evolution controls — only show when sprite has an evolution chain */}
+              {evoChain.length > 1 && (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  {/* Ghost overlay toggle */}
+                  <button
+                    onClick={() => setEvoOverlayOn(!evoOverlayOn)}
+                    className={`text-[9px] px-1.5 py-0.5 rounded transition-colors ${
+                      evoOverlayOn ? "bg-purple-500/30 text-purple-300" : "bg-black/10 text-black/30 hover:text-black/50"
+                    }`}
+                    title="Toggle ghost overlay of previous evolution (10% opacity)"
+                  >
+                    Ghost
+                  </button>
+                  {/* A/B/C compare buttons */}
+                  <div className="flex gap-0.5">
+                    {evoChain.map((evo, idx) => (
+                      <button
+                        key={evo.id}
+                        onClick={() => {
+                          if (evo.id === selected.id) {
+                            setEvoCompareIdx(null); // viewing current, clear compare
+                          } else {
+                            setEvoCompareIdx(evoCompareIdx === idx ? null : idx);
+                          }
+                        }}
+                        className={`text-[9px] w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                          evo.id === selected.id
+                            ? "bg-purple-500/40 text-purple-200 font-bold"
+                            : evoCompareIdx === idx
+                              ? "bg-orange-500/30 text-orange-300"
+                              : "bg-black/10 text-black/30 hover:text-black/50"
+                        }`}
+                        title={`${evo.name} (${evo.width}×${evo.height})`}
+                      >
+                        {String.fromCharCode(65 + idx)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -1492,14 +1573,15 @@ export function SpriteEditor() {
               {/* Render pixels + grid on canvas */}
               <CanvasRenderer
                 canvasRef={canvasRef}
-                pixels={pixels}
-                width={selected.width}
-                height={selected.height}
+                pixels={displayPixels}
+                width={displayWidth}
+                height={displayHeight}
                 zoom={zoom}
                 showGrid={showGrid}
                 showCheckerboard={showCheckerboard}
                 canvasBg={canvasBg}
-                selection={selection}
+                selection={evoCompareIdx !== null ? null : selection}
+                evoOverlay={evoCompareIdx !== null ? null : evoOverlayPixels}
               />
             </div>
           ) : (
@@ -1853,7 +1935,7 @@ export function SpriteEditor() {
 }
 
 // ─── Canvas renderer (draws pixels + grid + selection highlight) ─────────────
-function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection }: {
+function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection, evoOverlay }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   pixels: Map<string, string>;
   width: number;
@@ -1863,6 +1945,7 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
   showCheckerboard: boolean;
   canvasBg: string;
   selection: SelectionRect | null;
+  evoOverlay: { pixels: Map<string, string>; width: number; height: number } | null;
 }) {
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1883,6 +1966,19 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
         }
         ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
       }
+    }
+
+    // Draw evolution overlay ghost (10% opacity, bottom-center aligned)
+    if (evoOverlay) {
+      ctx.globalAlpha = 0.1;
+      const offsetX = Math.floor((width - evoOverlay.width) / 2);
+      const offsetY = height - evoOverlay.height; // bottom-aligned
+      for (const [key, color] of evoOverlay.pixels) {
+        const { x, y } = parsePixelKey(key);
+        ctx.fillStyle = color;
+        ctx.fillRect((x + offsetX) * zoom, (y + offsetY) * zoom, zoom, zoom);
+      }
+      ctx.globalAlpha = 1;
     }
 
     // Draw pixels
@@ -1920,7 +2016,7 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
         ctx.stroke();
       }
     }
-  }, [pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection]);
+  }, [pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection, evoOverlay]);
 
   return null;
 }
