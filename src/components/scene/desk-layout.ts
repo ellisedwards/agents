@@ -72,12 +72,13 @@ export function assignDesks(
     taken.add(OPENCLAW_DESK);
   }
 
-  // Slot-based assignment: slot N = desk N, always
+  // Slot-based assignment: slot N = desk N, but skip OpenClaw's reserved desk
   for (const id of agentIds) {
     if (id === "openclaw-main") continue;
     const slot = slotMap?.get(id);
     if (slot !== undefined && slot >= 0 && slot < DESK_POSITIONS.length) {
-      // Claw says this agent is in slot N → desk N. Period.
+      // If this slot collides with OpenClaw's desk, skip — will get fallback
+      if (taken.has(slot)) continue;
       stickyDesks.set(id, slot);
       taken.add(slot);
     }
