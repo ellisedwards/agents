@@ -34,4 +34,12 @@ export interface AgentState {
   subagentClass: MageColorIndex | null;
   teamColor: MageColorIndex;
   lastActivity: number;
+  // Game mode fields (only present when game mode ON)
+  exp?: number;
+  level?: number;
+  expToNext?: number;
+  streak?: boolean;
+  title?: string;
+  gameName?: string;
+  toolMasteries?: string[];
 }
