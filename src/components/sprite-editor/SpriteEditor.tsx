@@ -3,6 +3,14 @@ import type { SpriteDefinition, SpriteFrame, EditorTool, SpriteCategory } from "
 import { pixelKey, parsePixelKey, pixelRectsToMap, mapToPixelRects } from "./types";
 import { getBuiltInSprites, loadCustomSprites, saveCustomSprites } from "./sprite-library";
 
+// ─── Expected states per category ───────────────────────────────────────────
+const EXPECTED_STATES: Record<SpriteCategory, string[]> = {
+  agent: ["idle", "typing", "reading", "thinking", "waiting", "walk1", "walk2", "blink"],
+  subagent: ["idle", "typing", "reading", "thinking", "waiting", "walk1", "walk2"],
+  pet: ["idle", "walk1", "walk2", "sleep", "startled"],
+  custom: ["idle", "typing", "reading", "thinking", "waiting", "walk1", "walk2", "sleep", "startled"],
+};
+
 // ─── Color palette ──────────────────────────────────────────────────────────
 const PALETTE = [
   // Row 1: basics
@@ -263,10 +271,8 @@ export function SpriteEditor() {
   }, [allSprites]);
 
   // Add frame to current sprite
-  const addFrame = useCallback(() => {
-    if (!selected) return;
-    const name = prompt("Frame name (e.g. walk1, typing, sleep):");
-    if (!name) return;
+  const addFrame = useCallback((name: string) => {
+    if (!selected || !name) return;
     const updated = allSprites.map(s => {
       if (s.id !== selected.id) return s;
       return { ...s, frames: [...s.frames, { name, pixels: [] }] };
@@ -542,13 +548,52 @@ export function SpriteEditor() {
         <div className="flex-1 overflow-y-auto p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] text-white/40">FRAMES</span>
-            <div className="flex gap-1">
-              <button onClick={duplicateFrame} className="text-[9px] text-white/30 hover:text-white/60" title="Duplicate frame">dup</button>
-              <button onClick={addFrame} className="text-[9px] text-white/30 hover:text-white/60">+ add</button>
-            </div>
+            <button onClick={duplicateFrame} className="text-[9px] text-white/30 hover:text-white/60" title="Duplicate current frame">dup</button>
           </div>
+
+          {/* Expected states dropdown */}
+          {selected && (() => {
+            const expected = EXPECTED_STATES[selected.category] ?? EXPECTED_STATES.custom;
+            const existingNames = new Set(selected.frames.map(f => f.name));
+            const missing = expected.filter(s => !existingNames.has(s));
+            return (
+              <div className="mb-2">
+                <select
+                  value=""
+                  onChange={e => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    if (v === "__custom__") {
+                      const name = prompt("Frame name:");
+                      if (name) addFrame(name);
+                    } else {
+                      addFrame(v);
+                    }
+                    e.target.value = "";
+                  }}
+                  className="w-full bg-white/5 text-white/50 font-mono text-[9px] rounded px-2 py-1 border border-white/10 outline-none"
+                >
+                  <option value="" className="bg-[#1e1e2e]">+ Add state...</option>
+                  {missing.length > 0 && (
+                    <optgroup label="Expected" className="bg-[#1e1e2e]">
+                      {missing.map(s => (
+                        <option key={s} value={s} className="bg-[#1e1e2e]">{s}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Custom" className="bg-[#1e1e2e]">
+                    <option value="__custom__" className="bg-[#1e1e2e]">Custom name...</option>
+                  </optgroup>
+                </select>
+              </div>
+            );
+          })()}
+
+          {/* Frame list */}
           {selected?.frames.map((frame, i) => {
             const fp = pixelRectsToMap(frame.pixels);
+            const expected = EXPECTED_STATES[selected.category] ?? EXPECTED_STATES.custom;
+            const isExpected = expected.includes(frame.name);
             return (
               <button
                 key={`${frame.name}-${i}`}
@@ -560,7 +605,13 @@ export function SpriteEditor() {
                 <div className="bg-[#1a1a2e] rounded p-0.5 flex items-center justify-center" style={{ minWidth: 24, minHeight: 24 }}>
                   <SpritePreview pixels={fp} width={selected.width} height={selected.height} scale={1} />
                 </div>
-                <span className="text-[9px] text-white/50">{frame.name}</span>
+                <div className="flex flex-col items-start">
+                  <span className="text-[9px] text-white/50">{frame.name}</span>
+                  {!isExpected && <span className="text-[7px] text-white/20">custom</span>}
+                </div>
+                {frame.pixels.length === 0 && (
+                  <span className="text-[7px] text-yellow-400/40 ml-auto">empty</span>
+                )}
               </button>
             );
           })}
