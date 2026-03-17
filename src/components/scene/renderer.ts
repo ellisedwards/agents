@@ -156,6 +156,32 @@ const poofedIds = new Set<string>();
 const POOF_DURATION = 30;
 const POOF_COLORS = ["#ffee88", "#ffcc44", "#ffaa22", "#fff", "#eedd66", "#ff88ff", "#88eeff"];
 
+// Level-up celebration state
+interface LevelUpEffect {
+  x: number;
+  y: number;
+  frame: number;
+  teamColor: string;
+  particles: Array<{ angle: number; speed: number; color: string }>;
+}
+const activeLevelUps: LevelUpEffect[] = [];
+let screenFlashAlpha = 0;
+const previousLevels = new Map<string, number>();
+
+export function triggerLevelUp(x: number, y: number, teamColor: string) {
+  screenFlashAlpha = 0.15;
+  const particles: LevelUpEffect["particles"] = [];
+  const colors = [teamColor, "#ffcc44", "#ffffff"];
+  for (let i = 0; i < 15; i++) {
+    particles.push({
+      angle: (i / 15) * Math.PI * 2 + Math.random() * 0.3,
+      speed: 0.8 + Math.random() * 0.6,
+      color: colors[i % 3],
+    });
+  }
+  activeLevelUps.push({ x, y, frame: 0, teamColor, particles });
+}
+
 // Cat wanders across the whole room floor
 import { BUILDING_X, BUILDING_Y, BUILDING_W, FLOOR_Y, FLOOR_H } from "./environment";
 const CAT_HOME_X = BUILDING_X + BUILDING_W / 2;
@@ -1993,6 +2019,25 @@ export function renderScene(
     }
   }
 
+  // Detect level-ups
+  if (useAgentOfficeStore.getState().gameModeOn) {
+    for (const agent of agents) {
+      if (agent.level === undefined) continue;
+      const prev = previousLevels.get(agent.id) ?? 1;
+      if (agent.level > prev) {
+        const wsPos = getAgentPosition(agent.id);
+        const deskPos = deskMap.get(agent.id);
+        const pos = wsPos ?? deskPos;
+        if (pos) {
+          const px = "characterX" in pos ? (pos as { characterX: number }).characterX : pos.x;
+          const py = "characterY" in pos ? (pos as { characterY: number }).characterY : pos.y;
+          triggerLevelUp(px, py, TEAM_COLORS[agent.teamColor] ?? "#88cc88");
+        }
+      }
+      previousLevels.set(agent.id, agent.level);
+    }
+  }
+
   // Draw and advance poof particles
   for (let i = activePoofs.length - 1; i >= 0; i--) {
     const p = activePoofs[i];
@@ -2044,6 +2089,47 @@ export function renderScene(
     ctx.globalAlpha = 1;
   }
 
+  // Level-up celebrations
+  for (let i = activeLevelUps.length - 1; i >= 0; i--) {
+    const lu = activeLevelUps[i];
+    lu.frame++;
+    if (lu.frame > 60) { activeLevelUps.splice(i, 1); continue; }
+
+    const t = lu.frame / 60;
+
+    // Rising "LEVEL UP!" text
+    ctx.globalAlpha = Math.max(0, 1 - t);
+    ctx.fillStyle = "#000000";
+    ctx.font = "bold 5px monospace";
+    ctx.textAlign = "center";
+    const textY = lu.y - 10 - lu.frame * 0.33;
+    ctx.fillText("LEVEL UP!", lu.x + 1, textY + 1); // shadow
+    ctx.fillStyle = "#ffcc44";
+    ctx.fillText("LEVEL UP!", lu.x, textY);
+    ctx.textAlign = "start";
+
+    // Sparkle particles
+    for (const p of lu.particles) {
+      const spread = lu.frame * p.speed;
+      const px = lu.x + Math.cos(p.angle) * spread;
+      const py = lu.y + Math.sin(p.angle) * spread - t * 8;
+      ctx.fillStyle = p.color;
+      const size = Math.max(1, 3 - Math.floor(t * 3));
+      ctx.globalAlpha = Math.max(0, 1 - t * 1.3);
+      ctx.fillRect(Math.floor(px), Math.floor(py), size, size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Screen flash
+  if (screenFlashAlpha > 0) {
+    ctx.globalAlpha = screenFlashAlpha;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.globalAlpha = 1;
+    screenFlashAlpha = Math.max(0, screenFlashAlpha - 0.012);
+  }
+
   // Clean up agents that no longer exist — poof any that vanished without departing
   const activeIds = new Set(agents.map((a) => a.id));
   for (const id of knownAgentIds) {
@@ -2070,6 +2156,10 @@ export function renderScene(
   }
   for (const id of lastAgentState.keys()) {
     if (!activeIds.has(id)) lastAgentState.delete(id);
+  }
+  // Clean up game mode state for departed agents
+  for (const id of previousLevels.keys()) {
+    if (!activeIds.has(id)) previousLevels.delete(id);
   }
 
 }
