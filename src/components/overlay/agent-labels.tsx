@@ -177,48 +177,70 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         const maxLevel = Math.max(...ccMains.map(a => a.level ?? 1), 1);
         if (maxLevel > record) localStorage.setItem("game-mode-record", String(maxLevel));
         return (
-          <div className={`absolute z-30 bg-[#1e1e2e]/90 border border-white/10 rounded-md px-3 py-2 space-y-1.5 ${
+          <div className={`absolute z-30 rounded-[7px] px-[18px] py-[15px] ${
             hudPosition === "top-left" ? "top-2 left-2" :
             hudPosition === "bottom-left" ? "left-2" :
             "right-2"
-          }`} style={hudPosition !== "top-left" ? { bottom: "calc(1.5rem + 8px)" } : undefined}>
-            {ccMains.map(a => {
-              const teamHex = TEAM_COLORS[a.teamColor] ?? "#88cc88";
-              const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
-              const isRecord = (a.level ?? 1) >= record && record > 1;
-              return (
-                <div key={a.id} className="grid items-center gap-x-2" style={{ gridTemplateColumns: "10px 95px 32px 70px 16px" }}>
-                  <span style={{ color: teamHex }} className="text-[11px]">●</span>
-                  <div className="flex flex-col">
-                    <span className="font-mono text-[11px] text-white/70 truncate">
-                      {a.gameName ?? a.name}
-                    </span>
-                    {a.title && (
-                      <span className="font-mono text-[8px] text-white/30 italic truncate -mt-0.5">
-                        {a.title}
+          }`} style={{
+            backgroundColor: "rgba(31, 31, 36, 0.94)",
+            ...(hudPosition !== "top-left" ? { bottom: "calc(1.5rem + 8px)" } : {}),
+          }}>
+            <div className="flex flex-col gap-[15px]">
+              {ccMains.map(a => {
+                const teamHex = TEAM_COLORS[a.teamColor] ?? "#88cc88";
+                const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
+                const isRecord = (a.level ?? 1) >= record && record > 1;
+                return (
+                  <div key={a.id} className="flex items-center gap-[12px]">
+                    {/* Team dot */}
+                    <div className="w-[9px] h-[9px] rounded-full shrink-0" style={{ backgroundColor: teamHex }} />
+
+                    {/* Name + title */}
+                    <div className="flex flex-col gap-px w-[72px] shrink-0">
+                      <span className="font-semibold text-[14px] text-white truncate leading-tight">
+                        {a.gameName ?? a.name}
                       </span>
-                    )}
+                      {a.title && (
+                        <span className="text-[11px] text-[#636363] truncate leading-tight">
+                          {a.title}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Level */}
+                    <span className="font-semibold text-[14px] whitespace-nowrap shrink-0">
+                      <span className="text-[#787878]">LV</span>
+                      <span className="text-white">{a.level ?? 1}</span>
+                    </span>
+
+                    {/* EXP bar */}
+                    <div className="relative shrink-0" style={{ width: "120px", height: "14px" }}>
+                      {/* Filled portion */}
+                      <div className="absolute top-0 left-0 h-full rounded-l-[3.5px]" style={{
+                        width: `${fill * 100}%`,
+                        backgroundColor: teamHex,
+                        borderTopRightRadius: fill >= 1 ? "3.5px" : 0,
+                        borderBottomRightRadius: fill >= 1 ? "3.5px" : 0,
+                      }} />
+                      {/* Unfilled portion */}
+                      <div className="absolute top-0 h-full rounded-r-[3.5px]" style={{
+                        left: `${fill * 100}%`,
+                        width: `${(1 - fill) * 100}%`,
+                        backgroundColor: teamHex,
+                        opacity: 0.33,
+                        borderTopLeftRadius: fill <= 0 ? "3.5px" : 0,
+                        borderBottomLeftRadius: fill <= 0 ? "3.5px" : 0,
+                      }} />
+                      {/* Border overlay */}
+                      <div className="absolute inset-0 rounded-[3.5px] border-[1.5px] border-[#696969]" />
+                    </div>
+
+                    {/* Record indicator */}
+                    <span className="text-[14px] w-[18px] text-center shrink-0">{isRecord ? "🔥" : ""}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-white/40 text-right">
-                    Lv{a.level ?? 1}
-                  </span>
-                  <div style={{ width: "70px", height: "5px", position: "relative", borderRadius: "2px", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", inset: 0, background: `${teamHex}33` }} />
-                    <div style={{
-                      position: "absolute", top: 0, left: 0, bottom: "1px",
-                      width: `${fill * 100}%`,
-                      background: teamHex,
-                    }} />
-                    <div style={{
-                      position: "absolute", bottom: 0, left: 0,
-                      width: `${fill * 100}%`, height: "1px",
-                      background: `${teamHex}80`,
-                    }} />
-                  </div>
-                  <span className="text-[9px] text-center">{isRecord ? "👑" : ""}</span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         );
       })()}
