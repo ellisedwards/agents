@@ -44,74 +44,66 @@ export function getOverflowPosition(index: number): DeskPosition {
   return { x, y, characterX: x - 7, characterY: y - 4 };
 }
 
-function hashId(id: string): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-// Persistent desk assignments so agents don't jump around when others come/go
+// Slot N = Desk N. Claw is the source of truth.
+// stickyDesks only remembers the LAST assignment so agents don't jump
+// when slotMap is temporarily unavailable (claw disconnect).
 const stickyDesks = new Map<string, number>();
 
-// Maps claw slot number to desk index: slot 0→front-left, 1→front-center, 2→back-left, 3→back-center
-const SLOT_TO_DESK = [0, 1, 2, 3];
+const OPENCLAW_DESK = 2;
 
 export function assignDesks(
   agentIds: string[],
-  slotMap?: Map<string, number> // agentId → claw slot number
+  slotMap?: Map<string, number> // agentId → claw slot number (authoritative)
 ): Map<string, DeskPosition> {
   const assignments = new Map<string, DeskPosition>();
   const activeIds = new Set(agentIds);
 
-  // Clean up agents that are gone
+  // Clean up departed agents
   for (const id of stickyDesks.keys()) {
     if (!activeIds.has(id)) stickyDesks.delete(id);
   }
 
-  // Collect currently taken desk indices from sticky assignments
+  // First pass: assign from slot map (authoritative — always wins)
   const taken = new Set<number>();
-  for (const [id, deskIdx] of stickyDesks) {
-    if (activeIds.has(id)) taken.add(deskIdx);
-  }
 
-  // Reserve front-right desk (index 2) for openclaw
-  const OPENCLAW_DESK = 2;
-  if (activeIds.has("openclaw-main") && !stickyDesks.has("openclaw-main")) {
+  // Reserve openclaw desk
+  if (activeIds.has("openclaw-main")) {
     stickyDesks.set("openclaw-main", OPENCLAW_DESK);
     taken.add(OPENCLAW_DESK);
   }
 
+  // Slot-based assignment: slot N = desk N, always
   for (const id of agentIds) {
-    // Reuse existing sticky assignment if still valid
-    if (stickyDesks.has(id)) {
-      assignments.set(id, DESK_POSITIONS[stickyDesks.get(id)!]);
-      continue;
-    }
-
-    // If agent has a claw slot, use the deterministic slot→desk mapping
-    let deskIdx = -1;
+    if (id === "openclaw-main") continue;
     const slot = slotMap?.get(id);
-    if (slot !== undefined && slot >= 0 && slot < SLOT_TO_DESK.length) {
-      const slotDesk = SLOT_TO_DESK[slot];
-      if (!taken.has(slotDesk)) {
-        deskIdx = slotDesk;
-      }
+    if (slot !== undefined && slot >= 0 && slot < DESK_POSITIONS.length) {
+      // Claw says this agent is in slot N → desk N. Period.
+      stickyDesks.set(id, slot);
+      taken.add(slot);
+    }
+  }
+
+  // Second pass: fallback for agents without claw slots
+  for (const id of agentIds) {
+    if (stickyDesks.has(id)) continue; // already assigned above
+
+    // Fill first available desk
+    let deskIdx = -1;
+    const fillOrder = [0, 1, 2, 3, 4, 5];
+    for (const i of fillOrder) {
+      if (!taken.has(i)) { deskIdx = i; break; }
     }
 
-    // Fallback — fill desks front row first (indices 0,1,2 then 3,4,5)
-    if (deskIdx === -1) {
-      const fillOrder = [0, 1, 2, 3, 4, 5];
-      for (const i of fillOrder) {
-        if (!taken.has(i)) { deskIdx = i; break; }
-      }
-    }
-    if (deskIdx === -1) deskIdx = DESK_POSITIONS.length; // overflow
-
-    if (deskIdx < DESK_POSITIONS.length && !taken.has(deskIdx)) {
+    if (deskIdx >= 0 && deskIdx < DESK_POSITIONS.length) {
       taken.add(deskIdx);
       stickyDesks.set(id, deskIdx);
+    }
+  }
+
+  // Build final assignments
+  for (const id of agentIds) {
+    const deskIdx = stickyDesks.get(id);
+    if (deskIdx !== undefined && deskIdx < DESK_POSITIONS.length) {
       assignments.set(id, DESK_POSITIONS[deskIdx]);
     } else {
       const overflowIdx = Math.max(0, agentIds.indexOf(id) - DESK_POSITIONS.length);

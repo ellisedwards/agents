@@ -1924,37 +1924,41 @@ export function renderScene(
       (a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
     );
 
-    // Use authoritative slot mapping from claw if available
+    // --- Authoritative slot assignment from claw's slots_detail ---
+    // Rule: claw is the source of truth. Slot N = Desk N = Quadrant N.
+    // Don't clear every frame — only clean up departed agents, update from claw.
+
+    // 1. Remove agents that are no longer active
+    const activeMainIds = new Set(mainCCs.map(a => a.id));
+    for (const id of stickyQuadrants.keys()) {
+      if (!activeMainIds.has(id)) stickyQuadrants.delete(id);
+    }
+
+    // 2. Match agents to slots from claw data (authoritative)
     const slotsDetail = towerInfo.data.slotsDetail;
     if (slotsDetail && slotsDetail.length > 0) {
-      // Match agents to slots by session_id (project dir hash)
-      stickyQuadrants.clear();
       for (let s = 0; s < slotsDetail.length && s < 4; s++) {
         const detail = slotsDetail[s];
-        if (!detail.session_id) continue;
-        // Find the agent whose project dir hashes to this session_id
+        if (!detail.session_id && !detail.name) continue;
+        // Find matching agent by session_id or project name
         for (const agent of mainCCs) {
-          if (stickyQuadrants.has(agent.id)) continue;
-          // Extract project dir from agent file path
-          const projectsIdx = agent.id.indexOf("/.claude/projects/");
-          if (projectsIdx < 0) continue;
-          const afterProjects = agent.id.slice(projectsIdx + 18); // after "/.claude/projects/"
-          // Compare name as a simpler match (project basename)
-          if (detail.name && agent.id.includes(detail.name)) {
-            stickyQuadrants.set(agent.id, s);
+          const matchById = detail.session_id && agent.id.includes(detail.session_id);
+          const matchByName = detail.name && agent.id.includes(detail.name);
+          if (matchById || matchByName) {
+            const currentSlot = stickyQuadrants.get(agent.id);
+            if (currentSlot !== s) {
+              // Slot changed or newly assigned — update
+              stickyQuadrants.set(agent.id, s);
+            }
             break;
           }
         }
       }
     }
 
-    // Fallback: assign unmatched agents to remaining slots
+    // 3. Fallback: assign unmatched agents to remaining slots (sequential fill)
     const takenSlots = new Set(stickyQuadrants.values());
-    for (const id of stickyQuadrants.keys()) {
-      if (!mainCCs.some((a) => a.id === id)) stickyQuadrants.delete(id);
-    }
-    const sortedCCs = [...mainCCs].sort((a, b) => a.id.localeCompare(b.id));
-    for (const agent of sortedCCs) {
+    for (const agent of mainCCs) {
       if (stickyQuadrants.has(agent.id)) continue;
       for (let s = 0; s < 4; s++) {
         if (!takenSlots.has(s)) {
