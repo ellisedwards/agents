@@ -1,17 +1,21 @@
 import { EventEmitter } from "events";
 import { ClaudeCodeWatcher } from "./cc-watcher";
 import { OpenClawWatcher } from "./openclaw-watcher";
+import { ExpTracker } from "./exp-tracker";
 import type { AgentState } from "../../shared/types";
 
 class WatcherSingleton extends EventEmitter {
-  private ccWatcher = new ClaudeCodeWatcher();
+  private ccWatcher: ClaudeCodeWatcher;
   private ocWatcher: OpenClawWatcher;
   private ccAgents: AgentState[] = [];
   private ocAgent: AgentState | null = null;
   private started = false;
+  public expTracker: ExpTracker;
 
   constructor(clawBaseUrl: string) {
     super();
+    this.expTracker = new ExpTracker();
+    this.ccWatcher = new ClaudeCodeWatcher(this.expTracker);
     this.ocWatcher = new OpenClawWatcher(clawBaseUrl);
   }
 
@@ -47,6 +51,7 @@ class WatcherSingleton extends EventEmitter {
 
   clearAll() {
     this.ccWatcher.clearAll();
+    this.expTracker.clearAll();
   }
 }
 

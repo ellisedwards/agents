@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { parseTranscriptLine } from "./transcript-parser";
+import type { ExpTracker } from "./exp-tracker";
 import type { AgentState, AgentActivityState, MageColorIndex } from "../../shared/types";
 
 const CLAUDE_DIR = path.join(os.homedir(), ".claude", "projects");
@@ -35,6 +36,12 @@ export class ClaudeCodeWatcher extends EventEmitter {
   private departedPaths = new Map<string, number>(); // path → departure timestamp
   private scanInterval: ReturnType<typeof setInterval> | null = null;
   private ccCounter = 0;
+  private expTracker: ExpTracker;
+
+  constructor(expTracker: ExpTracker) {
+    super();
+    this.expTracker = expTracker;
+  }
 
   start() {
     this.scan();
@@ -247,6 +254,13 @@ export class ClaudeCodeWatcher extends EventEmitter {
         session.state = event.state;
         session.currentTool = event.toolName ?? null;
         session.hasBeenActive = true;
+        // EXP tracking
+        const currentAgents = this.getAgentList();
+        if (event.toolName) {
+          this.expTracker.onToolUse(session.filePath, event.toolName, currentAgents);
+        } else if (event.state === "thinking") {
+          this.expTracker.onThinking(session.filePath, currentAgents);
+        }
       } else if (event.type === "sub_agent_spawn") {
         session.pendingSubAgents++;
         session.expectingSubAgentSince = Date.now();
@@ -274,6 +288,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
     session.state = "departing";
     session.currentTool = null;
     this.departedPaths.set(session.filePath, Date.now());
+    this.expTracker.clearAgent(session.filePath);
     this.emitUpdate();
     setTimeout(() => {
       if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
@@ -302,7 +317,37 @@ export class ClaudeCodeWatcher extends EventEmitter {
       fs.unwatchFile(filePath);
       this.sessions.delete(filePath);
     }
+    this.expTracker.clearAll();
     this.emitUpdate();
+  }
+
+  /** Build current agent list (for EXP tracker context). */
+  private getAgentList(): AgentState[] {
+    const now = Date.now();
+    const agents: AgentState[] = [];
+    for (const [filePath, session] of this.sessions) {
+      const hasActiveSubagents = [...this.sessions.values()].some(
+        (s) => s.parentId === filePath
+      );
+      const isLounging =
+        session.subagentClass === null &&
+        session.state === "idle" &&
+        !hasActiveSubagents &&
+        now - session.lastActivity > LOUNGE_MS;
+      const effectiveState = (session.state === "idle" && hasActiveSubagents) ? "thinking" : session.state;
+      agents.push({
+        id: filePath,
+        source: "cc",
+        state: isLounging ? "lounging" : effectiveState,
+        currentTool: session.currentTool,
+        name: session.name,
+        parentId: session.parentId,
+        subagentClass: session.subagentClass,
+        teamColor: session.teamColor,
+        lastActivity: session.lastActivity,
+      });
+    }
+    return agents;
   }
 
   private emitUpdate() {
@@ -332,6 +377,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
         subagentClass: session.subagentClass,
         teamColor: session.teamColor,
         lastActivity: session.lastActivity,
+        ...this.expTracker.getExpFields(filePath, session.subagentClass !== null),
       });
     }
     this.emit("update", agents);

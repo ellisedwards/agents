@@ -112,6 +112,19 @@ app.post("/api/agents/clear", (_req, res) => {
   res.json({ ok: true });
 });
 
+// --- Game mode toggle ---
+app.get("/api/game-mode", (_req, res) => {
+  const tracker = watcher.expTracker;
+  const record = 0; // TODO: track from client via POST
+  res.json({ enabled: tracker.isEnabled(), record });
+});
+
+app.post("/api/game-mode", express.json(), (req, res) => {
+  const { enabled } = req.body;
+  watcher.expTracker.setEnabled(!!enabled);
+  res.json({ ok: true });
+});
+
 // --- Light brightness ---
 app.get("/api/brightness", async (_req, res) => {
   try {
