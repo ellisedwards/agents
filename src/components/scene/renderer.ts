@@ -1937,17 +1937,19 @@ export function renderScene(
     // 2. Match agents to slots from claw data (authoritative)
     const slotsDetail = towerInfo.data.slotsDetail;
     if (slotsDetail && slotsDetail.length > 0) {
+      const matchedAgentIds = new Set<string>(); // prevent double-matching
       for (let s = 0; s < slotsDetail.length && s < 4; s++) {
         const detail = slotsDetail[s];
         if (!detail.session_id && !detail.name) continue;
-        // Find matching agent by session_id or project name
+        // Find matching agent — skip agents already matched to another slot
         for (const agent of mainCCs) {
+          if (matchedAgentIds.has(agent.id)) continue;
           const matchById = detail.session_id && agent.id.includes(detail.session_id);
           const matchByName = detail.name && agent.id.includes(detail.name);
           if (matchById || matchByName) {
+            matchedAgentIds.add(agent.id);
             const currentSlot = stickyQuadrants.get(agent.id);
             if (currentSlot !== s) {
-              // Slot changed or newly assigned — update
               stickyQuadrants.set(agent.id, s);
             }
             break;
