@@ -74,6 +74,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const hudPosition = useAgentOfficeStore((s) => s.hudPosition);
   const setHudPosition = useAgentOfficeStore((s) => s.setHudPosition);
   const levelUpEvents = useAgentOfficeStore((s) => s.levelUpEvents);
+  const expGainEvents = useAgentOfficeStore((s) => s.expGainEvents);
   const deskEligible = agents.filter((a) =>
     a.state !== "lounging" && a.state !== "departing" &&
     (a.subagentClass === null || a.subagentClass === undefined)
@@ -195,10 +196,10 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     {/* Team dot */}
                     <div className="w-[9px] h-[9px] rounded-full shrink-0" style={{ backgroundColor: teamHex }} />
 
-                    {/* Name + title */}
-                    <div className="flex flex-col gap-px w-[72px] shrink-0">
+                    {/* Name + title + flame */}
+                    <div className="flex flex-col gap-px w-[96px] shrink-0">
                       <span className="font-semibold text-[14px] text-white truncate leading-tight">
-                        {a.gameName ?? a.name}
+                        {a.gameName ?? a.name}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
                       </span>
                       {a.title && (
                         <span className="text-[11px] text-[#636363] truncate leading-tight">
@@ -213,30 +214,33 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                       <span className="text-white">{a.level ?? 1}</span>
                     </span>
 
-                    {/* EXP bar */}
-                    <div className="relative shrink-0" style={{ width: "120px", height: "14px" }}>
-                      {/* Filled portion */}
-                      <div className="absolute top-0 left-0 h-full rounded-l-[3.5px]" style={{
-                        width: `${fill * 100}%`,
-                        backgroundColor: teamHex,
-                        borderTopRightRadius: fill >= 1 ? "3.5px" : 0,
-                        borderBottomRightRadius: fill >= 1 ? "3.5px" : 0,
-                      }} />
-                      {/* Unfilled portion */}
-                      <div className="absolute top-0 h-full rounded-r-[3.5px]" style={{
-                        left: `${fill * 100}%`,
-                        width: `${(1 - fill) * 100}%`,
-                        backgroundColor: teamHex,
-                        opacity: 0.33,
-                        borderTopLeftRadius: fill <= 0 ? "3.5px" : 0,
-                        borderBottomLeftRadius: fill <= 0 ? "3.5px" : 0,
-                      }} />
-                      {/* Border overlay */}
-                      <div className="absolute inset-0 rounded-[3.5px] border-[1.5px] border-[#696969]" />
+                    {/* EXP bar + counter */}
+                    <div className="flex flex-col shrink-0" style={{ width: "120px" }}>
+                      <div className="relative" style={{ width: "120px", height: "14px" }}>
+                        {/* Filled portion */}
+                        <div className="absolute top-0 left-0 h-full rounded-l-[3.5px]" style={{
+                          width: `${fill * 100}%`,
+                          backgroundColor: teamHex,
+                          borderTopRightRadius: fill >= 1 ? "3.5px" : 0,
+                          borderBottomRightRadius: fill >= 1 ? "3.5px" : 0,
+                        }} />
+                        {/* Unfilled portion */}
+                        <div className="absolute top-0 h-full rounded-r-[3.5px]" style={{
+                          left: `${fill * 100}%`,
+                          width: `${(1 - fill) * 100}%`,
+                          backgroundColor: teamHex,
+                          opacity: 0.33,
+                          borderTopLeftRadius: fill <= 0 ? "3.5px" : 0,
+                          borderBottomLeftRadius: fill <= 0 ? "3.5px" : 0,
+                        }} />
+                        {/* Border overlay */}
+                        <div className="absolute inset-0 rounded-[3.5px] border-[1.5px] border-[#696969]" />
+                      </div>
+                      <span className="text-[10px] text-[#636363] text-right leading-tight mt-[2px]">
+                        {a.exp ?? 0}/{a.expToNext ?? 100}
+                      </span>
                     </div>
 
-                    {/* Record indicator */}
-                    <span className="text-[14px] w-[18px] text-center shrink-0">{isRecord ? "🔥" : ""}</span>
                   </div>
                 );
               })}
@@ -602,6 +606,27 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 {agent.currentTool}
               </div>
             )}
+            {/* +EXP floating text */}
+            {gameModeOn && expGainEvents
+              .filter(ev => ev.agentId === agent.id)
+              .map(ev => (
+                <div
+                  key={ev.id}
+                  className="absolute font-semibold whitespace-nowrap pointer-events-none"
+                  style={{
+                    left: domPos.x,
+                    top: domPos.y - 30 * transform.scale,
+                    transform: "translateX(-50%)",
+                    fontSize: "12px",
+                    color: teamHex,
+                    textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+                    animation: "expFloat 1.5s ease-out forwards",
+                  }}
+                >
+                  +{ev.amount}
+                </div>
+              ))
+            }
             {/* Name tag — below character (subagents only in debug mode) */}
             {(isHovered || (labelsOn && (!isSubagent || debugOn)) || debugOn) && (
               <div
@@ -685,6 +710,10 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
           20% { transform: translateX(-50%) translateY(0) scale(1); }
           70% { opacity: 1; }
           100% { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(0.95); }
+        }
+        @keyframes expFloat {
+          0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-25px); }
         }
       `}</style>
     </div>

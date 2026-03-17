@@ -184,6 +184,7 @@ interface LevelUpEffect {
 const activeLevelUps: LevelUpEffect[] = [];
 let screenFlashAlpha = 0;
 const previousLevels = new Map<string, number>();
+const previousExp = new Map<string, number>(); // agentId → total exp (exp + level*expToNext approx)
 
 const pokeballFlashes = new Map<string, number>(); // agentId → remaining frames
 
@@ -2104,6 +2105,19 @@ export function renderScene(
         useAgentOfficeStore.getState().addLevelUp(agent.id, displayName, agent.level, agent.teamColor);
       }
       previousLevels.set(agent.id, agent.level);
+
+      // Detect EXP gains for floating +X text
+      const currentExp = agent.exp ?? 0;
+      const prevExp = previousExp.get(agent.id);
+      if (prevExp !== undefined && currentExp > prevExp) {
+        const gain = currentExp - prevExp;
+        useAgentOfficeStore.getState().addExpGain(agent.id, gain, agent.teamColor);
+      } else if (prevExp !== undefined && currentExp < prevExp && agent.level > (previousLevels.get(agent.id) ?? agent.level)) {
+        // Level wrapped — exp reset but level went up, estimate gain
+        const gain = currentExp + ((agent.expToNext ?? 100) - prevExp);
+        if (gain > 0) useAgentOfficeStore.getState().addExpGain(agent.id, gain, agent.teamColor);
+      }
+      previousExp.set(agent.id, currentExp);
     }
   }
 
@@ -2217,7 +2231,7 @@ export function renderScene(
   }
   // Clean up game mode state for departed agents
   for (const id of previousLevels.keys()) {
-    if (!activeIds.has(id)) previousLevels.delete(id);
+    if (!activeIds.has(id)) { previousLevels.delete(id); previousExp.delete(id); }
   }
   for (const id of pokeballFlashes.keys()) {
     if (!activeIds.has(id)) pokeballFlashes.delete(id);

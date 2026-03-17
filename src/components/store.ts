@@ -100,6 +100,8 @@ interface AgentOfficeStore {
   hudPosition: HudPosition;
   levelUpEvents: Array<{ id: string; agentId: string; name: string; level: number; teamColor: string; ts: number }>;
   addLevelUp: (agentId: string, name: string, level: number, teamColor: string) => void;
+  expGainEvents: Array<{ id: string; agentId: string; amount: number; teamColor: string; ts: number }>;
+  addExpGain: (agentId: string, amount: number, teamColor: string) => void;
   setAgents: (agents: AgentState[]) => void;
   selectAgent: (id: string | null) => void;
   setConnectionStatus: (status: AgentOfficeStore["connectionStatus"]) => void;
@@ -152,10 +154,17 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   addLevelUp: (agentId, name, level, teamColor) => {
     const ev = { id: `${agentId}-${level}-${Date.now()}`, agentId, name, level, teamColor, ts: Date.now() };
     set({ levelUpEvents: [...get().levelUpEvents, ev] });
-    // Auto-remove after 3s
     setTimeout(() => {
       set({ levelUpEvents: get().levelUpEvents.filter(e => e.id !== ev.id) });
     }, 3000);
+  },
+  expGainEvents: [],
+  addExpGain: (agentId, amount, teamColor) => {
+    const ev = { id: `${agentId}-${Date.now()}-${Math.random()}`, agentId, amount, teamColor, ts: Date.now() };
+    set({ expGainEvents: [...get().expGainEvents, ev] });
+    setTimeout(() => {
+      set({ expGainEvents: get().expGainEvents.filter(e => e.id !== ev.id) });
+    }, 1500);
   },
   setAgents: (incoming) => {
     const now = Date.now();
