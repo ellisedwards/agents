@@ -35,6 +35,115 @@ interface SelectionRect {
   h: number;
 }
 
+// ─── Image overlay state ────────────────────────────────────────────────────
+interface ImageOverlay {
+  src: string;           // data URL of the imported image
+  imgEl: HTMLImageElement;
+  x: number;             // grid position (can be fractional during drag)
+  y: number;
+  w: number;             // grid units
+  h: number;
+  opacity: number;       // 0-1
+}
+
+// ─── Color utility functions ────────────────────────────────────────────────
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + [r, g, b].map(c => Math.round(c).toString(16).padStart(2, "0")).join("");
+}
+
+function colorDistance(a: [number, number, number], b: [number, number, number]): number {
+  return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+}
+
+function snapToPalette(hex: string, palette: string[]): string {
+  const rgb = hexToRgb(hex);
+  let best = palette[0];
+  let bestDist = Infinity;
+  for (const p of palette) {
+    const d = colorDistance(rgb, hexToRgb(p));
+    if (d < bestDist) { bestDist = d; best = p; }
+  }
+  return best;
+}
+
+function extractPalette(pixels: [number, number, number, number][], maxColors = 16, mergeThreshold = 30): string[] {
+  // Count color frequencies (ignore mostly transparent)
+  const freq = new Map<string, number>();
+  for (const [r, g, b, a] of pixels) {
+    if (a < 128) continue;
+    const hex = rgbToHex(r, g, b);
+    freq.set(hex, (freq.get(hex) ?? 0) + 1);
+  }
+
+  // Sort by frequency
+  const sorted = [...freq.entries()].sort((a, b) => b[1] - a[1]);
+
+  // Merge similar colors
+  const merged: string[] = [];
+  for (const [hex] of sorted) {
+    const rgb = hexToRgb(hex);
+    const tooClose = merged.some(m => colorDistance(rgb, hexToRgb(m)) < mergeThreshold);
+    if (!tooClose) merged.push(hex);
+    if (merged.length >= maxColors) break;
+  }
+
+  return merged;
+}
+
+function rasterizeImage(
+  img: HTMLImageElement,
+  overlay: ImageOverlay,
+  gridW: number,
+  gridH: number,
+): { pixels: Map<string, string>; palette: string[] } {
+  // Draw the image at the overlay position onto a canvas matching the grid
+  const canvas = document.createElement("canvas");
+  canvas.width = gridW;
+  canvas.height = gridH;
+  const ctx = canvas.getContext("2d")!;
+
+  // Draw the image mapped from overlay grid coords to pixel coords
+  ctx.drawImage(img, overlay.x, overlay.y, overlay.w, overlay.h);
+
+  const imageData = ctx.getImageData(0, 0, gridW, gridH);
+  const rawPixels: [number, number, number, number][] = [];
+  for (let i = 0; i < imageData.data.length; i += 4) {
+    rawPixels.push([
+      imageData.data[i],
+      imageData.data[i + 1],
+      imageData.data[i + 2],
+      imageData.data[i + 3],
+    ]);
+  }
+
+  // Extract palette from the raw pixels
+  const palette = extractPalette(rawPixels);
+
+  // Snap each pixel to the palette
+  const result = new Map<string, string>();
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
+      const idx = y * gridW + x;
+      const [r, g, b, a] = rawPixels[idx];
+      if (a < 128) continue; // transparent
+      const hex = rgbToHex(r, g, b);
+      const snapped = snapToPalette(hex, palette);
+      result.set(pixelKey(x, y), snapped);
+    }
+  }
+
+  return { pixels: result, palette };
+}
+
 // ─── Preview component ─────────────────────────────────────────────────────
 function SpritePreview({ pixels, width, height, scale = 1, className = "" }: {
   pixels: Map<string, string>;
@@ -125,6 +234,16 @@ export function SpriteEditor() {
 
   // Clipboard for copy/paste frames
   const clipboardRef = useRef<Map<string, string> | null>(null);
+
+  // Image import overlay state
+  const [imageOverlay, setImageOverlay] = useState<ImageOverlay | null>(null);
+  const [draggingOverlay, setDraggingOverlay] = useState<"move" | "resize" | null>(null);
+  const [overlayDragStart, setOverlayDragStart] = useState<{ mx: number; my: number; ox: number; oy: number; ow: number; oh: number } | null>(null);
+  const [rasterizedPalette, setRasterizedPalette] = useState<string[] | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem("sprite-editor-api-key") ?? "");
+  const [showSettings, setShowSettings] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Track which sprites were edited this session
   const [dirtySprites, setDirtySprites] = useState<Set<string>>(new Set());
@@ -259,6 +378,151 @@ export function SpriteEditor() {
     setMoveStart(null);
     setSelectionStart(null);
   }, []);
+
+  // Handle image file import
+  const handleImageImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selected) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        // Fit the image to the grid while preserving aspect ratio
+        const aspect = img.width / img.height;
+        let w = selected.width;
+        let h = Math.round(w / aspect);
+        if (h > selected.height) {
+          h = selected.height;
+          w = Math.round(h * aspect);
+        }
+        setImageOverlay({
+          src,
+          imgEl: img,
+          x: 0,
+          y: 0,
+          w,
+          h,
+          opacity: 0.5,
+        });
+        setRasterizedPalette(null);
+      };
+      img.src = src;
+    };
+    reader.readAsDataURL(file);
+    // Reset file input so re-importing the same file works
+    e.target.value = "";
+  }, [selected]);
+
+  // Rasterize the overlay image into pixels
+  const handleRasterize = useCallback(() => {
+    if (!imageOverlay || !selected) return;
+    pushUndo();
+    const { pixels: rasterized, palette } = rasterizeImage(
+      imageOverlay.imgEl,
+      imageOverlay,
+      selected.width,
+      selected.height,
+    );
+    setPixels(rasterized);
+    setRasterizedPalette(palette);
+  }, [imageOverlay, selected, pushUndo]);
+
+  // AI Clean
+  const handleAiClean = useCallback(async () => {
+    if (!selected || !imageOverlay || !rasterizedPalette) return;
+    if (!apiKey) {
+      setShowSettings(true);
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const currentPixels: [number, number, string][] = [];
+      for (const [key, color] of pixels) {
+        const { x, y } = parsePixelKey(key);
+        currentPixels.push([x, y, color]);
+      }
+      const response = await fetch("/api/ai/pixel-clean", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: imageOverlay.src,
+          currentPixels,
+          palette: rasterizedPalette,
+          width: selected.width,
+          height: selected.height,
+          apiKey,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        alert(`AI Clean failed: ${err.error || response.statusText}`);
+        return;
+      }
+      const data = await response.json();
+      if (data.pixels && Array.isArray(data.pixels)) {
+        pushUndo();
+        const cleaned = new Map<string, string>();
+        for (const p of data.pixels) {
+          if (Array.isArray(p) && p.length >= 3) {
+            cleaned.set(pixelKey(p[0], p[1]), p[2]);
+          }
+        }
+        setPixels(cleaned);
+      }
+    } catch (err: any) {
+      alert(`AI Clean error: ${err.message}`);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [selected, imageOverlay, rasterizedPalette, apiKey, pixels, pushUndo]);
+
+  // Save API key to localStorage when it changes
+  useEffect(() => {
+    if (apiKey) localStorage.setItem("sprite-editor-api-key", apiKey);
+    else localStorage.removeItem("sprite-editor-api-key");
+  }, [apiKey]);
+
+  // Overlay drag handlers
+  const handleOverlayMouseDown = useCallback((e: React.MouseEvent, mode: "move" | "resize") => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!imageOverlay) return;
+    setDraggingOverlay(mode);
+    setOverlayDragStart({
+      mx: e.clientX,
+      my: e.clientY,
+      ox: imageOverlay.x,
+      oy: imageOverlay.y,
+      ow: imageOverlay.w,
+      oh: imageOverlay.h,
+    });
+  }, [imageOverlay]);
+
+  useEffect(() => {
+    if (!draggingOverlay || !overlayDragStart || !imageOverlay) return;
+    const handleMove = (e: MouseEvent) => {
+      const dx = (e.clientX - overlayDragStart.mx) / zoom;
+      const dy = (e.clientY - overlayDragStart.my) / zoom;
+      if (draggingOverlay === "move") {
+        setImageOverlay(prev => prev ? { ...prev, x: overlayDragStart.ox + dx, y: overlayDragStart.oy + dy } : null);
+      } else {
+        const newW = Math.max(1, Math.round(overlayDragStart.ow + dx));
+        const newH = Math.max(1, Math.round(overlayDragStart.oh + dy));
+        setImageOverlay(prev => prev ? { ...prev, w: newW, h: newH } : null);
+      }
+    };
+    const handleUp = () => {
+      setDraggingOverlay(null);
+      setOverlayDragStart(null);
+    };
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [draggingOverlay, overlayDragStart, imageOverlay, zoom]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -796,6 +1060,69 @@ export function SpriteEditor() {
             )}
           </div>
 
+          <div className="w-px h-5 bg-white/10" />
+
+          {/* Import / AI */}
+          <div className="flex gap-1 items-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageImport}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors"
+              title="Import an image to trace"
+            >
+              Import
+            </button>
+            {imageOverlay && (
+              <>
+                <button
+                  onClick={handleRasterize}
+                  className="text-[10px] px-2 py-1 rounded bg-purple-600/30 text-purple-300 hover:bg-purple-600/50 transition-colors"
+                >
+                  Rasterize
+                </button>
+                {rasterizedPalette && (
+                  <button
+                    onClick={handleAiClean}
+                    disabled={aiLoading}
+                    className="text-[10px] px-2 py-1 rounded bg-cyan-600/30 text-cyan-300 hover:bg-cyan-600/50 transition-colors disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {aiLoading && <span className="inline-block w-3 h-3 border border-cyan-300 border-t-transparent rounded-full animate-spin" />}
+                    AI Clean
+                  </button>
+                )}
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round((imageOverlay.opacity) * 100)}
+                  onChange={e => setImageOverlay(prev => prev ? { ...prev, opacity: Number(e.target.value) / 100 } : null)}
+                  className="w-12 h-1 accent-white/50"
+                  title="Overlay opacity"
+                />
+                <button
+                  onClick={() => { setImageOverlay(null); setRasterizedPalette(null); }}
+                  className="text-[10px] px-1 py-1 rounded text-red-400/50 hover:text-red-400 transition-colors"
+                  title="Remove overlay"
+                >
+                  X
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setShowSettings(v => !v)}
+              className={`text-[10px] px-1.5 py-1 rounded transition-colors ${showSettings ? "bg-white/15 text-white/70" : "text-white/30 hover:text-white/50"}`}
+              title="API Settings"
+            >
+              gear
+            </button>
+          </div>
+
           <div className="flex-1" />
 
           {/* Actions */}
@@ -828,6 +1155,21 @@ export function SpriteEditor() {
           </div>
         </div>
 
+        {/* Settings panel (API key) */}
+        {showSettings && (
+          <div className="bg-[#16162a] border-b border-white/10 px-3 py-2 flex items-center gap-3">
+            <span className="text-[10px] text-white/40">Anthropic API Key:</span>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder="sk-ant-..."
+              className="flex-1 max-w-[300px] bg-white/5 text-white/70 text-[10px] font-mono rounded px-2 py-1 border border-white/10 outline-none focus:border-white/30"
+            />
+            {apiKey && <span className="text-[9px] text-green-400/60">saved</span>}
+          </div>
+        )}
+
         {/* Canvas area — click on empty space to deselect */}
         <div
           className="flex-1 flex items-center justify-center overflow-auto p-4"
@@ -848,6 +1190,53 @@ export function SpriteEditor() {
                 onMouseLeave={() => { setDrawing(false); setMovingSelection(false); }}
                 onContextMenu={handleContextMenu}
               />
+              {/* Image overlay */}
+              {imageOverlay && (
+                <img
+                  src={imageOverlay.src}
+                  alt="overlay"
+                  style={{
+                    position: "absolute",
+                    left: imageOverlay.x * zoom,
+                    top: imageOverlay.y * zoom,
+                    width: imageOverlay.w * zoom,
+                    height: imageOverlay.h * zoom,
+                    opacity: imageOverlay.opacity,
+                    pointerEvents: "none",
+                    imageRendering: "pixelated",
+                  }}
+                />
+              )}
+              {/* Overlay drag handle (move) */}
+              {imageOverlay && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: imageOverlay.x * zoom,
+                    top: imageOverlay.y * zoom,
+                    width: imageOverlay.w * zoom,
+                    height: imageOverlay.h * zoom,
+                    border: "1px dashed rgba(200,100,255,0.6)",
+                    cursor: "move",
+                  }}
+                  onMouseDown={e => handleOverlayMouseDown(e, "move")}
+                >
+                  {/* Resize handle (bottom-right corner) */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: -4,
+                      bottom: -4,
+                      width: 8,
+                      height: 8,
+                      background: "rgba(200,100,255,0.8)",
+                      cursor: "nwse-resize",
+                      borderRadius: 2,
+                    }}
+                    onMouseDown={e => handleOverlayMouseDown(e, "resize")}
+                  />
+                </div>
+              )}
               {/* Selection overlay */}
               {selection && (
                 <div

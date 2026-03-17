@@ -274,6 +274,98 @@ app.get("/api/uptime-kuma", async (_req, res) => {
   }
 });
 
+// --- AI pixel-art clean endpoint ---
+app.post("/api/ai/pixel-clean", express.json({ limit: "10mb" }), async (req, res) => {
+  const { imageBase64, currentPixels, palette, width, height, apiKey } = req.body;
+  if (!apiKey || !imageBase64 || !currentPixels || !palette || !width || !height) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  // Determine media type from base64 header or default to png
+  let mediaType = "image/png";
+  let rawBase64 = imageBase64;
+  if (imageBase64.startsWith("data:")) {
+    const match = imageBase64.match(/^data:(image\/[^;]+);base64,(.*)$/);
+    if (match) {
+      mediaType = match[1];
+      rawBase64 = match[2];
+    }
+  }
+
+  // Build the rasterized grid description
+  const gridDesc = currentPixels.map((p: [number, number, string]) => `[${p[0]},${p[1]},"${p[2]}"]`).join(",");
+
+  const systemPrompt = `You are a pixel art cleanup assistant. You receive a rasterized pixel grid and the original reference image. Your job is to clean up the rasterized result:
+- Fix broken outlines (1px thick, connected)
+- Remove anti-aliasing artifacts (stray semi-transparent or off-palette pixels)
+- Snap every pixel color to the nearest color in the provided palette, or make it transparent (omit it)
+- Preserve the overall shape and recognizable features from the reference image
+- Keep the result within the ${width}x${height} grid
+
+Respond with ONLY a JSON array of [x, y, "#hexcolor"] tuples for non-transparent pixels. No markdown, no explanation, just the JSON array.`;
+
+  const userContent = [
+    {
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: mediaType,
+        data: rawBase64,
+      },
+    },
+    {
+      type: "text",
+      text: `Reference image above. Grid size: ${width}x${height}. Palette: ${JSON.stringify(palette)}.
+
+Current rasterized pixels (may have artifacts):
+[${gridDesc}]
+
+Clean up this pixel art. Return ONLY a JSON array of [x,y,"#hexcolor"] tuples.`,
+    },
+  ];
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: userContent }],
+        system: systemPrompt,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("[ai/pixel-clean] API error:", response.status, errText);
+      return res.status(response.status).json({ error: `Claude API error: ${response.status}` });
+    }
+
+    const data = await response.json() as { content: Array<{ type: string; text?: string }> };
+    const textBlock = data.content?.find((b: { type: string }) => b.type === "text");
+    if (!textBlock?.text) {
+      return res.status(500).json({ error: "No text response from Claude" });
+    }
+
+    // Parse the JSON array from the response (strip any markdown fences)
+    let cleaned = textBlock.text.trim();
+    if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "").trim();
+    }
+
+    const pixels = JSON.parse(cleaned);
+    res.json({ pixels });
+  } catch (err: any) {
+    console.error("[ai/pixel-clean] Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Static files (production) ---
 const clientDir = path.join(__dirname, "client");
 app.use(express.static(clientDir, {
