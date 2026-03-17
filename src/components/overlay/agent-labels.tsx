@@ -180,7 +180,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         const maxLevel = Math.max(...ccMains.map(a => a.level ?? 1), 1);
         if (maxLevel > record) localStorage.setItem("game-mode-record", String(maxLevel));
         return (
-          <div className={`absolute z-30 rounded-[7px] px-[18px] py-[15px] ${
+          <div className={`absolute z-30 rounded-[7px] px-[14px] py-[12px] ${
             hudPosition === "top-left" ? "top-2 left-2" :
             hudPosition === "bottom-left" ? "left-2" :
             "right-2"
@@ -237,7 +237,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     </div>
 
                     {/* Hover-reveal menu */}
-                    <div className="relative shrink-0 w-[16px]">
+                    <div className="relative shrink-0 w-[8px]">
                       <button
                         onClick={e => { e.stopPropagation(); setHudMenuId(hudMenuId === a.id ? null : a.id); }}
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-white/30 hover:text-white/60"
@@ -291,7 +291,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 : "text-white/20 hover:text-white/50"
             }`}
           >
-            {gameModeOn ? "stop" : "play"}
+            {gameModeOn ? "end game" : "play"}
           </button>
         </div>
 
