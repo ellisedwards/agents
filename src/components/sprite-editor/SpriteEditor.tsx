@@ -484,13 +484,41 @@ export function SpriteEditor() {
   }, [selected, pixels, frameIndex, allSprites]);
 
   // Export as TypeScript
-  const exportTS = useCallback(() => {
+  // Export patch — compact format for Claude to apply to source files
+  const [exportLabel, setExportLabel] = useState("Export Patch");
+  const exportPatch = useCallback(() => {
     if (!selected) return;
-    const rects = mapToPixelRects(pixels);
-    const lines = rects.map(r => `  { x: ${r.x}, y: ${r.y}, w: ${r.w}, h: ${r.h}, color: "${r.color}" },`);
-    const frame = selected.frames[frameIndex];
-    const text = `// ${selected.name} - ${frame?.name ?? "frame"} (${selected.width}x${selected.height})\nconst ${frame?.name ?? "frame"}: PixelRect[] = [\n${lines.join("\n")}\n];`;
+    // Collect all frames with current edits applied
+    const frames: Record<string, Array<[number, number, string]>> = {};
+    for (let fi = 0; fi < selected.frames.length; fi++) {
+      const frame = selected.frames[fi];
+      // Use live pixels for current frame, stored data for others
+      const rects = fi === frameIndex ? mapToPixelRects(pixels) : frame.pixels;
+      // Compact format: [x, y, color] tuples
+      const compact = rects.map(r => {
+        const entries: Array<[number, number, string]> = [];
+        for (let dy = 0; dy < r.h; dy++) {
+          for (let dx = 0; dx < r.w; dx++) {
+            entries.push([r.x + dx, r.y + dy, r.color]);
+          }
+        }
+        return entries;
+      }).flat();
+      frames[frame.name] = compact;
+    }
+    const patch = {
+      sprite: selected.id,
+      name: selected.name,
+      category: selected.category,
+      size: [selected.width, selected.height],
+      builtIn: selected.builtIn,
+      file: selected.builtIn ? `src/components/characters/${selected.id}.ts` : null,
+      frames,
+    };
+    const text = `SPRITE PATCH: ${selected.name}\n\`\`\`json\n${JSON.stringify(patch)}\n\`\`\``;
     navigator.clipboard.writeText(text);
+    setExportLabel("Copied!");
+    setTimeout(() => setExportLabel("Export Patch"), 1200);
   }, [selected, pixels, frameIndex]);
 
   // Create new custom sprite
@@ -764,9 +792,9 @@ export function SpriteEditor() {
               className="text-[10px] px-2 py-1 rounded bg-green-600/30 text-green-300 hover:bg-green-600/50 transition-colors">
               Save
             </button>
-            <button onClick={exportTS}
+            <button onClick={exportPatch}
               className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8">
-              Export TS
+              {exportLabel}
             </button>
           </div>
         </div>
