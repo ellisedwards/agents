@@ -961,6 +961,34 @@ export function SpriteEditor() {
     markDirty();
   }, [selected, allSprites, frameIndex, markDirty]);
 
+  // Copy frame pixels to another frame (overwrite or swap)
+  const copyFrameTo = useCallback((sourceIdx: number, targetIdx: number, mode: "overwrite" | "swap") => {
+    if (!selected) return;
+    const updated = allSprites.map(s => {
+      if (s.id !== selected.id) return s;
+      const frames = [...s.frames];
+      const sourcePixels = [...frames[sourceIdx].pixels];
+      if (mode === "swap") {
+        const targetPixels = [...frames[targetIdx].pixels];
+        frames[sourceIdx] = { ...frames[sourceIdx], pixels: targetPixels };
+        frames[targetIdx] = { ...frames[targetIdx], pixels: sourcePixels };
+      } else {
+        frames[targetIdx] = { ...frames[targetIdx], pixels: sourcePixels };
+      }
+      return { ...s, frames };
+    });
+    setAllSprites(updated);
+    if (!selected.builtIn) saveCustomSprites(updated.filter(s => !s.builtIn));
+    markDirty();
+    // If we're viewing the target, reload its pixels
+    if (frameIndex === targetIdx || (mode === "swap" && frameIndex === sourceIdx)) {
+      const sprite = updated.find(s => s.id === selected.id);
+      if (sprite) {
+        setPixels(pixelRectsToMap(sprite.frames[frameIndex].pixels));
+      }
+    }
+  }, [selected, allSprites, frameIndex, markDirty]);
+
   // Frame context menu state
   const [frameMenuIdx, setFrameMenuIdx] = useState<number | null>(null);
   const frameMenuRef = useRef<HTMLDivElement>(null);
@@ -1553,6 +1581,38 @@ export function SpriteEditor() {
                     >
                       Rename
                     </button>
+                    <div className="border-t border-white/5 my-0.5" />
+                    <div className="px-3 py-1 text-[8px] text-white/25">Copy pixels to...</div>
+                    {selected.frames.map((targetFrame, ti) => {
+                      if (ti === i) return null;
+                      const hasPixels = targetFrame.pixels.length > 0;
+                      return (
+                        <button
+                          key={`copy-${ti}`}
+                          onClick={() => {
+                            if (hasPixels) {
+                              const action = prompt(
+                                `"${targetFrame.name}" already has pixels.\nType "overwrite" to replace, or "swap" to swap pixels:`,
+                                "overwrite"
+                              );
+                              if (action === "overwrite") {
+                                copyFrameTo(i, ti, "overwrite");
+                              } else if (action === "swap") {
+                                copyFrameTo(i, ti, "swap");
+                              }
+                            } else {
+                              copyFrameTo(i, ti, "overwrite");
+                            }
+                            setFrameMenuIdx(null);
+                          }}
+                          className="block w-full text-left font-mono text-[9px] px-3 py-1 text-white/50 hover:bg-white/10 hover:text-white/80 flex items-center gap-1.5"
+                        >
+                          <Copy size={9} className="text-white/25" />
+                          {targetFrame.name}
+                          {hasPixels && <span className="text-[7px] text-yellow-400/40 ml-auto">has data</span>}
+                        </button>
+                      );
+                    })}
                     <div className="border-t border-white/5 my-0.5" />
                     <div className="px-3 py-1 text-[8px] text-white/25">Remap to...</div>
                     {expected.filter(s => s !== frame.name).map(s => (
