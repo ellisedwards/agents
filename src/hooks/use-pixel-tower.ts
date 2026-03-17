@@ -5,6 +5,13 @@ const PIXEL_ENDPOINT = "/api/pixels";
 const POLL_INTERVAL = 100; // 100ms for smooth canvas rendering
 const REACT_UPDATE_INTERVAL = 250; // React state updates for HTML overlay
 
+export interface SlotDetail {
+  state: string;
+  session_id?: string;
+  name?: string;
+  age_sec?: number;
+}
+
 export interface PixelTowerData {
   panels: {
     bottom: string[];
@@ -17,6 +24,7 @@ export interface PixelTowerData {
     color: string;
   };
   clawActivity?: string;
+  slotsDetail?: SlotDetail[];
 }
 
 const EMPTY: PixelTowerData = {

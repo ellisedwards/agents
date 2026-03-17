@@ -61,8 +61,14 @@ export class ClaudeCodeWatcher extends EventEmitter {
           this.sessions.delete(filePath);
         }
       } else if (now - session.lastActivity > STALE_MS) {
-        fs.unwatchFile(filePath);
-        this.sessions.delete(filePath);
+        // Don't drop main agent if it has active subagents
+        const hasSubagents = [...this.sessions.values()].some(
+          (s) => s.parentId === filePath
+        );
+        if (!hasSubagents) {
+          fs.unwatchFile(filePath);
+          this.sessions.delete(filePath);
+        }
       }
     }
     // Allow departed paths to be re-discovered after 2 minutes
@@ -306,18 +312,20 @@ export class ClaudeCodeWatcher extends EventEmitter {
       // Main agents (not subagents) idle for 2+ min → lounging
       // But don't lounge if this agent has active subagents running
       const hasActiveSubagents = [...this.sessions.values()].some(
-        (s) => s.parentId === filePath && now - s.lastActivity < SUBAGENT_STALE_MS
+        (s) => s.parentId === filePath
       );
       const isLounging =
         session.subagentClass === null &&
         session.state === "idle" &&
         !hasActiveSubagents &&
         now - session.lastActivity > LOUNGE_MS;
+      // Show as "thinking" while subagents work (main session idles during background tasks)
+      const effectiveState = (session.state === "idle" && hasActiveSubagents) ? "thinking" : session.state;
 
       agents.push({
         id: filePath,
         source: "cc",
-        state: isLounging ? "lounging" : session.state,
+        state: isLounging ? "lounging" : effectiveState,
         currentTool: session.currentTool,
         name: session.name,
         parentId: session.parentId,

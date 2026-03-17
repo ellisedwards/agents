@@ -47,12 +47,13 @@ const app = express();
 // --- Build ID (for stale-build detection) ---
 // Read from disk so rebuilds are detected without restarting the server
 const buildIdFile = path.join(__dirname, ".build-id");
+const serverStartedAt = new Date().toISOString();
 app.get("/api/build-id", (_req, res) => {
   try {
     const buildId = fs.readFileSync(buildIdFile, "utf-8").trim();
-    res.json({ buildId });
+    res.json({ buildId, serverStartedAt });
   } catch {
-    res.json({ buildId: "unknown" });
+    res.json({ buildId: "unknown", serverStartedAt });
   }
 });
 
@@ -178,15 +179,21 @@ app.post("/api/tower-reset", (_req, res) => {
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
   try {
-    const [pixelsRes, statusRes] = await Promise.all([
-      fetch(`${claw}/pixels`, { signal: AbortSignal.timeout(2000) }),
-      fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+    const fetchOpts = { signal: AbortSignal.timeout(2000), keepalive: false } as RequestInit;
+    const [pixelsRes, statusRes, slotsRes] = await Promise.all([
+      fetch(`${claw}/pixels`, fetchOpts),
+      fetch(`${claw}/status`, fetchOpts).catch(() => null),
+      fetch(`${claw}/hook/agent-slots`, fetchOpts).catch(() => null),
     ]);
     if (!pixelsRes.ok) return res.status(pixelsRes.status).json({ error: "claw unreachable" });
     const data = await pixelsRes.json();
     if (statusRes?.ok) {
       const status = await statusRes.json();
       data.clawActivity = status.claw_activity || "idle";
+    }
+    if (slotsRes?.ok) {
+      const slots = await slotsRes.json();
+      data.slotsDetail = slots.slots_detail || [];
     }
     res.json(data);
   } catch (e) {

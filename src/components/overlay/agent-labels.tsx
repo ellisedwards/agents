@@ -19,6 +19,27 @@ interface AgentLabelsProps {
 
 const HOVER_RADIUS = 22;
 
+function ServerInfo() {
+  const [info, setInfo] = useState<{ buildId: string; serverStartedAt: string } | null>(null);
+  useEffect(() => {
+    fetch("/api/build-id")
+      .then((r) => r.json())
+      .then(setInfo)
+      .catch(() => {});
+  }, []);
+  if (!info?.serverStartedAt) return null;
+  const started = new Date(info.serverStartedAt);
+  const ago = Math.floor((Date.now() - started.getTime()) / 60000);
+  const timeStr = ago < 1 ? "just now" : ago < 60 ? `${ago}m ago` : `${Math.floor(ago / 60)}h ${ago % 60}m ago`;
+  const match = info.buildId === __BUILD_ID__;
+  return (
+    <div className="font-mono text-[8px] text-white/25">
+      server: {timeStr}
+      {!match && <span className="text-yellow-400/60 ml-1">(stale)</span>}
+    </div>
+  );
+}
+
 const TIME_OPTIONS: { value: TimeMode; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "day", label: "Day" },
@@ -365,15 +386,16 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
               </div>
             </div>
 
-            {/* Build code */}
-            <div className="pt-1 border-t border-white/5">
+            {/* Build + server info */}
+            <div className="pt-1 border-t border-white/5 space-y-0.5">
               <button
                 onClick={() => navigator.clipboard.writeText(__BUILD_ID__)}
-                className="font-mono text-[8px] text-white/25 hover:text-white/50 transition-colors"
+                className="font-mono text-[8px] text-white/25 hover:text-white/50 transition-colors block"
                 title="Click to copy build ID"
               >
                 build: {__BUILD_ID__}
               </button>
+              <ServerInfo />
             </div>
           </div>
         )}

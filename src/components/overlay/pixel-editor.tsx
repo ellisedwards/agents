@@ -456,7 +456,7 @@ export function PixelEditor({ canvasRef }: PixelEditorProps) {
       />
 
       {/* Coordinates + toggle button — always visible at bottom-left */}
-      <div className="absolute bottom-2 left-2 z-30 flex items-center gap-2">
+      <div className="absolute bottom-8 left-2 z-30 flex items-center gap-2">
         <button
           onClick={() => setToolbarVisible((v) => !v)}
           className="font-mono text-[9px] px-2 py-1 rounded bg-[#1e1e2e]/90 border border-white/10 text-white/50 hover:text-white/80 transition-colors"
@@ -487,7 +487,7 @@ export function PixelEditor({ canvasRef }: PixelEditorProps) {
 
       {/* Toolbar — bottom center, toggleable */}
       {toolbarVisible && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#1e1e2e]/95 border border-white/10 rounded-md px-3 py-1.5">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#1e1e2e]/95 border border-white/10 rounded-md px-3 py-1.5">
           {/* Brush sizes */}
           {([1, 2, 4] as BrushSize[]).map((s, i) => (
             <button

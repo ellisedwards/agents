@@ -1062,18 +1062,27 @@ export function renderScene(
       ctx.fillRect(190, 51, 1, 10);   // x=190 y=51-60
       ctx.fillRect(201, 58, 1, 5);    // x=201 y=58-62
       // Dark horizontal accents
-      ctx.fillRect(173, 61, 2, 1);    // 173-174
-      ctx.fillRect(203, 61, 2, 1);    // 203-204
-      ctx.fillRect(216, 61, 2, 1);    // 216-217
-      ctx.fillRect(243, 61, 2, 1);    // 243-244
+      ctx.fillRect(173, 61, 2, 1);
+      ctx.fillRect(203, 61, 2, 1);
+      ctx.fillRect(216, 61, 2, 1);
+      ctx.fillRect(243, 61, 2, 1);
 
       // Left vertical edge line
       ctx.fillStyle = "#3d8f82";
       ctx.fillRect(170, 39, 1, 17);   // x=170 y=39-55
 
-      // Right vertical edge line (house border)
+      // Right vertical edge lines (house border)
       ctx.fillStyle = "#3f8f81";
-      ctx.fillRect(247, 44, 1, 22);   // x=247 y=44-65
+      ctx.fillRect(247, 44, 1, 17);   // x=247 y=44-60
+      ctx.fillRect(247, 62, 1, 4);    // x=247 y=62-65
+      ctx.fillRect(246, 41, 1, 21);   // x=246 y=41-61
+      ctx.fillRect(246, 62, 1, 4);    // x=246 y=62-65
+
+      // Dark accents at edges
+      ctx.fillStyle = "#26615e";
+      ctx.fillRect(247, 61, 1, 1);
+      ctx.fillRect(245, 65, 1, 1);
+      ctx.fillRect(172, 65, 1, 1);
 
       // Teal vertical accent
       ctx.fillStyle = "#2c625d";
@@ -1537,6 +1546,14 @@ export function renderScene(
       }
     }
 
+    // Use closed-eyes sprite for sleeping CC agents (idle 15+ min)
+    const sleepAgentData = agents.find((a) => a.id === entity.agentId);
+    const sleepIdleDuration = sleepAgentData ? Date.now() - sleepAgentData.lastActivity : 0;
+    if (entity.activityState === "idle" && entity.source === "cc"
+        && sleepIdleDuration > 15 * 60 * 1000) {
+      effectiveSpriteState = "waiting"; // closed eyes
+    }
+
     const sprite = getSprite(
       spriteCache,
       entity.spriteKey,
@@ -1607,18 +1624,22 @@ export function renderScene(
       ctx.globalAlpha = 1;
     }
 
-    // Idle CC agent "zzz" — shows agent is sleeping/waiting
-    if (entity.activityState === "idle" && entity.source === "cc" && !entity.isUnreachable
-        && entity.agentId !== "__cat__" && entity.agentId !== "__cat_float__") {
+    // Idle CC agent "zzz" — only after 15+ minutes of no activity
+    const agentData = agents.find((a) => a.id === entity.agentId);
+    const idleDuration = agentData ? Date.now() - agentData.lastActivity : 0;
+    const isSleeping = entity.activityState === "idle" && entity.source === "cc"
+      && !entity.isUnreachable && entity.agentId !== "__cat__"
+      && entity.agentId !== "__cat_float__" && idleDuration > 15 * 60 * 1000;
+    if (isSleeping) {
       const zPhase = Math.floor((frame + hashForPhase(entity.agentId)) / 40) % 3;
       ctx.fillStyle = "#8888aa";
-      ctx.font = "3px monospace";
-      const zx = entity.x + 5;
-      const zy = entity.y - sprite.height / 2 - 2;
-      ctx.globalAlpha = 0.5;
+      ctx.font = "4px monospace";
+      const zx = entity.x + 6;
+      const zy = entity.y - sprite.height / 2 - 3;
+      ctx.globalAlpha = 0.8;
       ctx.fillText("z", zx, zy);
-      if (zPhase >= 1) ctx.fillText("z", zx + 3, zy - 3);
-      if (zPhase >= 2) ctx.fillText("z", zx + 6, zy - 5);
+      if (zPhase >= 1) ctx.fillText("z", zx + 4, zy - 4);
+      if (zPhase >= 2) ctx.fillText("z", zx + 7, zy - 7);
       ctx.globalAlpha = 1;
     }
 
@@ -1682,11 +1703,39 @@ export function renderScene(
     const mainCCs = agents.filter(
       (a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
     );
+
+    // Use authoritative slot mapping from claw if available
+    const slotsDetail = towerInfo.data.slotsDetail;
+    if (slotsDetail && slotsDetail.length > 0) {
+      // Match agents to slots by session_id (project dir hash)
+      stickyQuadrants.clear();
+      for (let s = 0; s < slotsDetail.length && s < 4; s++) {
+        const detail = slotsDetail[s];
+        if (!detail.session_id) continue;
+        // Find the agent whose project dir hashes to this session_id
+        for (const agent of mainCCs) {
+          if (stickyQuadrants.has(agent.id)) continue;
+          // Extract project dir from agent file path
+          const projectsIdx = agent.id.indexOf("/.claude/projects/");
+          if (projectsIdx < 0) continue;
+          const afterProjects = agent.id.slice(projectsIdx + 18); // after "/.claude/projects/"
+          const projectDir = afterProjects.split("/")[0].replace(/^-/, "");
+          // Compare name as a simpler match (project basename)
+          if (detail.name && agent.id.includes(detail.name)) {
+            stickyQuadrants.set(agent.id, s);
+            break;
+          }
+        }
+      }
+    }
+
+    // Fallback: assign unmatched agents to remaining slots
+    const takenSlots = new Set(stickyQuadrants.values());
     for (const id of stickyQuadrants.keys()) {
       if (!mainCCs.some((a) => a.id === id)) stickyQuadrants.delete(id);
     }
-    const takenSlots = new Set(stickyQuadrants.values());
-    for (const agent of mainCCs) {
+    const sortedCCs = [...mainCCs].sort((a, b) => a.id.localeCompare(b.id));
+    for (const agent of sortedCCs) {
       if (stickyQuadrants.has(agent.id)) continue;
       for (let s = 0; s < 4; s++) {
         if (!takenSlots.has(s)) {
