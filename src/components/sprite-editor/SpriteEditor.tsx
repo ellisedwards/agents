@@ -101,6 +101,8 @@ export function SpriteEditor() {
   const [redoStack, setRedoStack] = useState<Array<Map<string, string>>>([]);
   const [drawing, setDrawing] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<SpriteCategory | "all">("all");
+  const [showCheckerboard, setShowCheckerboard] = useState(true);
+  const [canvasBg, setCanvasBg] = useState("#d4d4d4");
   const [animating, setAnimating] = useState(false);
   const [animFrame, setAnimFrame] = useState(0);
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -444,6 +446,32 @@ export function SpriteEditor() {
             <span className="text-[9px] text-white/40">Grid</span>
           </label>
 
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" checked={showCheckerboard} onChange={e => setShowCheckerboard(e.target.checked)} className="w-3 h-3" />
+            <span className="text-[9px] text-white/40">Transparency</span>
+          </label>
+
+          <div className="w-px h-5 bg-white/10" />
+
+          {/* Canvas background color */}
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] text-white/30">BG</span>
+            <button
+              onClick={() => {
+                const input = document.createElement("input");
+                input.type = "color";
+                input.value = canvasBg;
+                input.onchange = () => setCanvasBg(input.value);
+                input.click();
+              }}
+              className="w-4 h-4 rounded border border-white/20"
+              style={{ backgroundColor: canvasBg }}
+            />
+            {canvasBg !== "#d4d4d4" && (
+              <button onClick={() => setCanvasBg("#d4d4d4")} className="text-[8px] text-white/30 hover:text-white/50">rst</button>
+            )}
+          </div>
+
           <div className="flex-1" />
 
           {/* Actions */}
@@ -468,7 +496,7 @@ export function SpriteEditor() {
         </div>
 
         {/* Canvas area */}
-        <div className="flex-1 flex items-center justify-center overflow-auto bg-[#08080e] p-4">
+        <div className="flex-1 flex items-center justify-center overflow-auto p-4" style={{ backgroundColor: canvasBg }}>
           {selected ? (
             <div className="relative">
               <canvas
@@ -490,6 +518,8 @@ export function SpriteEditor() {
                 height={selected.height}
                 zoom={zoom}
                 showGrid={showGrid}
+                showCheckerboard={showCheckerboard}
+                canvasBg={canvasBg}
               />
             </div>
           ) : (
@@ -638,13 +668,15 @@ export function SpriteEditor() {
 }
 
 // ─── Canvas renderer (draws pixels + grid) ──────────────────────────────────
-function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid }: {
+function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   pixels: Map<string, string>;
   width: number;
   height: number;
   zoom: number;
   showGrid: boolean;
+  showCheckerboard: boolean;
+  canvasBg: string;
 }) {
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -654,11 +686,15 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid }: {
     // Clear
     ctx.clearRect(0, 0, width * zoom, height * zoom);
 
-    // Checkerboard background (transparency indicator)
+    // Background: checkerboard or solid
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const isLight = (x + y) % 2 === 0;
-        ctx.fillStyle = isLight ? "#1e1e2e" : "#16161e";
+        if (showCheckerboard) {
+          const isLight = (x + y) % 2 === 0;
+          ctx.fillStyle = isLight ? "#ffffff" : "#e0e0e0";
+        } else {
+          ctx.fillStyle = canvasBg;
+        }
         ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
       }
     }
@@ -687,7 +723,7 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid }: {
         ctx.stroke();
       }
     }
-  }, [pixels, width, height, zoom, showGrid]);
+  }, [pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg]);
 
   return null;
 }
