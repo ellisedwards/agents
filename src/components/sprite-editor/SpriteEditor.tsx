@@ -126,6 +126,9 @@ export function SpriteEditor() {
   // Clipboard for copy/paste frames
   const clipboardRef = useRef<Map<string, string> | null>(null);
 
+  // Track which sprites were edited this session
+  const [dirtySprites, setDirtySprites] = useState<Set<string>>(new Set());
+
   const selected = allSprites.find(s => s.id === selectedId) ?? null;
 
   // Load frame pixels when selection changes
@@ -468,8 +471,13 @@ export function SpriteEditor() {
   }, [selected, zoom, pixels]);
 
   // Save current pixels back to sprite definition
+  const markDirty = useCallback(() => {
+    if (selectedId) setDirtySprites(prev => new Set(prev).add(selectedId));
+  }, [selectedId]);
+
   const saveFrame = useCallback(() => {
     if (!selected) return;
+    markDirty();
     const rects = mapToPixelRects(pixels);
     const updatedSprites = allSprites.map(s => {
       if (s.id !== selected.id) return s;
@@ -481,45 +489,62 @@ export function SpriteEditor() {
     // Save custom sprites
     const customs = updatedSprites.filter(s => !s.builtIn);
     saveCustomSprites(customs);
-  }, [selected, pixels, frameIndex, allSprites]);
+  }, [selected, pixels, frameIndex, allSprites, markDirty]);
 
   // Export as TypeScript
   // Export patch — compact format for Claude to apply to source files
+  // Includes ALL sprites edited this session
   const [exportLabel, setExportLabel] = useState("Export Patch");
   const exportPatch = useCallback(() => {
-    if (!selected) return;
-    // Collect all frames with current edits applied
-    const frames: Record<string, Array<[number, number, string]>> = {};
-    for (let fi = 0; fi < selected.frames.length; fi++) {
-      const frame = selected.frames[fi];
-      // Use live pixels for current frame, stored data for others
-      const rects = fi === frameIndex ? mapToPixelRects(pixels) : frame.pixels;
-      // Compact format: [x, y, color] tuples
-      const compact = rects.map(r => {
-        const entries: Array<[number, number, string]> = [];
-        for (let dy = 0; dy < r.h; dy++) {
-          for (let dx = 0; dx < r.w; dx++) {
-            entries.push([r.x + dx, r.y + dy, r.color]);
+    // Save current frame first so it's included
+    if (selected) markDirty();
+
+    // Collect all dirty sprites (plus current if it has unsaved changes)
+    const idsToExport = new Set(dirtySprites);
+    if (selectedId) idsToExport.add(selectedId);
+
+    if (idsToExport.size === 0) return;
+
+    const patches: Array<Record<string, unknown>> = [];
+    for (const id of idsToExport) {
+      const sprite = allSprites.find(s => s.id === id);
+      if (!sprite) continue;
+
+      const frames: Record<string, Array<[number, number, string]>> = {};
+      for (let fi = 0; fi < sprite.frames.length; fi++) {
+        const frame = sprite.frames[fi];
+        // Use live pixels for current sprite+frame, stored data otherwise
+        const rects = (id === selectedId && fi === frameIndex)
+          ? mapToPixelRects(pixels)
+          : frame.pixels;
+        const compact = rects.flatMap(r => {
+          const entries: Array<[number, number, string]> = [];
+          for (let dy = 0; dy < r.h; dy++) {
+            for (let dx = 0; dx < r.w; dx++) {
+              entries.push([r.x + dx, r.y + dy, r.color]);
+            }
           }
-        }
-        return entries;
-      }).flat();
-      frames[frame.name] = compact;
+          return entries;
+        });
+        frames[frame.name] = compact;
+      }
+      patches.push({
+        sprite: sprite.id,
+        name: sprite.name,
+        category: sprite.category,
+        size: [sprite.width, sprite.height],
+        builtIn: sprite.builtIn,
+        file: sprite.builtIn ? `src/components/characters/${sprite.id}.ts` : null,
+        frames,
+      });
     }
-    const patch = {
-      sprite: selected.id,
-      name: selected.name,
-      category: selected.category,
-      size: [selected.width, selected.height],
-      builtIn: selected.builtIn,
-      file: selected.builtIn ? `src/components/characters/${selected.id}.ts` : null,
-      frames,
-    };
-    const text = `SPRITE PATCH: ${selected.name}\n\`\`\`json\n${JSON.stringify(patch)}\n\`\`\``;
+
+    const header = patches.map(p => p.name).join(", ");
+    const text = `SPRITE PATCH (${patches.length} sprite${patches.length > 1 ? "s" : ""}): ${header}\n\`\`\`json\n${JSON.stringify(patches.length === 1 ? patches[0] : patches)}\n\`\`\``;
     navigator.clipboard.writeText(text);
-    setExportLabel("Copied!");
+    setExportLabel(`Copied ${patches.length}!`);
     setTimeout(() => setExportLabel("Export Patch"), 1200);
-  }, [selected, pixels, frameIndex]);
+  }, [selected, selectedId, pixels, frameIndex, allSprites, dirtySprites, markDirty]);
 
   // Create new custom sprite
   const createNew = useCallback(() => {
@@ -793,8 +818,12 @@ export function SpriteEditor() {
               Save
             </button>
             <button onClick={exportPatch}
-              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8">
-              {exportLabel}
+              className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                dirtySprites.size > 0
+                  ? "bg-blue-600/30 text-blue-300 hover:bg-blue-600/50"
+                  : "text-white/40 hover:text-white/70 hover:bg-white/8"
+              }`}>
+              {exportLabel}{dirtySprites.size > 0 && ` (${dirtySprites.size})`}
             </button>
           </div>
         </div>
