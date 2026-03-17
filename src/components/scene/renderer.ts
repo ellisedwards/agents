@@ -88,6 +88,9 @@ const beamingAgents = new Set<string>();
 const lastAgentState = new Map<string, string>();
 // Remember last desk position so lounging agents can wander from where they sat
 const lastDeskPos = new Map<string, { x: number; y: number }>();
+export function getLastDeskPos(agentId: string): { x: number; y: number } | undefined {
+  return lastDeskPos.get(agentId);
+}
 // Track known agents to detect first appearance (beam-in)
 const knownAgentIds = new Set<string>();
 // Sticky quadrant assignment — each CC keeps its slot for the session
@@ -130,8 +133,22 @@ function assignStarter(agentId: string, agents: AgentState[]): CharacterType {
 
 const manualOverrides = new Set<string>();
 export function setAgentCharacter(agentId: string, character: CharacterType) {
+  const prev = stickyStarters.get(agentId);
   stickyStarters.set(agentId, character);
   manualOverrides.add(agentId);
+  // Trigger poof + beam-in if character actually changed
+  if (prev && prev !== character) {
+    const sp = smoothPos.get(agentId);
+    if (sp) {
+      activePoofs.push({ x: sp.x, y: sp.y, frame: 0, color: "#ffcc44" });
+      activeBeams.push({
+        fromX: sp.x, fromY: sp.y - 30,
+        toX: sp.x, toY: sp.y,
+        frame: 0, agentId,
+      });
+      beamingAgents.add(agentId);
+    }
+  }
 }
 export function getAgentCharacter(agentId: string): CharacterType | undefined {
   return stickyStarters.get(agentId);
@@ -182,7 +199,8 @@ export function getCurrentFrame(): number {
 }
 
 export function triggerLevelUp(x: number, y: number, teamColor: string) {
-  screenFlashAlpha = 0.15;
+  // screenFlashAlpha disabled — was causing full-scene redraw flash
+  // screenFlashAlpha = 0.06;
   const particles: LevelUpEffect["particles"] = [];
   const colors = [teamColor, "#ffcc44", "#ffffff"];
   for (let i = 0; i < 15; i++) {
@@ -2027,7 +2045,7 @@ export function renderScene(
       if (totalExp <= 0) continue;
 
       const barX = pos.x + 1;
-      const barY = pos.y + 6;
+      const barY = pos.y + 9;
       const barW = 7;
       const fill = (agent.exp ?? 0) / (agent.expToNext ?? 100);
       const teamHex = TEAM_COLORS[agent.teamColor] ?? "#88cc88";
@@ -2064,7 +2082,7 @@ export function renderScene(
   if (useAgentOfficeStore.getState().gameModeOn) {
     for (const agent of agents) {
       if (agent.level === undefined) continue;
-      const prev = previousLevels.get(agent.id) ?? 1;
+      const prev = previousLevels.get(agent.id) ?? agent.level;
       if (agent.level > prev) {
         pokeballFlashes.set(agent.id, 20);
         const wsPos = getAgentPosition(agent.id);
@@ -2169,7 +2187,7 @@ export function renderScene(
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.globalAlpha = 1;
-    screenFlashAlpha = Math.max(0, screenFlashAlpha - 0.012);
+    screenFlashAlpha = Math.max(0, screenFlashAlpha - 0.02);
   }
 
   // Clean up agents that no longer exist — poof any that vanished without departing

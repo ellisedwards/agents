@@ -73,7 +73,7 @@ function adjustBrightness(hex: string, amount: number): string {
 
 // SVG cursors encoded as data URIs
 const CURSOR_PENCIL = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 20l1.5-4.5L17 4l3 3L8.5 18.5z' fill='%23fff' stroke='%23000' stroke-width='1'/%3E%3Cpath d='M4 20l1.5-4.5 3 3z' fill='%23ffa' stroke='%23000' stroke-width='0.5'/%3E%3Cpath d='M17 4l3 3' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E") 2 22, crosshair`;
-const CURSOR_ERASER = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Crect x='4' y='10' width='14' height='10' rx='2' fill='%23f8a' stroke='%23000' stroke-width='1' transform='rotate(-20 11 15)'/%3E%3Crect x='4' y='14' width='14' height='6' rx='1' fill='%23fff' stroke='%23000' stroke-width='0.5' transform='rotate(-20 11 17)'/%3E%3C/svg%3E") 8 20, crosshair`;
+const CURSOR_ERASER = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Crect x='4' y='10' width='14' height='10' rx='2' fill='%23f8a' stroke='%23000' stroke-width='1' transform='rotate(-20 11 15)'/%3E%3Crect x='4' y='14' width='14' height='6' rx='1' fill='%23fff' stroke='%23000' stroke-width='0.5' transform='rotate(-20 11 17)'/%3E%3C/svg%3E") 8 18, crosshair`;
 const CURSOR_PICKER = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2v6M12 16v6M2 12h6M16 12h6' stroke='%23fff' stroke-width='1.5'/%3E%3Cpath d='M12 2v6M12 16v6M2 12h6M16 12h6' stroke='%23000' stroke-width='0.5'/%3E%3Ccircle cx='12' cy='12' r='3' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='12' r='3' fill='none' stroke='%23000' stroke-width='0.5'/%3E%3C/svg%3E") 12 12, crosshair`;
 
 function getCursor(tool: Tool): string {
@@ -107,6 +107,7 @@ export function PixelEditor({ canvasRef }: PixelEditorProps) {
   const colorInputRef = useRef<HTMLInputElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
   const coordsRef = useRef<HTMLDivElement>(null);
+  const pickerPreviewRef = useRef<HTMLDivElement>(null);
 
   const pixelsRef = useRef<Map<string, DecoPixel>>(new Map());
   const sessionStartRef = useRef<DecoPixel[]>([]);
@@ -256,8 +257,39 @@ export function PixelEditor({ canvasRef }: PixelEditorProps) {
       if (coordsEl) {
         coordsEl.textContent = `${px},${py}`;
       }
+
+      // Eyedropper color preview
+      const previewEl = pickerPreviewRef.current;
+      if (previewEl) {
+        const isPickerMode = altHeld || tool === "eyedropper";
+        if (isPickerMode) {
+          // Sample color at pixel position
+          const key = `${px},${py}`;
+          const pixel = pixelsRef.current.get(key);
+          const sampleColor = pixel ? pixel.color : null;
+          // Also check rendered canvas for background colors
+          const ctx = canvas.getContext("2d");
+          let displayColor = sampleColor;
+          if (!displayColor && ctx) {
+            const imgData = ctx.getImageData(px, py, 1, 1).data;
+            if (imgData[3] > 0) {
+              displayColor = `#${imgData[0].toString(16).padStart(2,"0")}${imgData[1].toString(16).padStart(2,"0")}${imgData[2].toString(16).padStart(2,"0")}`;
+            }
+          }
+          if (displayColor) {
+            previewEl.style.left = `${e.clientX + 16}px`;
+            previewEl.style.top = `${e.clientY + 8}px`;
+            previewEl.style.backgroundColor = displayColor;
+            previewEl.style.opacity = "1";
+          } else {
+            previewEl.style.opacity = "0";
+          }
+        } else {
+          previewEl.style.opacity = "0";
+        }
+      }
     },
-    [canvasRef, brushSize]
+    [canvasRef, brushSize, altHeld, tool]
   );
 
   const hideHighlight = useCallback(() => {
@@ -265,6 +297,8 @@ export function PixelEditor({ canvasRef }: PixelEditorProps) {
     if (el) el.style.opacity = "0";
     const coordsEl = coordsRef.current;
     if (coordsEl) coordsEl.textContent = "";
+    const previewEl = pickerPreviewRef.current;
+    if (previewEl) previewEl.style.opacity = "0";
   }, []);
 
   const pickColor = useCallback(
@@ -407,6 +441,21 @@ export function PixelEditor({ canvasRef }: PixelEditorProps) {
           borderColor: tool === "eraser"
             ? "rgba(255,100,100,0.25)"
             : "rgba(100,160,255,0.20)",
+          transition: "opacity 0.1s",
+        }}
+      />
+
+      {/* Eyedropper color preview — follows cursor */}
+      <div
+        ref={pickerPreviewRef}
+        className="pointer-events-none fixed z-30"
+        style={{
+          opacity: 0,
+          width: 14,
+          height: 14,
+          border: "2px solid rgba(255,255,255,0.8)",
+          borderRadius: 2,
+          boxShadow: "0 1px 4px rgba(0,0,0,0.5)",
           transition: "opacity 0.1s",
         }}
       />

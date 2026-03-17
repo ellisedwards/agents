@@ -9,7 +9,7 @@ import type { AgentState, AgentActivityState, MageColorIndex } from "../../share
 const CLAUDE_DIR = path.join(os.homedir(), ".claude", "projects");
 const STALE_MS = 15 * 60 * 1000; // 15 minutes
 const SUBAGENT_STALE_MS = 30 * 60 * 1000; // 30 minutes — MCP tool calls don't update JSONL mtime
-const LOUNGE_MS = 2 * 60 * 1000; // 2 minutes idle → lounging
+const LOUNGE_MS = 5 * 60 * 1000; // 5 minutes idle → lounging
 const SCAN_INTERVAL_MS = 3_000;
 const WATCH_INTERVAL_MS = 500;
 const MAX_WATCHED = 20;

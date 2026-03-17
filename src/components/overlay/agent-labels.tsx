@@ -9,7 +9,7 @@ import {
   type CanvasTransform,
 } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
-import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, getAgentSlot, getSlotMap, setAgentCharacter, getAgentCharacter, STARTERS } from "../scene/renderer";
+import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, getAgentSlot, getSlotMap, setAgentCharacter, getAgentCharacter, STARTERS, getLastDeskPos } from "../scene/renderer";
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
 
@@ -166,6 +166,54 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       onClick={handleClick}
       style={{ pointerEvents: "auto" }}
     >
+      {/* Game mode floating stats panel */}
+      {gameModeOn && (() => {
+        const ccMains = agents.filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined));
+        if (ccMains.length === 0) return null;
+        const record = parseInt(localStorage.getItem("game-mode-record") ?? "1", 10);
+        const maxLevel = Math.max(...ccMains.map(a => a.level ?? 1), 1);
+        if (maxLevel > record) localStorage.setItem("game-mode-record", String(maxLevel));
+        return (
+          <div className="absolute top-2 left-2 z-30 bg-[#1e1e2e]/90 border border-white/10 rounded-md px-3 py-2 space-y-1.5">
+            {ccMains.map(a => {
+              const teamHex = TEAM_COLORS[a.teamColor] ?? "#88cc88";
+              const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
+              const isRecord = (a.level ?? 1) >= record && record > 1;
+              return (
+                <div key={a.id} className="grid items-center gap-x-2" style={{ gridTemplateColumns: "10px 50px 14px 28px 50px auto" }}>
+                  <span style={{ color: teamHex }} className="text-[11px]">●</span>
+                  <span className="font-mono text-[11px] text-white/70 truncate">
+                    {a.gameName ?? a.name}
+                  </span>
+                  <span className="text-[9px] text-center">{isRecord ? "👑" : ""}</span>
+                  <span className="font-mono text-[10px] text-white/40 text-right">
+                    Lv{a.level ?? 1}
+                  </span>
+                  <div style={{ width: "50px", height: "4px", position: "relative", borderRadius: "2px", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", inset: 0, background: `${teamHex}33` }} />
+                    <div style={{
+                      position: "absolute", top: 0, left: 0, bottom: "1px",
+                      width: `${fill * 100}%`,
+                      background: teamHex,
+                    }} />
+                    <div style={{
+                      position: "absolute", bottom: 0, left: 0,
+                      width: `${fill * 100}%`, height: "1px",
+                      background: `${teamHex}80`,
+                    }} />
+                  </div>
+                  {a.title ? (
+                    <span className="font-mono text-[9px] text-white/30 italic truncate">
+                      {a.title}
+                    </span>
+                  ) : <span />}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Edit + Settings buttons */}
       <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
         {/* Edit button + dropdown */}
@@ -450,15 +498,20 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         // Use actual rendered position from the scene
         const walkPos = getAgentPosition(agent.id);
         const pos = deskMap.get(agent.id);
-        if (!walkPos && !pos) return null;
+        const savedDesk = getLastDeskPos(agent.id);
+        if (!walkPos && !pos && !savedDesk) return null;
         const oY = getThemeById(themeId).floorOffsetY ?? 0;
-        const charX = walkPos ? walkPos.x : pos!.characterX;
-        const charY = walkPos ? walkPos.y : pos!.characterY + oY;
+        // Lounging CC agents: keep label at desk, not wandering position
+        const isLounging = agent.state === "lounging";
+        const labelPos = (isLounging && savedDesk) ? savedDesk : null;
+        const charX = labelPos ? labelPos.x : walkPos ? walkPos.x : pos ? pos.characterX : savedDesk!.x;
+        const charY = labelPos ? labelPos.y : walkPos ? walkPos.y : pos ? pos.characterY + oY : savedDesk!.y;
 
         const domPos = canvasToDOM(transform, charX, charY);
 
         const isHovered = hoveredId === agent.id;
         const isActive = agent.currentTool !== null;
+        const isSubagent = agent.subagentClass !== null && agent.subagentClass !== undefined;
         const teamHex = TEAM_COLORS[agent.teamColor] ?? "#88cc88";
 
         return (
@@ -469,7 +522,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 className="absolute font-mono font-bold px-2 py-1 bg-[#181825]/90 rounded whitespace-nowrap pointer-events-none transition-opacity duration-150"
                 style={{
                   left: domPos.x,
-                  top: domPos.y - 14 * transform.scale,
+                  top: domPos.y - 22 * transform.scale,
                   transform: "translateX(-50%)",
                   fontSize: "15px",
                   color: teamHex,
@@ -481,8 +534,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 {agent.currentTool}
               </div>
             )}
-            {/* Name tag — below character */}
-            {(isHovered || labelsOn || debugOn) && (
+            {/* Name tag — below character (subagents only in debug mode) */}
+            {(isHovered || (labelsOn && (!isSubagent || debugOn)) || debugOn) && (
               <div
                 className="absolute font-mono font-bold whitespace-nowrap pointer-events-none transition-opacity duration-150 flex flex-col items-center"
                 style={{
@@ -490,29 +543,24 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                   top: domPos.y + 16 * transform.scale,
                   transform: "translateX(-50%)",
                   opacity: isHovered ? 1 : (labelsOn || debugOn) ? 0.7 : 0,
-                  textShadow: "0 1px 3px rgba(0,0,0,0.8)",
                 }}
               >
-                <span style={{
-                  fontSize: "13px",
-                  color: agent.source === "openclaw" ? "#cc3333" : teamHex,
-                }}>
+                <span
+                  className="px-2 py-0.5 rounded"
+                  style={{
+                    fontSize: "13px",
+                    color: "#ffffff",
+                    backgroundColor: gameModeOn ? `${teamHex}cc` : "#181825e6",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.6)",
+                  }}
+                >
                   {gameModeOn && agent.gameName ? agent.gameName : agent.name}
                 </span>
-                {gameModeOn && agent.title && (
-                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>
-                    &ldquo;{agent.title}&rdquo;
-                  </span>
-                )}
                 {gameModeOn && agent.level !== undefined && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "3px", marginTop: "1px" }}>
-                    <div style={{
-                      width: "20px", height: "2px",
-                      background: `linear-gradient(to right, ${teamHex} ${((agent.exp ?? 0) / (agent.expToNext ?? 100)) * 100}%, ${teamHex}33 ${((agent.exp ?? 0) / (agent.expToNext ?? 100)) * 100}%)`,
-                      borderRadius: "1px",
-                    }} />
-                    <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.6)" }}>Lv{agent.level}</span>
-                  </div>
+                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", marginTop: "2px" }}>
+                    {agent.title && <span style={{ fontStyle: "italic" }}>&ldquo;{agent.title}&rdquo; </span>}
+                    <span>Lv{agent.level}</span>
+                  </span>
                 )}
                 {debugOn && (() => {
                   const slot = getAgentSlot(agent.id);

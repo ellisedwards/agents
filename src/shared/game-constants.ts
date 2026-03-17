@@ -1,7 +1,7 @@
 // src/shared/game-constants.ts
 
 // --- Leveling Curve ---
-const BASE_EXP = 100;
+const BASE_EXP = 200;
 const LEVEL_MULTIPLIER = 1.5;
 
 export function expForLevel(level: number): number {

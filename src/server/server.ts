@@ -30,6 +30,38 @@ function clawGet(claw: string, urlPath: string, timeoutSec = 2): Promise<any> {
   });
 }
 
+// POST to claw via curl (for sparkle endpoint etc.)
+function clawPost(claw: string, urlPath: string, body: object, timeoutSec = 3): Promise<any> {
+  const url = `${claw}${urlPath}`;
+  return new Promise((resolve, reject) => {
+    execFile("curl", [
+      "-s", "-X", "POST",
+      "-H", "Content-Type: application/json",
+      "-d", JSON.stringify(body),
+      "--connect-timeout", String(timeoutSec),
+      "--max-time", String(timeoutSec),
+      url,
+    ], { timeout: (timeoutSec * 1000) + 1000 }, (err, stdout) => {
+      if (err) return reject(new Error(`claw unreachable: ${urlPath}`));
+      try { resolve(JSON.parse(stdout || "{}")); }
+      catch { resolve({}); }
+    });
+  });
+}
+
+// Yeelight level-up sparkle — fire-and-forget
+const lastSparkleTime = new Map<number, number>();
+function triggerLevelUpSparkle(slotIndex: number) {
+  const now = Date.now();
+  const last = lastSparkleTime.get(slotIndex) ?? 0;
+  if (now - last < 5000) return; // 5s cooldown
+  lastSparkleTime.set(slotIndex, now);
+  clawPost(claw, "/hook/agent-slots/sparkle", {
+    slot: slotIndex,
+    duration: 2.0,
+  }).catch(() => {}); // silent fail
+}
+
 // --- Auto-recovery: reconnect matrix if socket dies ---
 let lastMatrixConnected = true;
 let autoRecoveryInProgress = false;
@@ -260,6 +292,37 @@ app.get("*", (_req, res) => {
 
 // --- Start ---
 watcher.start();
+
+// Level-up sparkle: check for level-ups on each agent emission
+watcher.on("agents", (agents: AgentState[]) => {
+  if (!watcher.expTracker.isEnabled()) return;
+  for (const agent of agents) {
+    if (agent.source !== "cc") continue;
+    if (watcher.expTracker.consumeLevelUp(agent.id)) {
+      // Find this agent's claw slot by querying slot detail
+      // Use cached slot data from the last /api/pixels fetch if available
+      // Simple approach: query claw for slot info, match by project dir name
+      const projectsIdx = agent.id.indexOf("/.claude/projects/");
+      if (projectsIdx < 0) continue;
+      const projectDir = agent.id.slice(projectsIdx + 18).split("/")[0];
+      clawGet(claw, "/hook/agent-slots").then((data) => {
+        if (!data?.slots_detail) return;
+        for (let s = 0; s < data.slots_detail.length; s++) {
+          const detail = data.slots_detail[s];
+          if (detail.name && projectDir.includes(detail.name)) {
+            triggerLevelUpSparkle(s);
+            return;
+          }
+          if (detail.session_id && agent.id.includes(detail.session_id)) {
+            triggerLevelUpSparkle(s);
+            return;
+          }
+        }
+      }).catch(() => {});
+    }
+  }
+});
+
 checkAndAutoRecover(claw);
 const server = app.listen(config.port, () => {
   console.log(`Agent Office running at http://localhost:${config.port}`);

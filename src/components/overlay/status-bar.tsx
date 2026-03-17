@@ -151,60 +151,7 @@ export function StatusBar() {
         </button>
       )}
 
-      {/* Game mode per-agent EXP display */}
-      {gameModeOn && (() => {
-        const ccMains = agents.filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined));
-        const record = parseInt(localStorage.getItem("game-mode-record") ?? "1", 10);
-
-        // Update record if any agent beats it
-        const maxLevel = Math.max(...ccMains.map(a => a.level ?? 1), 1);
-        if (maxLevel > record) localStorage.setItem("game-mode-record", String(maxLevel));
-
-        return (
-          <div className="flex items-center gap-3">
-            {ccMains.map(a => {
-              const teamHex = TEAM_COLORS[a.teamColor] ?? "#88cc88";
-              const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
-              const isRecord = (a.level ?? 1) >= record && record > 1;
-              const pulseTime = levelUpPulses.current.get(a.id) ?? 0;
-              const isPulsing = Date.now() - pulseTime < 500;
-              return (
-                <div key={a.id} className="flex items-center gap-1.5" style={{
-                  background: isPulsing ? `${teamHex}4D` : "transparent",
-                  transition: "background 0.5s",
-                  borderRadius: "3px",
-                  padding: "0 3px",
-                }}>
-                  <span style={{ color: teamHex }} className="text-[10px]">●</span>
-                  <span className="font-mono text-[10px] text-white/60">
-                    {a.gameName ?? a.name}
-                  </span>
-                  {isRecord && <span className="text-[8px]">👑</span>}
-                  <span className="font-mono text-[10px] text-white/40">
-                    Lv{a.level ?? 1}
-                  </span>
-                  <div style={{ width: "40px", height: "3px", position: "relative", borderRadius: "1px", overflow: "hidden" }}>
-                    <div style={{
-                      position: "absolute", inset: 0,
-                      background: `${teamHex}33`,
-                    }} />
-                    <div style={{
-                      position: "absolute", top: 0, left: 0, bottom: 0,
-                      width: `${fill * 100}%`,
-                      background: teamHex,
-                    }} />
-                    <div style={{
-                      position: "absolute", bottom: 0, left: 0,
-                      width: `${fill * 100}%`, height: "1px",
-                      background: `${teamHex}99`,
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
+      {/* Game mode stats moved to floating panel in agent-labels */}
 
       {/* Relay indicator */}
       {relayMessages.length > 0 && (
