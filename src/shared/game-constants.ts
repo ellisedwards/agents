@@ -1,13 +1,10 @@
 // src/shared/game-constants.ts
 
-// --- Leveling Curve ---
-const BASE_EXP = 200;
-const LEVEL_MULTIPLIER = 1.5;
-
+// --- Leveling Curve (FF-style quadratic) ---
+// Lv1→2: 25 exp, Lv10: 80 exp, Lv50: 520 exp, Lv99: 1495 exp
+// Total to 99: ~60k exp (~5-6k tool uses over multi-day sessions)
 export function expForLevel(level: number): number {
-  let exp = BASE_EXP;
-  for (let i = 1; i < level; i++) exp = Math.floor(exp * LEVEL_MULTIPLIER);
-  return exp;
+  return Math.floor(20 + level * level * 0.1 + level * 5);
 }
 
 // --- EXP Awards ---

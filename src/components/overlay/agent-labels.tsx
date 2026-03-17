@@ -217,22 +217,18 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     {/* EXP bar + counter */}
                     <div className="flex flex-col shrink-0" style={{ width: "120px" }}>
                       <div className="relative" style={{ width: "120px", height: "14px" }}>
-                        {/* Filled portion */}
-                        <div className="absolute top-0 left-0 h-full rounded-l-[3.5px]" style={{
-                          width: `${fill * 100}%`,
-                          backgroundColor: teamHex,
-                          borderTopRightRadius: fill >= 1 ? "3.5px" : 0,
-                          borderBottomRightRadius: fill >= 1 ? "3.5px" : 0,
-                        }} />
-                        {/* Unfilled portion */}
-                        <div className="absolute top-0 h-full rounded-r-[3.5px]" style={{
-                          left: `${fill * 100}%`,
-                          width: `${(1 - fill) * 100}%`,
+                        {/* Track (team color at low opacity, always full width, fully rounded) */}
+                        <div className="absolute inset-0 rounded-[3.5px]" style={{
                           backgroundColor: teamHex,
                           opacity: 0.33,
-                          borderTopLeftRadius: fill <= 0 ? "3.5px" : 0,
-                          borderBottomLeftRadius: fill <= 0 ? "3.5px" : 0,
                         }} />
+                        {/* Fill bar (always fully rounded on both ends) */}
+                        {fill > 0 && (
+                          <div className="absolute top-0 left-0 h-full rounded-[3.5px]" style={{
+                            width: `${Math.max(fill * 100, 5)}%`,
+                            backgroundColor: teamHex,
+                          }} />
+                        )}
                         {/* Border overlay */}
                         <div className="absolute inset-0 rounded-[3.5px] border-[1.5px] border-[#696969]" />
                       </div>
