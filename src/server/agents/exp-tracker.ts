@@ -216,10 +216,17 @@ export class ExpTracker {
     }
   }
 
+  private lastThinkingExp = new Map<string, number>(); // agentId → timestamp
+  private static readonly THINKING_COOLDOWN_MS = 30_000; // 30s between thinking exp
+
   onThinking(agentId: string, allAgents: AgentState[]): void {
     if (!this.enabled) return;
     const agent = allAgents.find(a => a.id === agentId);
     if (agent && (agent.state === "lounging" || agent.state === "departing")) return;
+    const now = Date.now();
+    const last = this.lastThinkingExp.get(agentId) ?? 0;
+    if (now - last < ExpTracker.THINKING_COOLDOWN_MS) return;
+    this.lastThinkingExp.set(agentId, now);
     const d = this.getOrCreate(agentId);
     this.awardExp(d, EXP_AWARDS.thinking);
   }
@@ -248,22 +255,25 @@ export class ExpTracker {
     // Subagents don't get game names or display fields (they're transient)
     if (isSubagent) return null;
 
-    const masteries: string[] = [];
+    // Find the dominant tool (most used that has a mastery title)
+    let topTool: string | null = null;
+    let topCount = 0;
     for (const [tool, count] of Object.entries(d.toolCounts)) {
-      if (count >= TOOL_MASTERY_THRESHOLD && TOOL_MASTERY[tool]) {
-        const title = TOOL_MASTERY[tool];
-        if (!masteries.includes(title)) masteries.push(title);
+      if (count >= TOOL_MASTERY_THRESHOLD && TOOL_MASTERY[tool] && count > topCount) {
+        topTool = tool;
+        topCount = count;
       }
     }
+    const masteryTitle = topTool ? TOOL_MASTERY[topTool] : null;
 
     return {
       exp: d.exp,
       level: d.level,
       expToNext: d.expToNext,
       streak: d.streak,
-      title: masteries[0] ?? getLevelTitle(d.level),
+      title: masteryTitle ?? getLevelTitle(d.level),
       gameName: d.gameName,
-      toolMasteries: masteries.length > 0 ? masteries : undefined,
+      toolMasteries: masteryTitle ? [masteryTitle] : undefined,
     };
   }
 

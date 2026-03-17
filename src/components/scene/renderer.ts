@@ -2090,7 +2090,7 @@ export function renderScene(
     for (const agent of agents) {
       if (agent.level === undefined) continue;
       const prev = previousLevels.get(agent.id) ?? agent.level;
-      if (agent.level > prev && agent.level - prev === 1) {
+      if (agent.level > prev && agent.level - prev <= 3) {
         pokeballFlashes.set(agent.id, 20);
         const wsPos = getAgentPosition(agent.id);
         const deskPos = deskMap.get(agent.id);
