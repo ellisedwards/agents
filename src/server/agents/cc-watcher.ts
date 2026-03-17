@@ -7,7 +7,7 @@ import type { ExpTracker } from "./exp-tracker";
 import type { AgentState, AgentActivityState, MageColorIndex } from "../../shared/types";
 
 const CLAUDE_DIR = path.join(os.homedir(), ".claude", "projects");
-const STALE_MS = 15 * 60 * 1000; // 15 minutes
+const STALE_MS = 30 * 60 * 1000; // 30 minutes
 const SUBAGENT_STALE_MS = 30 * 60 * 1000; // 30 minutes — MCP tool calls don't update JSONL mtime
 const LOUNGE_MS = 5 * 60 * 1000; // 5 minutes idle → lounging
 const SCAN_INTERVAL_MS = 3_000;
