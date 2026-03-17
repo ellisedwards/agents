@@ -17,7 +17,7 @@ export interface SpriteDefinition {
   builtIn: boolean; // true = from code, false = user-created
 }
 
-export type EditorTool = "pencil" | "eraser" | "eyedropper" | "fill" | "move";
+export type EditorTool = "pencil" | "eraser" | "eyedropper" | "fill" | "select";
 
 export interface EditorState {
   activeSpriteId: string | null;

@@ -27,6 +27,14 @@ const PALETTE = [
   "#FFCADF", "#F8CCD6", "#EB3B36", "#C8484D", "#AB3F00", "#8E7D03",
 ];
 
+// ─── Selection rectangle type ───────────────────────────────────────────────
+interface SelectionRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 // ─── Preview component ─────────────────────────────────────────────────────
 function SpritePreview({ pixels, width, height, scale = 1, className = "" }: {
   pixels: Map<string, string>;
@@ -108,6 +116,16 @@ export function SpriteEditor() {
   const colorInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Selection state
+  const [selection, setSelection] = useState<SelectionRect | null>(null);
+  const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
+  const [selectedPixels, setSelectedPixels] = useState<Map<string, string>>(new Map());
+  const [movingSelection, setMovingSelection] = useState(false);
+  const [moveStart, setMoveStart] = useState<{ x: number; y: number } | null>(null);
+
+  // Clipboard for copy/paste frames
+  const clipboardRef = useRef<Map<string, string> | null>(null);
+
   const selected = allSprites.find(s => s.id === selectedId) ?? null;
 
   // Load frame pixels when selection changes
@@ -118,6 +136,8 @@ export function SpriteEditor() {
     setPixels(pixelRectsToMap(frame.pixels));
     setUndoStack([]);
     setRedoStack([]);
+    setSelection(null);
+    setSelectedPixels(new Map());
   }, [selectedId, frameIndex, selected?.id]);
 
   // Animation loop
@@ -130,21 +150,6 @@ export function SpriteEditor() {
     }, 250);
     return () => clearInterval(id);
   }, [animating, selected]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "b" || e.key === "p") setTool("pencil");
-      else if (e.key === "e") setTool("eraser");
-      else if (e.key === "i") setTool("eyedropper");
-      else if (e.key === "g") setShowGrid(v => !v);
-      else if (e.key === "f") setTool("fill");
-      else if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
-      else if ((e.metaKey || e.ctrlKey) && (e.key === "z" && e.shiftKey || e.key === "y")) { e.preventDefault(); redo(); }
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [undoStack, redoStack]);
 
   const pushUndo = useCallback(() => {
     setUndoStack(prev => [...prev.slice(-50), new Map(pixels)]);
@@ -171,6 +176,100 @@ export function SpriteEditor() {
     });
   }, [pixels]);
 
+  // Flip horizontal
+  const flipH = useCallback(() => {
+    if (!selected) return;
+    pushUndo();
+    const newPixels = new Map<string, string>();
+    for (const [key, c] of pixels) {
+      const { x, y } = parsePixelKey(key);
+      newPixels.set(pixelKey(selected.width - 1 - x, y), c);
+    }
+    setPixels(newPixels);
+  }, [selected, pixels, pushUndo]);
+
+  // Flip vertical
+  const flipV = useCallback(() => {
+    if (!selected) return;
+    pushUndo();
+    const newPixels = new Map<string, string>();
+    for (const [key, c] of pixels) {
+      const { x, y } = parsePixelKey(key);
+      newPixels.set(pixelKey(x, selected.height - 1 - y), c);
+    }
+    setPixels(newPixels);
+  }, [selected, pixels, pushUndo]);
+
+  // Shift all pixels by dx, dy
+  const shiftPixels = useCallback((dx: number, dy: number) => {
+    if (!selected) return;
+    pushUndo();
+    const newPixels = new Map<string, string>();
+    for (const [key, c] of pixels) {
+      const { x, y } = parsePixelKey(key);
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx >= 0 && nx < selected.width && ny >= 0 && ny < selected.height) {
+        newPixels.set(pixelKey(nx, ny), c);
+      }
+    }
+    setPixels(newPixels);
+  }, [selected, pixels, pushUndo]);
+
+  // Clear current frame
+  const clearFrame = useCallback(() => {
+    if (!selected) return;
+    pushUndo();
+    setPixels(new Map());
+  }, [selected, pushUndo]);
+
+  // Clear selection
+  const clearSelection = useCallback(() => {
+    setSelection(null);
+    setSelectedPixels(new Map());
+    setMovingSelection(false);
+    setMoveStart(null);
+    setSelectionStart(null);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      // Don't handle shortcuts if a text input is focused
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      if (e.key === "b" || e.key === "p") setTool("pencil");
+      else if (e.key === "e") setTool("eraser");
+      else if (e.key === "i") setTool("eyedropper");
+      else if (e.key === "g") setShowGrid(v => !v);
+      else if (e.key === "f") setTool("fill");
+      else if (e.key === "s") setTool("select");
+      else if (e.key === "Escape") clearSelection();
+      else if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if ((e.metaKey || e.ctrlKey) && (e.key === "z" && e.shiftKey || e.key === "y")) { e.preventDefault(); redo(); }
+      // Copy/Paste frame (Cmd+C / Cmd+V)
+      else if ((e.metaKey || e.ctrlKey) && e.key === "c") {
+        e.preventDefault();
+        clipboardRef.current = new Map(pixels);
+      }
+      else if ((e.metaKey || e.ctrlKey) && e.key === "v") {
+        e.preventDefault();
+        if (clipboardRef.current) {
+          pushUndo();
+          setPixels(new Map(clipboardRef.current));
+        }
+      }
+      // Arrow keys shift all pixels
+      else if (e.key === "ArrowUp") { e.preventDefault(); shiftPixels(0, -1); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); shiftPixels(0, 1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); shiftPixels(-1, 0); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); shiftPixels(1, 0); }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [undoStack, redoStack, pixels, pushUndo, shiftPixels, clearSelection, undo, redo]);
+
   // Flood fill
   const floodFill = useCallback((startX: number, startY: number, fillColor: string) => {
     if (!selected) return;
@@ -194,12 +293,26 @@ export function SpriteEditor() {
     setPixels(newPixels);
   }, [pixels, selected]);
 
+  // Check if a pixel is inside the selection
+  const isInSelection = useCallback((px: number, py: number): boolean => {
+    if (!selection) return false;
+    return px >= selection.x && px < selection.x + selection.w &&
+           py >= selection.y && py < selection.y + selection.h;
+  }, [selection]);
+
   const handleCanvasInteraction = useCallback((e: React.MouseEvent, isStart: boolean) => {
     if (!selected || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / zoom);
     const y = Math.floor((e.clientY - rect.top) / zoom);
     if (x < 0 || x >= selected.width || y < 0 || y >= selected.height) return;
+
+    // Right-click eyedropper
+    if (e.button === 2) {
+      const c = pixels.get(pixelKey(x, y));
+      if (c) setColor(c);
+      return;
+    }
 
     if (tool === "eyedropper") {
       const c = pixels.get(pixelKey(x, y));
@@ -214,6 +327,65 @@ export function SpriteEditor() {
       return;
     }
 
+    // Select tool
+    if (tool === "select") {
+      if (isStart) {
+        // Check if clicking inside existing selection to move it
+        if (selection && isInSelection(x, y) && selectedPixels.size > 0) {
+          setMovingSelection(true);
+          setMoveStart({ x, y });
+          return;
+        }
+        // Start new selection
+        clearSelection();
+        setSelectionStart({ x, y });
+        setSelection({ x, y, w: 1, h: 1 });
+      } else {
+        // Dragging to form selection or moving
+        if (movingSelection && moveStart && selection) {
+          const dx = x - moveStart.x;
+          const dy = y - moveStart.y;
+          if (dx === 0 && dy === 0) return;
+
+          pushUndo();
+          // Move selected pixels
+          const newPixels = new Map(pixels);
+          // Remove old positions of selected pixels
+          for (const [key] of selectedPixels) {
+            newPixels.delete(key);
+          }
+          // Place at new positions
+          const newSelectedPixels = new Map<string, string>();
+          for (const [key, c] of selectedPixels) {
+            const pos = parsePixelKey(key);
+            const nx = pos.x + dx;
+            const ny = pos.y + dy;
+            if (nx >= 0 && nx < selected.width && ny >= 0 && ny < selected.height) {
+              newPixels.set(pixelKey(nx, ny), c);
+              newSelectedPixels.set(pixelKey(nx, ny), c);
+            }
+          }
+          setPixels(newPixels);
+          setSelectedPixels(newSelectedPixels);
+          setSelection({
+            x: selection.x + dx,
+            y: selection.y + dy,
+            w: selection.w,
+            h: selection.h,
+          });
+          setMoveStart({ x, y });
+        } else if (selectionStart) {
+          // Resize selection rectangle
+          const sx = Math.min(selectionStart.x, x);
+          const sy = Math.min(selectionStart.y, y);
+          const ex = Math.max(selectionStart.x, x);
+          const ey = Math.max(selectionStart.y, y);
+          setSelection({ x: sx, y: sy, w: ex - sx + 1, h: ey - sy + 1 });
+        }
+      }
+      return;
+    }
+
     if (isStart) pushUndo();
 
     setPixels(prev => {
@@ -225,7 +397,42 @@ export function SpriteEditor() {
       }
       return next;
     });
-  }, [selected, zoom, tool, color, pixels, pushUndo, floodFill]);
+  }, [selected, zoom, tool, color, pixels, pushUndo, floodFill, selection, selectionStart, selectedPixels, movingSelection, moveStart, isInSelection, clearSelection]);
+
+  // Finalize selection on mouseUp (capture pixels inside selection)
+  const handleCanvasMouseUp = useCallback(() => {
+    setDrawing(false);
+    if (tool === "select" && movingSelection) {
+      setMovingSelection(false);
+      setMoveStart(null);
+      return;
+    }
+    if (tool === "select" && selection && selectionStart) {
+      // Capture pixels within the selection
+      const captured = new Map<string, string>();
+      for (let py = selection.y; py < selection.y + selection.h; py++) {
+        for (let px = selection.x; px < selection.x + selection.w; px++) {
+          const key = pixelKey(px, py);
+          const c = pixels.get(key);
+          if (c) captured.set(key, c);
+        }
+      }
+      setSelectedPixels(captured);
+      setSelectionStart(null);
+    }
+  }, [tool, selection, selectionStart, pixels, movingSelection]);
+
+  // Right-click handler to prevent context menu
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!selected || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / zoom);
+    const y = Math.floor((e.clientY - rect.top) / zoom);
+    if (x < 0 || x >= selected.width || y < 0 || y >= selected.height) return;
+    const c = pixels.get(pixelKey(x, y));
+    if (c) setColor(c);
+  }, [selected, zoom, pixels]);
 
   // Save current pixels back to sprite definition
   const saveFrame = useCallback(() => {
@@ -344,6 +551,16 @@ export function SpriteEditor() {
       {/* ─── Left: Library ────────────────────────────────────── */}
       <div className="w-[200px] bg-[#0e0e1a] border-r border-white/10 flex flex-col">
         <div className="p-3 border-b border-white/10">
+          {/* Exit button */}
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => { window.location.href = "/"; }}
+              className="text-[10px] text-white/40 hover:text-white/80 transition-colors flex items-center gap-1"
+              title="Back to Office"
+            >
+              <span className="text-[12px]">&larr;</span> Back to Office
+            </button>
+          </div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] text-white/60 font-bold tracking-wider">SPRITES</span>
             <button
@@ -392,6 +609,7 @@ export function SpriteEditor() {
               ["eraser", "E"],
               ["eyedropper", "I"],
               ["fill", "F"],
+              ["select", "S"],
             ] as [EditorTool, string][]).map(([t, key]) => (
               <button
                 key={t}
@@ -404,6 +622,26 @@ export function SpriteEditor() {
                 {t}
               </button>
             ))}
+          </div>
+
+          <div className="w-px h-5 bg-white/10" />
+
+          {/* Flip buttons */}
+          <div className="flex gap-1">
+            <button
+              onClick={flipH}
+              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors"
+              title="Flip Horizontal"
+            >
+              Flip H
+            </button>
+            <button
+              onClick={flipV}
+              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors"
+              title="Flip Vertical"
+            >
+              Flip V
+            </button>
           </div>
 
           <div className="w-px h-5 bg-white/10" />
@@ -476,6 +714,11 @@ export function SpriteEditor() {
 
           {/* Actions */}
           <div className="flex gap-1">
+            <button onClick={clearFrame}
+              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8"
+              title="Clear all pixels in this frame">
+              Clear
+            </button>
             <button onClick={undo} disabled={undoStack.length === 0}
               className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 disabled:opacity-20">
               Undo
@@ -503,13 +746,30 @@ export function SpriteEditor() {
                 ref={canvasRef}
                 width={canvasWidth}
                 height={canvasHeight}
-                className="cursor-crosshair"
+                className={tool === "select" ? "cursor-crosshair" : "cursor-crosshair"}
                 style={{ imageRendering: "pixelated" }}
-                onMouseDown={e => { setDrawing(true); handleCanvasInteraction(e, true); }}
+                onMouseDown={e => { if (e.button === 2) return; setDrawing(true); handleCanvasInteraction(e, true); }}
                 onMouseMove={e => { if (drawing) handleCanvasInteraction(e, false); }}
-                onMouseUp={() => setDrawing(false)}
-                onMouseLeave={() => setDrawing(false)}
+                onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={() => { setDrawing(false); setMovingSelection(false); }}
+                onContextMenu={handleContextMenu}
               />
+              {/* Selection overlay */}
+              {selection && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: selection.x * zoom,
+                    top: selection.y * zoom,
+                    width: selection.w * zoom,
+                    height: selection.h * zoom,
+                    border: "1px dashed rgba(255,255,255,0.8)",
+                    pointerEvents: "none",
+                    boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                    animation: "marching-ants 0.5s linear infinite",
+                  }}
+                />
+              )}
               {/* Render pixels + grid on canvas */}
               <CanvasRenderer
                 canvasRef={canvasRef}
@@ -520,6 +780,7 @@ export function SpriteEditor() {
                 showGrid={showGrid}
                 showCheckerboard={showCheckerboard}
                 canvasBg={canvasBg}
+                selection={selection}
               />
             </div>
           ) : (
@@ -663,12 +924,21 @@ export function SpriteEditor() {
           </div>
         )}
       </div>
+
+      {/* Marching ants animation */}
+      <style>{`
+        @keyframes marching-ants {
+          0% { border-color: rgba(255,255,255,0.8); }
+          50% { border-color: rgba(0,0,0,0.8); }
+          100% { border-color: rgba(255,255,255,0.8); }
+        }
+      `}</style>
     </div>
   );
 }
 
-// ─── Canvas renderer (draws pixels + grid) ──────────────────────────────────
-function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg }: {
+// ─── Canvas renderer (draws pixels + grid + selection highlight) ─────────────
+function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   pixels: Map<string, string>;
   width: number;
@@ -677,6 +947,7 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
   showGrid: boolean;
   showCheckerboard: boolean;
   canvasBg: string;
+  selection: SelectionRect | null;
 }) {
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -706,6 +977,17 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
       ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
     }
 
+    // Highlight selected pixels
+    if (selection) {
+      ctx.fillStyle = "rgba(100, 150, 255, 0.15)";
+      ctx.fillRect(
+        selection.x * zoom,
+        selection.y * zoom,
+        selection.w * zoom,
+        selection.h * zoom
+      );
+    }
+
     // Grid
     if (showGrid && zoom >= 8) {
       ctx.strokeStyle = "rgba(255,255,255,0.06)";
@@ -723,7 +1005,7 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
         ctx.stroke();
       }
     }
-  }, [pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg]);
+  }, [pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection]);
 
   return null;
 }
