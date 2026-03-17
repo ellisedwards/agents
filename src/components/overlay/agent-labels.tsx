@@ -535,6 +535,36 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
               </div>
             </div>
 
+            {/* Light Test */}
+            <div className="pt-1 border-t border-white/5 space-y-1">
+              <span className="font-mono text-[10px] text-white/50 block">Light Test</span>
+              <div className="grid grid-cols-4 gap-1">
+                {[0, 1, 2, 3].map(slot => (
+                  <div key={slot} className="flex flex-col items-center gap-0.5">
+                    <span className="font-mono text-[8px] text-white/30">S{slot}</span>
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action: "sparkle" }) })}
+                        className="font-mono text-[7px] text-yellow-300/60 bg-yellow-500/10 hover:bg-yellow-500/20 rounded px-1 py-0.5 transition-colors"
+                      >sparkle</button>
+                      <button
+                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action: "thinking" }) })}
+                        className="font-mono text-[7px] text-amber-300/60 bg-amber-500/10 hover:bg-amber-500/20 rounded px-1 py-0.5 transition-colors"
+                      >think</button>
+                      <button
+                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action: "active" }) })}
+                        className="font-mono text-[7px] text-green-300/60 bg-green-500/10 hover:bg-green-500/20 rounded px-1 py-0.5 transition-colors"
+                      >active</button>
+                      <button
+                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action: "off" }) })}
+                        className="font-mono text-[7px] text-white/30 bg-white/5 hover:bg-white/10 rounded px-1 py-0.5 transition-colors"
+                      >off</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Character picker — only for starter themes */}
             {getThemeById(themeId).skins?.agent === "starter" && (() => {
               const ccAgents = agents.filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined));

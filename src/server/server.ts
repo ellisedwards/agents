@@ -161,6 +161,40 @@ app.post("/api/sparkle", express.json(), (req, res) => {
   res.json({ ok: true });
 });
 
+// Light test panel — simulate claw hooks for any slot
+app.post("/api/light-test", express.json(), async (req, res) => {
+  const { slot, action } = req.body;
+  if (slot === undefined || slot < 0 || slot > 3) return res.status(400).json({ error: "slot 0-3 required" });
+  try {
+    switch (action) {
+      case "sparkle":
+        await clawPost(claw, "/hook/agent-slots/sparkle", { slot, duration: 2.0 });
+        break;
+      case "thinking":
+        await clawPost(claw, `/hook/thinking-start?slot=${slot}`, {});
+        break;
+      case "thinking-stop":
+        await clawPost(claw, `/hook/thinking-end?slot=${slot}`, {});
+        break;
+      case "active":
+        await clawPost(claw, `/hook/prompt-start?slot=${slot}`, {});
+        break;
+      case "active-stop":
+        await clawPost(claw, `/hook/prompt-end?slot=${slot}`, {});
+        break;
+      case "off":
+        await clawPost(claw, `/hook/thinking-end?slot=${slot}`, {});
+        await clawPost(claw, `/hook/prompt-end?slot=${slot}`, {});
+        break;
+      default:
+        return res.status(400).json({ error: "unknown action" });
+    }
+    res.json({ ok: true, slot, action });
+  } catch (err: any) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // --- Game mode toggle ---
 app.get("/api/game-mode", (_req, res) => {
   const tracker = watcher.expTracker;
