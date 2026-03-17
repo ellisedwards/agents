@@ -153,6 +153,14 @@ app.post("/api/kill-agent", express.json(), (req, res) => {
   res.json({ ok: true });
 });
 
+// Client-triggered sparkle — perfectly timed with visual level-up
+app.post("/api/sparkle", express.json(), (req, res) => {
+  const { slot } = req.body;
+  if (slot === undefined || slot < 0 || slot > 3) return res.status(400).json({ error: "slot 0-3 required" });
+  triggerLevelUpSparkle(slot);
+  res.json({ ok: true });
+});
+
 // --- Game mode toggle ---
 app.get("/api/game-mode", (_req, res) => {
   const tracker = watcher.expTracker;
@@ -394,35 +402,8 @@ app.get("*", (_req, res) => {
 // --- Start ---
 watcher.start();
 
-// Level-up sparkle: check for level-ups on each agent emission
-watcher.on("agents", (agents: AgentState[]) => {
-  if (!watcher.expTracker.isEnabled()) return;
-  for (const agent of agents) {
-    if (agent.source !== "cc") continue;
-    if (watcher.expTracker.consumeLevelUp(agent.id)) {
-      // Find this agent's claw slot by querying slot detail
-      // Use cached slot data from the last /api/pixels fetch if available
-      // Simple approach: query claw for slot info, match by project dir name
-      const projectsIdx = agent.id.indexOf("/.claude/projects/");
-      if (projectsIdx < 0) continue;
-      const projectDir = agent.id.slice(projectsIdx + 18).split("/")[0];
-      clawGet(claw, "/hook/agent-slots").then((data) => {
-        if (!data?.slots_detail) return;
-        for (let s = 0; s < data.slots_detail.length; s++) {
-          const detail = data.slots_detail[s];
-          if (detail.name && projectDir.includes(detail.name)) {
-            triggerLevelUpSparkle(s);
-            return;
-          }
-          if (detail.session_id && agent.id.includes(detail.session_id)) {
-            triggerLevelUpSparkle(s);
-            return;
-          }
-        }
-      }).catch(() => {});
-    }
-  }
-});
+// Level-up sparkle is now client-driven via POST /api/sparkle
+// (client triggers at the exact visual moment, not on a server poll)
 
 checkAndAutoRecover(claw);
 const server = app.listen(config.port, () => {

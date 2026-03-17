@@ -2107,6 +2107,15 @@ export function renderScene(
         // Emit to store for HTML overlay
         const displayName = agent.gameName ?? agent.name;
         useAgentOfficeStore.getState().addLevelUp(agent.id, displayName, agent.level, agent.teamColor);
+        // Trigger claw sparkle on the agent's slot — client-driven, perfectly timed
+        const sparkleSlot = stickyQuadrants.get(agent.id);
+        if (sparkleSlot !== undefined) {
+          fetch(`/api/sparkle`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slot: sparkleSlot }),
+          }).catch(() => {});
+        }
       }
       previousLevels.set(agent.id, agent.level);
 
