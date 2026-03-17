@@ -123,6 +123,7 @@ interface AgentOfficeStore {
   setEditMode: (mode: EditMode) => void;
   setGameModeOn: (on: boolean) => void;
   setHudPosition: (pos: HudPosition) => void;
+  killAgent: (agentId: string) => void;
 }
 
 const initialTower = loadTowerPrefs();
@@ -236,6 +237,16 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setHudPosition: (pos) => {
     set({ hudPosition: pos });
     localStorage.setItem("agent-office-hud-pos", pos);
+  },
+  killAgent: (agentId) => {
+    // Remove from local store immediately
+    set({ agents: get().agents.filter(a => a.id !== agentId) });
+    // Tell server to clear this agent's exp and session
+    fetch(`/api/kill-agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentId }),
+    }).catch(() => {});
   },
 }));
 

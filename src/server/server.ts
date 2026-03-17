@@ -144,6 +144,15 @@ app.post("/api/agents/clear", (_req, res) => {
   res.json({ ok: true });
 });
 
+// Kill a specific agent — remove from watcher + clear exp
+app.post("/api/kill-agent", express.json(), (req, res) => {
+  const { agentId } = req.body;
+  if (!agentId) return res.status(400).json({ error: "agentId required" });
+  watcher.expTracker.clearAgent(agentId);
+  watcher.removeAgent(agentId);
+  res.json({ ok: true });
+});
+
 // --- Game mode toggle ---
 app.get("/api/game-mode", (_req, res) => {
   const tracker = watcher.expTracker;

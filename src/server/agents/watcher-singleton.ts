@@ -53,6 +53,12 @@ class WatcherSingleton extends EventEmitter {
     this.ccWatcher.clearAll();
     this.expTracker.clearAll();
   }
+
+  removeAgent(agentId: string) {
+    this.ccWatcher.removeAgent(agentId);
+    this.ccAgents = this.ccAgents.filter(a => a.id !== agentId);
+    this.emitMerged();
+  }
 }
 
 export function createWatcher(clawBaseUrl: string): WatcherSingleton {

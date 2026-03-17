@@ -324,6 +324,18 @@ export class ClaudeCodeWatcher extends EventEmitter {
     this.emitUpdate();
   }
 
+  /** Kill a specific agent session. Will reappear if CC is still active on next tool event. */
+  removeAgent(agentId: string) {
+    const session = this.sessions.get(agentId);
+    if (session) {
+      if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
+      fs.unwatchFile(agentId);
+      this.sessions.delete(agentId);
+      this.departedPaths.set(agentId, Date.now());
+    }
+    this.emitUpdate();
+  }
+
   /** Build current agent list (for EXP tracker context). */
   private getAgentList(): AgentState[] {
     const now = Date.now();
