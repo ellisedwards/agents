@@ -168,6 +168,8 @@ const activeLevelUps: LevelUpEffect[] = [];
 let screenFlashAlpha = 0;
 const previousLevels = new Map<string, number>();
 
+const pokeballFlashes = new Map<string, number>(); // agentId → remaining frames
+
 // Game mode: expose agent level and frame to environment.ts for golden pokeball
 const agentLevelAtDesk = new Map<number, number>(); // deskIndex → level
 let currentFrame = 0; // updated each renderScene call
@@ -1948,6 +1950,20 @@ export function renderScene(
       if (!pos) continue;
       const dx = pos.x;
       const dy = pos.y;
+
+      // Pokeball level-up flash — white→gold overlay
+      const flashFrames = pokeballFlashes.get(agent.id) ?? 0;
+      if (flashFrames > 0) {
+        pokeballFlashes.set(agent.id, flashFrames - 1);
+        const flashT = flashFrames / 20;
+        const flashColor = flashT > 0.5 ? "#ffffff" : "#ffcc44";
+        ctx.globalAlpha = flashT * 0.6;
+        ctx.fillStyle = flashColor;
+        ctx.fillRect(dx + 1, dy - 1, 7, 7); // Cover pokeball area
+        ctx.globalAlpha = 1;
+        if (flashFrames <= 1) pokeballFlashes.delete(agent.id);
+      }
+
       const isTool = agent.state === "reading" || agent.state === "typing" || agent.state === "waiting";
       if (isTool) {
         const HIRST = [
@@ -2050,6 +2066,7 @@ export function renderScene(
       if (agent.level === undefined) continue;
       const prev = previousLevels.get(agent.id) ?? 1;
       if (agent.level > prev) {
+        pokeballFlashes.set(agent.id, 20);
         const wsPos = getAgentPosition(agent.id);
         const deskPos = deskMap.get(agent.id);
         const pos = wsPos ?? deskPos;
@@ -2185,6 +2202,9 @@ export function renderScene(
   // Clean up game mode state for departed agents
   for (const id of previousLevels.keys()) {
     if (!activeIds.has(id)) previousLevels.delete(id);
+  }
+  for (const id of pokeballFlashes.keys()) {
+    if (!activeIds.has(id)) pokeballFlashes.delete(id);
   }
   // agentLevelAtDesk is cleared and rebuilt each frame, no per-agent cleanup needed
 
