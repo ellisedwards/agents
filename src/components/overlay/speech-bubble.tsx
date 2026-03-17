@@ -2,7 +2,7 @@
 import { useAgentOfficeStore } from "../store";
 import { canvasToDOM, type CanvasTransform } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
-import { getAgentPosition } from "../scene/renderer";
+import { getAgentPosition, getSlotMap } from "../scene/renderer";
 
 interface SpeechBubblesProps {
   transform: CanvasTransform;
@@ -10,8 +10,12 @@ interface SpeechBubblesProps {
 
 export function SpeechBubbles({ transform }: SpeechBubblesProps) {
   const agents = useAgentOfficeStore((s) => s.agents);
-  const waitingAgents = agents.filter((a) => a.state === "waiting");
-  const deskMap = assignDesks(agents.map((a) => a.id));
+  const deskEligible = agents.filter((a) =>
+    a.state !== "lounging" && a.state !== "departing" &&
+    (a.subagentClass === null || a.subagentClass === undefined)
+  );
+  const waitingAgents = deskEligible.filter((a) => a.state === "waiting");
+  const deskMap = assignDesks(deskEligible.map((a) => a.id), getSlotMap());
 
   return (
     <>
