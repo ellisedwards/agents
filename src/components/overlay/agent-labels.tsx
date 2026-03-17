@@ -481,7 +481,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 {agent.currentTool}
               </div>
             )}
-            {/* Name tag — below character, on hover or always if labels on */}
+            {/* Name tag — below character */}
             {(isHovered || labelsOn || debugOn) && (
               <div
                 className="absolute font-mono font-bold whitespace-nowrap pointer-events-none transition-opacity duration-150 flex flex-col items-center"
@@ -497,9 +497,24 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                   fontSize: "13px",
                   color: agent.source === "openclaw" ? "#cc3333" : teamHex,
                 }}>
-                  {agent.name}
+                  {gameModeOn && agent.gameName ? agent.gameName : agent.name}
                 </span>
-                {(labelsOn || debugOn) && (() => {
+                {gameModeOn && agent.title && (
+                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", fontStyle: "italic" }}>
+                    &ldquo;{agent.title}&rdquo;
+                  </span>
+                )}
+                {gameModeOn && agent.level !== undefined && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "3px", marginTop: "1px" }}>
+                    <div style={{
+                      width: "20px", height: "2px",
+                      background: `linear-gradient(to right, ${teamHex} ${((agent.exp ?? 0) / (agent.expToNext ?? 100)) * 100}%, ${teamHex}33 ${((agent.exp ?? 0) / (agent.expToNext ?? 100)) * 100}%)`,
+                      borderRadius: "1px",
+                    }} />
+                    <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.6)" }}>Lv{agent.level}</span>
+                  </div>
+                )}
+                {debugOn && (() => {
                   const slot = getAgentSlot(agent.id);
                   const deskIdx = deskEligible.indexOf(agent);
                   if (deskIdx < 0) return null;
