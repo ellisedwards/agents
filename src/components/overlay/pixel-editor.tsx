@@ -21,17 +21,29 @@ function storageKey(themeId: string, mode: EditMode): string {
   return `pixelEditor:${themeId}:${mode}`;
 }
 
+const decoPixelCache = new Map<string, DecoPixel[]>();
+
 export function loadDecoPixels(themeId: string, mode: EditMode): DecoPixel[] {
+  const cacheKey = `${themeId}:${mode}`;
+  const cached = decoPixelCache.get(cacheKey);
+  if (cached) return cached;
   try {
     const raw = localStorage.getItem(storageKey(themeId, mode));
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw) as DecoPixel[];
+      decoPixelCache.set(cacheKey, parsed);
+      return parsed;
+    }
   } catch {}
-  return [];
+  const empty: DecoPixel[] = [];
+  decoPixelCache.set(cacheKey, empty);
+  return empty;
 }
 
 function saveDecoPixels(themeId: string, mode: EditMode, pixels: DecoPixel[]) {
   try {
     localStorage.setItem(storageKey(themeId, mode), JSON.stringify(pixels));
+    decoPixelCache.delete(`${themeId}:${mode}`);
   } catch {}
 }
 

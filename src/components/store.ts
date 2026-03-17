@@ -26,7 +26,7 @@ export interface ClawHealth {
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
 export type TowerSize = "small" | "medium" | "large" | "monolith";
-export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base" | "pallet-town";
+export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base" | "pallet-town" | "pokemoon";
 export type EditMode = "none" | "background" | "tower-decor" | "lounge" | "posters";
 
 interface TowerPrefs {
@@ -44,9 +44,10 @@ function loadTowerPrefs(): TowerPrefs {
   if (typeof window === "undefined") return defaults;
   try {
     const raw = localStorage.getItem(TOWER_STORAGE_KEY);
+    if (!raw) return defaults;
     const parsed = JSON.parse(raw);
     if (parsed.size === "obelisk") parsed.size = "monolith";
-    if (raw) return { ...defaults, ...parsed };
+    return { ...defaults, ...parsed };
   } catch {}
   return defaults;
 }
@@ -58,7 +59,7 @@ function saveTowerPrefs(prefs: TowerPrefs) {
 }
 
 const THEME_STORAGE_KEY = "agent-office-theme";
-const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "tropical-island", "lunar-base", "pallet-town"];
+const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "tropical-island", "lunar-base", "pallet-town", "pokemoon"];
 
 function loadThemeId(): ThemeId {
   if (typeof window === "undefined") return "forest";

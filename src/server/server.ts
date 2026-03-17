@@ -7,6 +7,29 @@ import { loadConfig, clawBaseUrl } from "./config";
 import { createWatcher } from "./agents/watcher-singleton";
 import type { AgentState } from "../shared/types";
 
+// --- Claw communication via curl ---
+// Node's networking gets permanently poisoned when a destination becomes
+// temporarily unreachable (macOS per-process routing cache). Both fetch()
+// and http.get fail with EHOSTUNREACH even after the host comes back.
+// curl is immune because each invocation is a fresh process.
+function clawGet(claw: string, urlPath: string, timeoutSec = 2): Promise<any> {
+  const url = `${claw}${urlPath}`;
+  return new Promise((resolve, reject) => {
+    execFile("curl", [
+      "-s",
+      "--connect-timeout", String(timeoutSec),
+      "--max-time", String(timeoutSec),
+      url,
+    ], { timeout: (timeoutSec * 1000) + 1000 }, (err, stdout) => {
+      if (err) return reject(new Error(`claw unreachable: ${urlPath}`));
+      const trimmed = stdout.trim();
+      if (!trimmed) return reject(new Error("empty response"));
+      try { resolve(JSON.parse(trimmed)); }
+      catch { reject(new Error("bad json")); }
+    });
+  });
+}
+
 // --- Auto-recovery: reconnect matrix if socket dies ---
 let lastMatrixConnected = true;
 let autoRecoveryInProgress = false;
@@ -15,9 +38,7 @@ function checkAndAutoRecover(claw: string) {
   setInterval(async () => {
     if (autoRecoveryInProgress) return;
     try {
-      const r = await fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) });
-      if (!r.ok) return;
-      const data = await r.json();
+      const data = await clawGet(claw, "/status");
       const connected = data.connected === true;
       if (!connected && lastMatrixConnected) {
         console.log("[auto-recovery] Yeelight disconnected, running tower-reset...");
@@ -65,6 +86,10 @@ app.get("/api/agents", (req, res) => {
     Connection: "keep-alive",
   });
 
+  const heartbeat = setInterval(() => {
+    res.write(":keepalive\n\n");
+  }, 15000);
+
   const current = watcher.getAgents();
   res.write(`data: ${JSON.stringify(current)}\n\n`);
 
@@ -75,7 +100,10 @@ app.get("/api/agents", (req, res) => {
   };
 
   watcher.on("agents", onAgents);
-  req.on("close", () => watcher.off("agents", onAgents));
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    watcher.off("agents", onAgents);
+  });
 });
 
 // --- Agent management ---
@@ -87,9 +115,7 @@ app.post("/api/agents/clear", (_req, res) => {
 // --- Light brightness ---
 app.get("/api/brightness", async (_req, res) => {
   try {
-    const r = await fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) });
-    if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
-    const data = await r.json();
+    const data = await clawGet(claw, "/status");
     res.json({ brightness: data.brightness ?? null });
   } catch {
     res.status(502).json({ error: "claw unreachable" });
@@ -102,9 +128,8 @@ app.get("/api/brightness/:level", async (req, res) => {
     return res.status(400).json({ error: "brightness must be 0-100" });
   }
   try {
-    const r = await fetch(`${claw}/brightness/${level}`, { signal: AbortSignal.timeout(2000) });
-    if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
-    res.json(await r.json());
+    const data = await clawGet(claw, `/brightness/${level}`);
+    res.json(data);
   } catch {
     res.status(502).json({ error: "claw unreachable" });
   }
@@ -113,30 +138,27 @@ app.get("/api/brightness/:level", async (req, res) => {
 // --- Claw health ---
 app.get("/api/claw-health", async (_req, res) => {
   try {
-    const [statusRes, pixelsRes] = await Promise.all([
-      fetch(`${claw}/status`, { signal: AbortSignal.timeout(2000) }),
-      fetch(`${claw}/pixels`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+    const [statusData, pixelsData] = await Promise.all([
+      clawGet(claw, "/status"),
+      clawGet(claw, "/pixels").catch(() => null),
     ]);
-    if (!statusRes.ok) return res.json({ reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
-    const data = await statusRes.json();
     // Derive slot status from actual pixel data (source of truth)
     const quadrantIndices = [[15,16,20,21],[18,19,23,24],[0,1,5,6],[3,4,8,9]];
-    let slots = data.agent_slots?.slots || ["off","off","off","off"];
-    if (pixelsRes?.ok) {
-      const px = await pixelsRes.json();
-      const top = px.panels?.top || [];
+    let slots = statusData.agent_slots?.slots || ["off","off","off","off"];
+    if (pixelsData?.panels) {
+      const top = pixelsData.panels.top || [];
       slots = quadrantIndices.map((indices: number[]) =>
         indices.some((i: number) => top[i] && top[i] !== "#000000") ? "active" : "off"
       );
     }
     res.json({
       reachable: true,
-      yeelightConnected: data.connected === true,
+      yeelightConnected: statusData.connected === true,
       slots,
       activeSlots: slots.filter((s: string) => s !== "off").length,
-      matrixMode: data.claw_activity || null,
-      brightness: data.brightness ?? null,
-      animationRunning: data.animation_running ?? false,
+      matrixMode: statusData.claw_activity || null,
+      brightness: statusData.brightness ?? null,
+      animationRunning: statusData.animation_running ?? false,
     });
   } catch {
     res.json({ reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
@@ -146,12 +168,10 @@ app.get("/api/claw-health", async (_req, res) => {
 // --- Relay ---
 app.get("/api/relay", async (_req, res) => {
   try {
-    const [outRes, inRes] = await Promise.all([
-      fetch(`${claw}/relay`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
-      fetch(`${claw}/relay/reply`, { signal: AbortSignal.timeout(2000) }).catch(() => null),
+    const [outData, inData] = await Promise.all([
+      clawGet(claw, "/relay").catch(() => ({ messages: [] })),
+      clawGet(claw, "/relay/reply").catch(() => ({ replies: [] })),
     ]);
-    const outData = outRes?.ok ? await outRes.json() : { messages: [] };
-    const inData = inRes?.ok ? await inRes.json() : { replies: [] };
     // Normalize into unified format
     const messages = [
       ...(outData.messages || []).filter((m: any) => m.msg).map((m: any) => ({ from: m.from || "agent-office", msg: m.msg, time: m.time })),
@@ -179,21 +199,18 @@ app.post("/api/tower-reset", (_req, res) => {
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
   try {
-    const fetchOpts = { signal: AbortSignal.timeout(2000), keepalive: false } as RequestInit;
-    const [pixelsRes, statusRes, slotsRes] = await Promise.all([
-      fetch(`${claw}/pixels`, fetchOpts),
-      fetch(`${claw}/status`, fetchOpts).catch(() => null),
-      fetch(`${claw}/hook/agent-slots`, fetchOpts).catch(() => null),
+    const [pixelsData, statusData, slotsData] = await Promise.all([
+      clawGet(claw, "/pixels"),
+      clawGet(claw, "/status").catch(() => null),
+      clawGet(claw, "/hook/agent-slots").catch(() => null),
     ]);
-    if (!pixelsRes.ok) return res.status(pixelsRes.status).json({ error: "claw unreachable" });
-    const data = await pixelsRes.json();
-    if (statusRes?.ok) {
-      const status = await statusRes.json();
-      data.clawActivity = status.claw_activity || "idle";
+    if (!pixelsData?.panels) return res.status(502).json({ error: "claw unreachable" });
+    const data = pixelsData;
+    if (statusData) {
+      data.clawActivity = statusData.claw_activity || "idle";
     }
-    if (slotsRes?.ok) {
-      const slots = await slotsRes.json();
-      data.slotsDetail = slots.slots_detail || [];
+    if (slotsData?.slots_detail) {
+      data.slotsDetail = slotsData.slots_detail;
     }
     res.json(data);
   } catch (e) {
@@ -204,9 +221,8 @@ app.get("/api/pixels", async (_req, res) => {
 
 app.get("/api/uptime-kuma", async (_req, res) => {
   try {
-    const r = await fetch(`${claw}/hook/uptime-kuma`, { signal: AbortSignal.timeout(2000) });
-    if (!r.ok) return res.status(r.status).json({ error: "claw unreachable" });
-    res.json(await r.json());
+    const data = await clawGet(claw, "/hook/uptime-kuma");
+    res.json(data);
   } catch (e) {
     console.error("[proxy] /api/uptime-kuma error:", e);
     res.status(502).json({ error: "claw unreachable" });

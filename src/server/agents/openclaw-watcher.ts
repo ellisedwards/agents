@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { execFile } from "child_process";
 import type { AgentState, AgentActivityState } from "../../shared/types";
 
 interface OpenClawStatus {
@@ -38,21 +39,21 @@ export class OpenClawWatcher extends EventEmitter {
     }
   }
 
-  private async poll() {
-    try {
-      const res = await fetch(this.statusUrl, {
-        signal: AbortSignal.timeout(1500),
+  private poll() {
+    execFile("curl", ["-s", "--connect-timeout", "2", "--max-time", "2", this.statusUrl],
+      { timeout: 3000 }, (err, stdout) => {
+        if (err || !stdout.trim()) {
+          this.emit("update", this.makeAgent("idle", true));
+          return;
+        }
+        try {
+          const status: OpenClawStatus = JSON.parse(stdout);
+          const state = this.deriveState(status);
+          this.emit("update", this.makeAgent(state));
+        } catch {
+          this.emit("update", this.makeAgent("idle", true));
+        }
       });
-      if (res.ok) {
-        const status: OpenClawStatus = await res.json();
-        const state = this.deriveState(status);
-        this.emit("update", this.makeAgent(state));
-      } else {
-        this.emit("update", this.makeAgent("idle", true));
-      }
-    } catch {
-      this.emit("update", this.makeAgent("idle", true));
-    }
   }
 
   private deriveState(status: OpenClawStatus): AgentActivityState {

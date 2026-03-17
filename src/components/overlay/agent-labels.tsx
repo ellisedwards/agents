@@ -2,14 +2,14 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useAgentOfficeStore } from "../store";
 import type { TimeMode, TowerSize, ThemeId, EditMode } from "../store";
-import { ALL_THEMES } from "../scene/themes";
+import { ALL_THEMES, getThemeById } from "../scene/themes";
 import {
   canvasToDOM,
   domToCanvas,
   type CanvasTransform,
 } from "../canvas-transform";
 import { assignDesks } from "../scene/desk-layout";
-import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, getAgentSlot } from "../scene/renderer";
+import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, getAgentSlot, getSlotMap, setAgentCharacter, getAgentCharacter, STARTERS } from "../scene/renderer";
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
 
@@ -73,7 +73,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
     a.state !== "lounging" && a.state !== "departing" &&
     (a.subagentClass === null || a.subagentClass === undefined)
   );
-  const deskMap = assignDesks(deskEligible.map((a) => a.id));
+  const deskMap = assignDesks(deskEligible.map((a) => a.id), getSlotMap());
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -386,6 +386,31 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
               </div>
             </div>
 
+            {/* Character picker — only for starter themes */}
+            {getThemeById(themeId).skins?.agent === "starter" && (() => {
+              const ccAgents = agents.filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined));
+              if (ccAgents.length === 0) return null;
+              return (
+                <div className="pt-1 border-t border-white/5 space-y-1">
+                  <span className="font-mono text-[10px] text-white/50 block">Characters</span>
+                  {ccAgents.map(a => (
+                    <div key={a.id} className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[9px] text-white/40 truncate max-w-[50px]">{a.name}</span>
+                      <select
+                        value={getAgentCharacter(a.id) ?? "charmander"}
+                        onChange={(e) => { setAgentCharacter(a.id, e.target.value as any); }}
+                        className="bg-white/10 text-white/70 font-mono text-[9px] rounded px-1 py-0.5 border border-white/10 outline-none"
+                      >
+                        {STARTERS.map(s => (
+                          <option key={s} value={s} className="bg-[#1e1e2e]">{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {/* Build + server info */}
             <div className="pt-1 border-t border-white/5 space-y-0.5">
               <button
@@ -407,8 +432,9 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         const walkPos = getAgentPosition(agent.id);
         const pos = deskMap.get(agent.id);
         if (!walkPos && !pos) return null;
+        const oY = getThemeById(themeId).floorOffsetY ?? 0;
         const charX = walkPos ? walkPos.x : pos!.characterX;
-        const charY = walkPos ? walkPos.y : pos!.characterY;
+        const charY = walkPos ? walkPos.y : pos!.characterY + oY;
 
         const domPos = canvasToDOM(transform, charX, charY);
 
@@ -457,6 +483,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 {(labelsOn || debugOn) && (() => {
                   const slot = getAgentSlot(agent.id);
                   const deskIdx = deskEligible.indexOf(agent);
+                  if (deskIdx < 0) return null;
                   return <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>d{deskIdx}{slot !== undefined ? ` s${slot}` : ""}</span>;
                 })()}
               </div>

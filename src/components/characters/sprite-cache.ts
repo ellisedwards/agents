@@ -20,9 +20,10 @@ import { BULBASAUR_SPRITES, BULBASAUR_WIDTH, BULBASAUR_HEIGHT } from "./bulbasau
 import { TRAINER_SPRITES, TRAINER_BLINK, TRAINER_WIDTH, TRAINER_HEIGHT } from "./trainer";
 import { PIKACHU_SPRITES, PIKACHU_WIDTH, PIKACHU_HEIGHT, PIKACHU_WALK1, PIKACHU_WALK2 } from "./pikachu";
 import { JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT, JIGGLYPUFF_IDLE, JIGGLYPUFF_WALK1, JIGGLYPUFF_WALK2, JIGGLYPUFF_SLEEP, JIGGLYPUFF_STARTLED } from "./jigglypuff";
+import { MEW_SPRITES, MEW_WIDTH, MEW_HEIGHT, MEW_WALK1, MEW_WALK2, MEW_SLEEP } from "./mew";
 
 export type CharacterType = "clawd" | "claw" | `mage-${MageColorIndex}` | "cat" | "sphynx" | "gecko" | "space-cat"
-  | "charmander" | "squirtle" | "bulbasaur" | "trainer" | "pikachu" | "jigglypuff";
+  | "charmander" | "squirtle" | "bulbasaur" | "trainer" | "pikachu" | "jigglypuff" | "mew";
 
 interface CachedSprite {
   canvas: OffscreenCanvas;
@@ -138,6 +139,12 @@ export function buildSpriteCache(): Map<string, CachedSprite> {
   // Pikachu walk frames (for subagent wandering)
   cache.set("pikachu:walk1", renderToOffscreen(PIKACHU_WALK1, PIKACHU_WIDTH, PIKACHU_HEIGHT));
   cache.set("pikachu:walk2", renderToOffscreen(PIKACHU_WALK2, PIKACHU_WIDTH, PIKACHU_HEIGHT));
+
+  // Mew (starter)
+  registerAgentSprites(cache, "mew", MEW_SPRITES, MEW_WIDTH, MEW_HEIGHT);
+  cache.set("mew:walk1", renderToOffscreen(MEW_WALK1, MEW_WIDTH, MEW_HEIGHT));
+  cache.set("mew:walk2", renderToOffscreen(MEW_WALK2, MEW_WIDTH, MEW_HEIGHT));
+  cache.set("mew:sleep", renderToOffscreen(MEW_SLEEP, MEW_WIDTH, MEW_HEIGHT));
 
   // Jigglypuff (pet)
   cache.set("jigglypuff:idle", renderToOffscreen(JIGGLYPUFF_IDLE, JIGGLYPUFF_WIDTH, JIGGLYPUFF_HEIGHT));

@@ -54,8 +54,12 @@ function hashId(id: string): number {
 // Persistent desk assignments so agents don't jump around when others come/go
 const stickyDesks = new Map<string, number>();
 
+// Maps claw slot number to desk index: slot 0→front-left, 1→front-center, 2→back-left, 3→back-center
+const SLOT_TO_DESK = [0, 1, 2, 3];
+
 export function assignDesks(
-  agentIds: string[]
+  agentIds: string[],
+  slotMap?: Map<string, number> // agentId → claw slot number
 ): Map<string, DeskPosition> {
   const assignments = new Map<string, DeskPosition>();
   const activeIds = new Set(agentIds);
@@ -85,11 +89,22 @@ export function assignDesks(
       continue;
     }
 
-    // New agent — fill desks front row first (indices 3,4,5 then 0,1,2)
+    // If agent has a claw slot, use the deterministic slot→desk mapping
     let deskIdx = -1;
-    const fillOrder = [3, 4, 5, 0, 1, 2];
-    for (const i of fillOrder) {
-      if (!taken.has(i)) { deskIdx = i; break; }
+    const slot = slotMap?.get(id);
+    if (slot !== undefined && slot >= 0 && slot < SLOT_TO_DESK.length) {
+      const slotDesk = SLOT_TO_DESK[slot];
+      if (!taken.has(slotDesk)) {
+        deskIdx = slotDesk;
+      }
+    }
+
+    // Fallback — fill desks front row first (indices 3,4,5 then 0,1,2)
+    if (deskIdx === -1) {
+      const fillOrder = [3, 4, 5, 0, 1, 2];
+      for (const i of fillOrder) {
+        if (!taken.has(i)) { deskIdx = i; break; }
+      }
     }
     if (deskIdx === -1) deskIdx = DESK_POSITIONS.length; // overflow
 
@@ -98,7 +113,7 @@ export function assignDesks(
       stickyDesks.set(id, deskIdx);
       assignments.set(id, DESK_POSITIONS[deskIdx]);
     } else {
-      const overflowIdx = agentIds.indexOf(id) - DESK_POSITIONS.length;
+      const overflowIdx = Math.max(0, agentIds.indexOf(id) - DESK_POSITIONS.length);
       assignments.set(id, getOverflowPosition(overflowIdx));
     }
   }

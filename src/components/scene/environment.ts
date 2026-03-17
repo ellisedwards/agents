@@ -98,11 +98,11 @@ function drawSky(ctx: CanvasRenderingContext2D, tod: TimeOfDay, theme: SceneThem
   rect(ctx, 0, 0, W, 8, sky[0]);
   rect(ctx, 0, 8, W, 8, sky[1]);
   // Lunar base: extend sky lower for more visible horizon
-  const skyBottom = theme.id === "lunar-base" ? 20 : 10;
+  const skyBottom = (theme.id === "lunar-base" || theme.id === "pokemoon") ? 20 : 10;
   rect(ctx, 0, 16, W, skyBottom, sky[2]);
 
   // Earth rise — lunar-base only, rounder 8x8 with clipped corners
-  if (theme.id === "lunar-base") {
+  if (theme.id === "lunar-base" || theme.id === "pokemoon") {
     const ex = W - 60;
     const ey = 6;
     // Glow
@@ -368,7 +368,7 @@ function drawGround(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
     ctx.drawImage(islandCanvasCache.canvas, 0, 0);
   } else if (g.tileSize <= 1) {
     // Per-pixel noise ground
-    const groundBase = theme.id === "lunar-base" ? 30 : 20;
+    const groundBase = (theme.id === "lunar-base" || theme.id === "pokemoon") ? 30 : 20;
     const sr1 = parseInt(g.baseColor1.slice(1, 3), 16);
     const sg1 = parseInt(g.baseColor1.slice(3, 5), 16);
     const sb1 = parseInt(g.baseColor1.slice(5, 7), 16);
@@ -394,7 +394,7 @@ function drawGround(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
       }
     }
     // Lunar craters
-    if (theme.id === "lunar-base") {
+    if (theme.id === "lunar-base" || theme.id === "pokemoon") {
       seed = 4242;
       // Mix of sizes: 3 huge, 4 medium, 7 small
       const craterSizes = [
@@ -1470,7 +1470,7 @@ function drawBackgroundTrees(ctx: CanvasRenderingContext2D, theme: SceneTheme) {
   const spacing = Math.floor(W / count);
   for (let i = 0; i < count; i++) {
     const vx = Math.floor(spacing * 0.5) + i * spacing + Math.floor(srand() * 6);
-    const vyBase = theme.id === "lunar-base" ? 34 : 28;
+    const vyBase = (theme.id === "lunar-base" || theme.id === "pokemoon") ? 34 : 28;
     const vy = vyBase + Math.floor(srand() * 4);
     const vv = Math.floor(srand() * 4);
     if (!hasIsland || isOnIsland(vx, vy, islandMargin)) {
@@ -1568,7 +1568,7 @@ function drawDeskFront(
     rect(ctx, dx + 7, dy + 8, 2, 3, d.legColor);
   }
   if (hasLaptop) {
-    if (theme.id === "pallet-town") {
+    if (theme.id === "pallet-town" || theme.id === "pokemoon") {
       // Pokeball — 7x7 centered at dx+3, dy-1
       const bx = dx + 1;
       const by = dy - 1;
@@ -1818,12 +1818,12 @@ export function drawEnvironment(
       drawBackgroundFeature(ctx, feat.cx, feat.peak, feat.base, feat.halfWidth, feat.bodyColor, feat.capColor, feat.shape);
     }
 
-    // Sky effects — shooting stars (lunar only)
-    if (theme.id === "lunar-base") {
+    // Sky effects — shooting stars (lunar + pokemoon)
+    if (theme.id === "lunar-base" || theme.id === "pokemoon") {
       updateAndDrawShootingStars(ctx);
     }
     // UFOs draw in all scenes, auto-spawn only in lunar + desert
-    const ufoAutoSpawn = theme.id === "lunar-base" || theme.id === "golden-ruins";
+    const ufoAutoSpawn = theme.id === "lunar-base" || theme.id === "golden-ruins" || theme.id === "pokemoon";
     updateAndDrawUfos(ctx, ufoAutoSpawn);
 
     drawGround(ctx, theme);

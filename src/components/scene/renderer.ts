@@ -26,7 +26,7 @@ let floatY = 0;
 let floatStartX = 0;
 let floatFrame = 0;
 let floatMaxHeight = -20; // how high before returning (varies)
-let nextFloatCheck = 60 * 60 * (4 + Math.random() * 6); // 4-10 min at 60fps
+let nextFloatCheck = 30 * 60 * (4 + Math.random() * 6); // 4-10 min at 30fps
 
 /** Wake/startle the cat when poked. */
 export function pokeCat(): boolean {
@@ -86,6 +86,8 @@ const BEAM_COLORS = ["#aaccff", "#88aadd", "#ccddff", "#ffffff", "#99bbee"];
 const beamingAgents = new Set<string>();
 // Track last known state to detect wander→desk transitions
 const lastAgentState = new Map<string, string>();
+// Remember last desk position so lounging agents can wander from where they sat
+const lastDeskPos = new Map<string, { x: number; y: number }>();
 // Track known agents to detect first appearance (beam-in)
 const knownAgentIds = new Set<string>();
 // Sticky quadrant assignment — each CC keeps its slot for the session
@@ -97,25 +99,44 @@ const blinkActive = new Map<string, number>(); // frames remaining in blink
 export function getAgentSlot(agentId: string): number | undefined {
   return stickyQuadrants.get(agentId);
 }
+export function getSlotMap(): Map<string, number> {
+  return stickyQuadrants;
+}
 // Sticky starter assignment — round-robin charmander/squirtle/bulbasaur, no dupes until all 3 used
-const STARTERS: CharacterType[] = ["charmander", "squirtle", "bulbasaur"];
+const STARTERS: CharacterType[] = ["charmander", "squirtle", "bulbasaur", "mew"];
 const stickyStarters = new Map<string, CharacterType>();
 function assignStarter(agentId: string, agents: AgentState[]): CharacterType {
   // Return existing assignment if still active
   if (stickyStarters.has(agentId)) return stickyStarters.get(agentId)!;
-  // Clean up departed agents
+  // Clean up departed agents (preserve manual overrides)
   const activeIds = new Set(agents.map(a => a.id));
   for (const id of stickyStarters.keys()) {
-    if (!activeIds.has(id)) stickyStarters.delete(id);
+    if (!activeIds.has(id)) {
+      stickyStarters.delete(id);
+      manualOverrides.delete(id);
+    }
   }
-  // Find which starters are already in use
-  const used = new Set(stickyStarters.values());
-  // Pick the first unused starter, or fall back to round-robin if all 3 are taken
+  // Find which starters are already in use (only count auto-assigned, not manual overrides)
+  const used = new Set<CharacterType>();
+  for (const [id, char] of stickyStarters) {
+    if (!manualOverrides.has(id)) used.add(char);
+  }
+  // Pick the first unused starter, or fall back to round-robin if all 4 are taken
   let pick = STARTERS.find(s => !used.has(s));
   if (!pick) pick = STARTERS[stickyStarters.size % STARTERS.length];
   stickyStarters.set(agentId, pick);
   return pick;
 }
+
+const manualOverrides = new Set<string>();
+export function setAgentCharacter(agentId: string, character: CharacterType) {
+  stickyStarters.set(agentId, character);
+  manualOverrides.add(agentId);
+}
+export function getAgentCharacter(agentId: string): CharacterType | undefined {
+  return stickyStarters.get(agentId);
+}
+export { STARTERS };
 
 // Monolith materialize transition
 let monolithVisible = false;
@@ -794,6 +815,62 @@ export function drawMonolithSurrounds(ctx: CanvasRenderingContext2D, theme: Scen
     ctx.fillRect(baseCX - 9, baseY + 9, 13, 1);
   }
 
+  // Pokemoon: scattered lunar rocks + crater ring around monolith base
+  if (theme.id === "pokemoon") {
+    const baseY = oy + slabH;
+    const baseCX = cx;
+    const rockDark = "#383840";
+    const rockMid = "#484850";
+    const rockLight = "#585860";
+    const rockHighlight = "#686870";
+
+    // Crater ring — shallow depression around base
+    ctx.fillStyle = "#303038";
+    ctx.fillRect(baseCX - 16, baseY + 2, 32, 3);
+    ctx.fillRect(baseCX - 14, baseY + 5, 28, 2);
+    ctx.fillStyle = "#3a3a42";
+    ctx.fillRect(baseCX - 14, baseY + 3, 28, 2);
+    // Rim highlights
+    ctx.fillStyle = rockLight;
+    ctx.fillRect(baseCX - 16, baseY + 1, 32, 1);
+
+    // Scattered rocks — left side
+    const rocks = [
+      { dx: -20, dy: -2, w: 5, h: 4 },
+      { dx: -24, dy: 3, w: 4, h: 3 },
+      { dx: -18, dy: 6, w: 3, h: 2 },
+      { dx: -26, dy: 0, w: 3, h: 2 },
+      // Right side
+      { dx: 16, dy: -2, w: 5, h: 4 },
+      { dx: 22, dy: 3, w: 4, h: 3 },
+      { dx: 14, dy: 6, w: 3, h: 2 },
+      { dx: 24, dy: 1, w: 3, h: 2 },
+      // Front scattered
+      { dx: -8, dy: 8, w: 3, h: 2 },
+      { dx: 5, dy: 9, w: 4, h: 2 },
+      { dx: -3, dy: 10, w: 2, h: 2 },
+    ];
+    for (let ri = 0; ri < rocks.length; ri++) {
+      const r = rocks[ri];
+      const rx = baseCX + r.dx;
+      const ry = baseY + r.dy;
+      ctx.fillStyle = rockDark;
+      ctx.fillRect(rx, ry, r.w, r.h);
+      ctx.fillStyle = ri < 8 ? rockMid : rockDark;
+      ctx.fillRect(rx, ry, r.w, r.h - 1);
+      ctx.fillStyle = rockHighlight;
+      ctx.fillRect(rx, ry, r.w, 1);
+    }
+
+    // Small craters near base
+    ctx.fillStyle = "#303038";
+    ctx.fillRect(baseCX - 22, baseY + 7, 3, 2);
+    ctx.fillRect(baseCX + 20, baseY + 8, 2, 2);
+    ctx.fillStyle = "#282830";
+    ctx.fillRect(baseCX - 21, baseY + 7, 1, 1);
+    ctx.fillRect(baseCX + 21, baseY + 8, 1, 1);
+  }
+
   ctx.globalAlpha = 1;
 }
 
@@ -1020,7 +1097,7 @@ export function renderScene(
     a.state !== "lounging" && a.state !== "departing" &&
     (a.subagentClass === null || a.subagentClass === undefined)
   );
-  const rawDeskMap = assignDesks(deskEligible.map((a) => a.id));
+  const rawDeskMap = assignDesks(deskEligible.map((a) => a.id), stickyQuadrants);
   const deskMap = new Map<string, { x: number; y: number; characterX: number; characterY: number }>();
   for (const [id, pos] of rawDeskMap) {
     deskMap.set(id, { x: pos.x, y: pos.y + oY, characterX: pos.characterX, characterY: pos.characterY + oY });
@@ -1185,8 +1262,6 @@ export function renderScene(
   }
 
   // 5. Lounge zones — fireplace area (left) and guitar/amp area (right)
-  const loungeFireplace = { x: BUILDING_X + 18, y: FLOOR_Y + 12 + oY };
-  const loungeGuitar = { x: BUILDING_X + BUILDING_W - 20, y: FLOOR_Y + 12 + oY };
 
   // 6. Build drawable entities
   const entities: DrawableEntity[] = [];
@@ -1227,13 +1302,15 @@ export function renderScene(
     let flipX = false;
 
     if (agent.state === "lounging") {
-      // Lounging agents wander near fireplace or guitar
-      const loungeHome = hashForPhase(agent.id) % 2 === 0 ? loungeFireplace : loungeGuitar;
+      // Lounging agents wander slowly from their last desk position
+      const savedDesk = lastDeskPos.get(agent.id);
+      const homeX = savedDesk ? savedDesk.x : BUILDING_X + BUILDING_W / 2;
+      const homeY = savedDesk ? savedDesk.y : FLOOR_Y + FLOOR_H / 2 + oY;
       if (!walkStates.has(agent.id)) {
-        walkStates.set(agent.id, createWalkState(loungeHome.x, loungeHome.y));
+        walkStates.set(agent.id, createWalkState(homeX, homeY));
       }
       const ws = walkStates.get(agent.id)!;
-      updateWalkState(ws, false, loungeHome.x, loungeHome.y, 18, allAvoidZones);
+      updateWalkState(ws, false, homeX, homeY, 25, allAvoidZones, true);
       drawX = ws.currentX;
       drawY = ws.currentY;
       flipX = ws.facingRight;
@@ -1261,6 +1338,8 @@ export function renderScene(
       // Active desk-bound agents sit at their desk
       const pos = deskMap.get(agent.id);
       if (!pos) continue;
+      // Remember desk position for lounging wander
+      lastDeskPos.set(agent.id, { x: pos.characterX, y: pos.characterY });
       // Beam-in for newly appearing agents
       if (!knownAgentIds.has(agent.id) && !beamingAgents.has(agent.id)) {
         knownAgentIds.add(agent.id);
@@ -1366,7 +1445,7 @@ export function renderScene(
       floatStartX = catWalkState.currentX;
       floatFrame = 0;
       floatMaxHeight = catWalkState.currentY - (20 + Math.random() * 80);
-      nextFloatCheck = 60 * 60 * (4 + Math.random() * 6);
+      nextFloatCheck = 30 * 60 * (4 + Math.random() * 6);
     }
   }
 
@@ -1488,9 +1567,11 @@ export function renderScene(
   }
 
   // 7.5. Draw sub-agent connection lines behind all entities
+  const agentById = new Map(agents.map(a => [a.id, a]));
+  const entityById = new Map(entities.map(e => [e.agentId, e]));
   for (const entity of entities) {
     if (entity.parentId) {
-      const parentEntity = entities.find((e) => e.agentId === entity.parentId);
+      const parentEntity = entityById.get(entity.parentId);
       if (parentEntity) {
         const tc = TEAM_COLORS[entity.teamColor] ?? "#c4856c";
         ctx.strokeStyle = tc + "88";
@@ -1547,7 +1628,7 @@ export function renderScene(
     }
 
     // Use closed-eyes sprite for sleeping CC agents (idle 15+ min)
-    const sleepAgentData = agents.find((a) => a.id === entity.agentId);
+    const sleepAgentData = agentById.get(entity.agentId);
     const sleepIdleDuration = sleepAgentData ? Date.now() - sleepAgentData.lastActivity : 0;
     if (entity.activityState === "idle" && entity.source === "cc"
         && sleepIdleDuration > 15 * 60 * 1000) {
@@ -1625,7 +1706,7 @@ export function renderScene(
     }
 
     // Idle CC agent "zzz" — only after 15+ minutes of no activity
-    const agentData = agents.find((a) => a.id === entity.agentId);
+    const agentData = agentById.get(entity.agentId);
     const idleDuration = agentData ? Date.now() - agentData.lastActivity : 0;
     const isSleeping = entity.activityState === "idle" && entity.source === "cc"
       && !entity.isUnreachable && entity.agentId !== "__cat__"
@@ -1719,7 +1800,6 @@ export function renderScene(
           const projectsIdx = agent.id.indexOf("/.claude/projects/");
           if (projectsIdx < 0) continue;
           const afterProjects = agent.id.slice(projectsIdx + 18); // after "/.claude/projects/"
-          const projectDir = afterProjects.split("/")[0].replace(/^-/, "");
           // Compare name as a simpler match (project basename)
           if (detail.name && agent.id.includes(detail.name)) {
             stickyQuadrants.set(agent.id, s);
@@ -1772,6 +1852,26 @@ export function renderScene(
         ctx.fillRect(dx + 3, dy + 2, 2, 2);
         ctx.globalAlpha = 1;
       } else {
+        ctx.globalAlpha = 0.1;
+        ctx.fillStyle = "#cc8800";
+        ctx.fillRect(dx + 2, dy + 1, 4, 4);
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = "#ddaa22";
+        ctx.fillRect(dx + 2, dy + 1, 3, 3);
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = "#ffcc44";
+        ctx.fillRect(dx + 3, dy + 2, 2, 2);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // Claw agent pokeball glow — yellow when thinking, same as CC agents
+    const clawAgent = agents.find((a) => a.source === "openclaw");
+    if (clawAgent && clawAgent.state === "thinking") {
+      const clawPos = deskMap.get(clawAgent.id);
+      if (clawPos) {
+        const dx = clawPos.x;
+        const dy = clawPos.y;
         ctx.globalAlpha = 0.1;
         ctx.fillStyle = "#cc8800";
         ctx.fillRect(dx + 2, dy + 1, 4, 4);

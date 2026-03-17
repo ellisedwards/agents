@@ -22,14 +22,15 @@ export interface AvoidZone {
 }
 
 const SUBAGENT_SPEED = 0.5;
+const LOUNGE_SPEED = 0.2;
 const CAT_SPEED = 0.3;
 const IDLE_MIN_FRAMES = 60;
 const IDLE_MAX_FRAMES = 150;
 const CAT_IDLE_MIN = 90;
 const CAT_IDLE_MAX = 240;
-// ~15 min nap at 60fps = 54000 frames, vary between 12-18 min
-const CAT_SLEEP_MIN = 43200;
-const CAT_SLEEP_MAX = 64800;
+// ~15 min nap at 30fps = 27000 frames, vary between 12-18 min
+const CAT_SLEEP_MIN = 21600;
+const CAT_SLEEP_MAX = 32400;
 // Cat naps after 8-15 idle cycles (walk/pause rounds)
 const CAT_NAP_AFTER_MIN = 8;
 const CAT_NAP_AFTER_MAX = 15;
@@ -124,7 +125,8 @@ export function updateWalkState(
   homeX: number,
   homeY: number,
   wanderRadius: number,
-  avoidZones: AvoidZone[] = []
+  avoidZones: AvoidZone[] = [],
+  isLounging = false
 ): void {
   // Sleeping — count down until wake
   if (state.isSleeping) {
@@ -140,7 +142,7 @@ export function updateWalkState(
   }
 
   if (state.isMoving) {
-    const speed = isCat ? CAT_SPEED : SUBAGENT_SPEED;
+    const speed = isCat ? CAT_SPEED : isLounging ? LOUNGE_SPEED : SUBAGENT_SPEED;
     const dx = state.targetX - state.currentX;
     const dy = state.targetY - state.currentY;
     const dist = Math.sqrt(dx * dx + dy * dy);
