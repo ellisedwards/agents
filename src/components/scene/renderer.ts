@@ -168,6 +168,17 @@ const activeLevelUps: LevelUpEffect[] = [];
 let screenFlashAlpha = 0;
 const previousLevels = new Map<string, number>();
 
+// Game mode: expose agent level and frame to environment.ts for golden pokeball
+const agentLevelAtDesk = new Map<number, number>(); // deskIndex → level
+let currentFrame = 0; // updated each renderScene call
+
+export function getAgentLevelAtDesk(deskIndex: number): number {
+  return agentLevelAtDesk.get(deskIndex) ?? 0;
+}
+export function getCurrentFrame(): number {
+  return currentFrame;
+}
+
 export function triggerLevelUp(x: number, y: number, teamColor: string) {
   screenFlashAlpha = 0.15;
   const particles: LevelUpEffect["particles"] = [];
@@ -1153,6 +1164,7 @@ export function renderScene(
 ) {
   // Ensure pixel-perfect rendering every frame
   ctx.imageSmoothingEnabled = false;
+  currentFrame = frame;
 
   // Pallet Town: don't render anything until the background PNG is loaded
   if (theme.id === "pallet-town" && !getPalletTownBg()) return;
@@ -1186,6 +1198,19 @@ export function renderScene(
     if (!rawPos) continue;
     const idx = DESK_POSITIONS.indexOf(rawPos);
     if (idx >= 0) occupiedDeskIndices.add(idx);
+  }
+
+  // 3a. Populate agent levels at desks for golden pokeball
+  if (useAgentOfficeStore.getState().gameModeOn) {
+    agentLevelAtDesk.clear();
+    for (const agent of deskEligible) {
+      const rawPos = rawDeskMap.get(agent.id);
+      if (!rawPos) continue;
+      const idx = DESK_POSITIONS.indexOf(rawPos);
+      if (idx >= 0 && agent.level !== undefined) {
+        agentLevelAtDesk.set(idx, agent.level);
+      }
+    }
   }
 
   // 3b. Build avoid zones for seated agents (walkers should steer around them)
@@ -2161,5 +2186,6 @@ export function renderScene(
   for (const id of previousLevels.keys()) {
     if (!activeIds.has(id)) previousLevels.delete(id);
   }
+  // agentLevelAtDesk is cleared and rebuilt each frame, no per-agent cleanup needed
 
 }

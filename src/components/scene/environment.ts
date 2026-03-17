@@ -2,6 +2,7 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../canvas-transform";
 import type { SceneTheme } from "./themes/types";
 import { forestTheme } from "./themes/forest";
 import palletTownBgUrl from "../../assets/pallet-town-bg.png";
+import { getAgentLevelAtDesk, getCurrentFrame } from "./renderer";
 
 const W = CANVAS_WIDTH;
 const H = CANVAS_HEIGHT;
@@ -1557,7 +1558,8 @@ function drawDeskFront(
   dx: number,
   dy: number,
   hasLaptop: boolean,
-  theme: SceneTheme
+  theme: SceneTheme,
+  deskIndex: number = -1
 ) {
   const d = theme.desk;
   if (!d.hideDesks) {
@@ -1587,14 +1589,33 @@ function drawDeskFront(
       // Left/right edges
       rect(ctx, bx, by + 1, 1, 5, BK);
       rect(ctx, bx + 6, by + 1, 1, 5, BK);
-      // Red top half (rows 1-2)
-      rect(ctx, bx + 1, by + 1, 5, 2, "#cc2222");
-      // Highlight on red
-      rect(ctx, bx + 2, by + 1, 3, 1, "#dd3333");
-      // White bottom half (rows 4-5)
-      rect(ctx, bx + 1, by + 4, 5, 2, "#e8e0d8");
-      // Slight shadow on bottom white
-      rect(ctx, bx + 1, by + 5, 3, 1, "#d0c8c0");
+      // Golden pokeball evolution
+      const agentLevel = getAgentLevelAtDesk(deskIndex);
+      const isGold = agentLevel >= 10;
+      const isFullGold = agentLevel >= 20;
+
+      // Red top half (rows 1-2) — gold if evolved
+      const topColor = isGold ? "#cc8800" : "#cc2222";
+      const topHighlight = isGold ? "#ddaa22" : "#dd3333";
+      rect(ctx, bx + 1, by + 1, 5, 2, topColor);
+      // Highlight on red/gold
+      rect(ctx, bx + 2, by + 1, 3, 1, topHighlight);
+      // White bottom half (rows 4-5) — gold if full evolution
+      const bottomColor = isFullGold ? "#ddaa22" : "#e8e0d8";
+      const bottomShadow = isFullGold ? "#ccaa00" : "#d0c8c0";
+      rect(ctx, bx + 1, by + 4, 5, 2, bottomColor);
+      // Slight shadow on bottom
+      rect(ctx, bx + 1, by + 5, 3, 1, bottomShadow);
+
+      // Full gold shimmer
+      if (isFullGold) {
+        const frame = getCurrentFrame();
+        const shimmerPhase = Math.floor(frame / 12) % 4;
+        const shimmerPixels = [[bx+2, by+1], [bx+4, by+2], [bx+2, by+4], [bx+4, by+5]];
+        const sp = shimmerPixels[shimmerPhase];
+        ctx.fillStyle = "#ffee88";
+        ctx.fillRect(sp[0], sp[1], 1, 1);
+      }
       // Black middle band (row 3)
       rect(ctx, bx + 1, by + 3, 5, 1, BK);
       // Center button (white dot) — this is the glow target
@@ -1615,10 +1636,11 @@ function drawDesk(
   dx: number,
   dy: number,
   hasLaptop: boolean,
-  theme: SceneTheme
+  theme: SceneTheme,
+  deskIndex: number = -1
 ) {
   drawDeskChair(ctx, dx, dy, theme);
-  drawDeskFront(ctx, dx, dy, hasLaptop, theme);
+  drawDeskFront(ctx, dx, dy, hasLaptop, theme, deskIndex);
 }
 
 function updateAndDrawShootingStars(ctx: CanvasRenderingContext2D) {
@@ -1771,7 +1793,7 @@ export function drawDeskFronts() {
   if (!_pendingDeskFronts) return;
   const { ctx, positions, occupied, theme } = _pendingDeskFronts;
   for (let i = 0; i < positions.length; i++) {
-    drawDeskFront(ctx, positions[i].x, positions[i].y, occupied.has(i), theme);
+    drawDeskFront(ctx, positions[i].x, positions[i].y, occupied.has(i), theme, i);
   }
   _pendingDeskFronts = null;
 }
