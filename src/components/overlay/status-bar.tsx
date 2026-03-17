@@ -16,6 +16,10 @@ export function StatusBar() {
   const ccSub = agents.filter((a) => a.source === "cc" && a.subagentClass !== null && a.subagentClass !== undefined).length;
   const ocCount = agents.filter((a) => a.source === "openclaw").length;
 
+  // Level-up pulse tracking
+  const levelUpPulses = useRef<Map<string, number>>(new Map());
+  const prevLevelsRef = useRef<Map<string, number>>(new Map());
+
   const [brightness, setBrightness] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const [relayOpen, setRelayOpen] = useState(false);
@@ -95,6 +99,17 @@ export function StatusBar() {
     }
   };
 
+  // Detect level changes for pulse effect
+  for (const a of agents) {
+    if (a.level !== undefined) {
+      const prev = prevLevelsRef.current.get(a.id) ?? 1;
+      if (a.level > prev) {
+        levelUpPulses.current.set(a.id, Date.now());
+      }
+      prevLevelsRef.current.set(a.id, a.level);
+    }
+  }
+
   return (
     <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#08080e]/95 flex items-center px-3 gap-4 font-mono text-[10px]">
       {staleBuild && (
@@ -151,8 +166,15 @@ export function StatusBar() {
               const teamHex = TEAM_COLORS[a.teamColor] ?? "#88cc88";
               const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
               const isRecord = (a.level ?? 1) >= record && record > 1;
+              const pulseTime = levelUpPulses.current.get(a.id) ?? 0;
+              const isPulsing = Date.now() - pulseTime < 500;
               return (
-                <div key={a.id} className="flex items-center gap-1.5">
+                <div key={a.id} className="flex items-center gap-1.5" style={{
+                  background: isPulsing ? `${teamHex}4D` : "transparent",
+                  transition: "background 0.5s",
+                  borderRadius: "3px",
+                  padding: "0 3px",
+                }}>
                   <span style={{ color: teamHex }} className="text-[10px]">●</span>
                   <span className="font-mono text-[10px] text-white/60">
                     {a.gameName ?? a.name}
