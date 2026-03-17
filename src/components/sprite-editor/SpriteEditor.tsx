@@ -8,7 +8,7 @@ import {
   Trash2, Undo2, Redo2, Save, ClipboardCopy,
   ImagePlus, Sparkles, Settings, X, ArrowLeft,
   Grid3x3, Eye, EyeOff, ZoomIn, Copy, Plus,
-  Play, Square,
+  Play, Square, MoreVertical, ArrowUpDown,
 } from "lucide-react";
 
 // ─── Expected states per category ───────────────────────────────────────────
@@ -70,6 +70,33 @@ function rgbToHex(r: number, g: number, b: number): string {
 
 function colorDistance(a: [number, number, number], b: [number, number, number]): number {
   return Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+}
+
+function adjustBrightness(hex: string, amount: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const adjust = (v: number) => Math.max(0, Math.min(255, Math.round(
+    amount > 0 ? v + (255 - v) * amount : v + v * amount
+  )));
+  return `#${adjust(r).toString(16).padStart(2, "0")}${adjust(g).toString(16).padStart(2, "0")}${adjust(b).toString(16).padStart(2, "0")}`;
+}
+
+// SVG cursors
+const CURSOR_PENCIL = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 20l1.5-4.5L17 4l3 3L8.5 18.5z' fill='%23fff' stroke='%23000' stroke-width='1'/%3E%3Cpath d='M4 20l1.5-4.5 3 3z' fill='%23ffa' stroke='%23000' stroke-width='0.5'/%3E%3C/svg%3E") 2 22, crosshair`;
+const CURSOR_ERASER = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Crect x='4' y='10' width='14' height='10' rx='2' fill='%23f8a' stroke='%23000' stroke-width='1' transform='rotate(-20 11 15)'/%3E%3C/svg%3E") 8 18, crosshair`;
+const CURSOR_PICKER = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='3' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='12' r='3' fill='none' stroke='%23000' stroke-width='0.5'/%3E%3Cpath d='M12 2v6M12 16v6M2 12h6M16 12h6' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, crosshair`;
+
+function getEditorCursor(tool: EditorTool, altHeld: boolean): string {
+  if (altHeld) return CURSOR_PICKER;
+  switch (tool) {
+    case "pencil": return CURSOR_PENCIL;
+    case "eraser": return CURSOR_ERASER;
+    case "eyedropper": return CURSOR_PICKER;
+    case "fill": return "crosshair";
+    case "select": return "crosshair";
+    default: return "crosshair";
+  }
 }
 
 function snapToPalette(hex: string, palette: string[]): string {
@@ -242,6 +269,12 @@ export function SpriteEditor() {
 
   // Clipboard for copy/paste frames
   const clipboardRef = useRef<Map<string, string> | null>(null);
+
+  // Alt-eyedropper and cursor highlight
+  const [altHeld, setAltHeld] = useState(false);
+  const [hoverPixel, setHoverPixel] = useState<{ x: number; y: number } | null>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
+  const coordsRef = useRef<HTMLDivElement>(null);
 
   // Image import overlay state
   const [imageOverlay, setImageOverlay] = useState<ImageOverlay | null>(null);
@@ -534,7 +567,10 @@ export function SpriteEditor() {
 
   // Keyboard shortcuts
   useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Alt for temporary eyedropper
+      if (e.key === "Alt") { e.preventDefault(); setAltHeld(true); return; }
+
       // Don't handle shortcuts if a text input is focused
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -546,6 +582,8 @@ export function SpriteEditor() {
       else if (e.key === "f") setTool("fill");
       else if (e.key === "s") setTool("select");
       else if (e.key === "Escape") clearSelection();
+      else if (e.key === "[") setColor(c => adjustBrightness(c, -0.1));
+      else if (e.key === "]") setColor(c => adjustBrightness(c, 0.1));
       else if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
       else if ((e.metaKey || e.ctrlKey) && (e.key === "z" && e.shiftKey || e.key === "y")) { e.preventDefault(); redo(); }
       // Copy/Paste frame (Cmd+C / Cmd+V)
@@ -560,14 +598,21 @@ export function SpriteEditor() {
           setPixels(new Map(clipboardRef.current));
         }
       }
-      // Arrow keys shift all pixels
+      // Arrow keys shift pixels
       else if (e.key === "ArrowUp") { e.preventDefault(); shiftPixels(0, -1); }
       else if (e.key === "ArrowDown") { e.preventDefault(); shiftPixels(0, 1); }
       else if (e.key === "ArrowLeft") { e.preventDefault(); shiftPixels(-1, 0); }
       else if (e.key === "ArrowRight") { e.preventDefault(); shiftPixels(1, 0); }
     }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    function handleKeyUp(e: KeyboardEvent) {
+      if (e.key === "Alt") setAltHeld(false);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
   }, [undoStack, redoStack, pixels, pushUndo, shiftPixels, clearSelection, undo, redo]);
 
   // Flood fill
@@ -617,10 +662,10 @@ export function SpriteEditor() {
       return;
     }
 
-    if (tool === "eyedropper") {
+    if (tool === "eyedropper" || altHeld) {
       const c = pixels.get(pixelKey(x, y));
       if (c) setColor(c);
-      setTool("pencil");
+      if (tool === "eyedropper") setTool("pencil");
       return;
     }
 
@@ -700,7 +745,7 @@ export function SpriteEditor() {
       }
       return next;
     });
-  }, [selected, zoom, tool, color, pixels, pushUndo, floodFill, selection, selectionStart, selectedPixels, movingSelection, moveStart, isInSelection, clearSelection]);
+  }, [selected, zoom, tool, color, pixels, pushUndo, floodFill, selection, selectionStart, selectedPixels, movingSelection, moveStart, isInSelection, clearSelection, altHeld]);
 
   // Finalize selection on mouseUp (capture pixels inside selection)
   const handleCanvasMouseUp = useCallback(() => {
@@ -864,6 +909,73 @@ export function SpriteEditor() {
     if (!selected.builtIn) saveCustomSprites(updated.filter(s => !s.builtIn));
     setFrameIndex(frameIndex + 1);
   }, [selected, frameIndex, allSprites]);
+
+  // Rename a frame
+  const renameFrame = useCallback((fi: number, newName: string) => {
+    if (!selected || !newName) return;
+    const updated = allSprites.map(s => {
+      if (s.id !== selected.id) return s;
+      const frames = [...s.frames];
+      frames[fi] = { ...frames[fi], name: newName };
+      return { ...s, frames };
+    });
+    setAllSprites(updated);
+    if (!selected.builtIn) saveCustomSprites(updated.filter(s => !s.builtIn));
+    markDirty();
+  }, [selected, allSprites, markDirty]);
+
+  // Swap two frames (for remap — swap this frame's name with another)
+  const swapFrameNames = useCallback((fi: number, targetName: string) => {
+    if (!selected) return;
+    const targetIdx = selected.frames.findIndex(f => f.name === targetName);
+    const updated = allSprites.map(s => {
+      if (s.id !== selected.id) return s;
+      const frames = [...s.frames];
+      if (targetIdx >= 0) {
+        // Swap names between the two frames
+        const oldName = frames[fi].name;
+        frames[fi] = { ...frames[fi], name: targetName };
+        frames[targetIdx] = { ...frames[targetIdx], name: oldName };
+      } else {
+        // Target name doesn't exist yet — just rename this frame
+        frames[fi] = { ...frames[fi], name: targetName };
+      }
+      return { ...s, frames };
+    });
+    setAllSprites(updated);
+    if (!selected.builtIn) saveCustomSprites(updated.filter(s => !s.builtIn));
+    markDirty();
+  }, [selected, allSprites, markDirty]);
+
+  // Delete a frame
+  const deleteFrame = useCallback((fi: number) => {
+    if (!selected || selected.frames.length <= 1) return;
+    const updated = allSprites.map(s => {
+      if (s.id !== selected.id) return s;
+      const frames = s.frames.filter((_, idx) => idx !== fi);
+      return { ...s, frames };
+    });
+    setAllSprites(updated);
+    if (!selected.builtIn) saveCustomSprites(updated.filter(s => !s.builtIn));
+    if (frameIndex >= fi && frameIndex > 0) setFrameIndex(frameIndex - 1);
+    markDirty();
+  }, [selected, allSprites, frameIndex, markDirty]);
+
+  // Frame context menu state
+  const [frameMenuIdx, setFrameMenuIdx] = useState<number | null>(null);
+  const frameMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close frame menu on outside click
+  useEffect(() => {
+    if (frameMenuIdx === null) return;
+    const handler = (e: MouseEvent) => {
+      if (frameMenuRef.current && !frameMenuRef.current.contains(e.target as Node)) {
+        setFrameMenuIdx(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [frameMenuIdx]);
 
   // Delete custom sprite
   const deleteSprite = useCallback(() => {
@@ -1176,13 +1288,51 @@ export function SpriteEditor() {
                 ref={canvasRef}
                 width={canvasWidth}
                 height={canvasHeight}
-                className={tool === "select" ? "cursor-crosshair" : "cursor-crosshair"}
-                style={{ imageRendering: "pixelated" }}
+                style={{ imageRendering: "pixelated", cursor: getEditorCursor(tool, altHeld) }}
                 onMouseDown={e => { if (e.button === 2) return; setDrawing(true); handleCanvasInteraction(e, true); }}
-                onMouseMove={e => { if (drawing) handleCanvasInteraction(e, false); }}
+                onMouseMove={e => {
+                  // Track hover pixel for highlight
+                  const rect = canvasRef.current!.getBoundingClientRect();
+                  const px = Math.floor((e.clientX - rect.left) / zoom);
+                  const py = Math.floor((e.clientY - rect.top) / zoom);
+                  if (px >= 0 && px < (selected?.width ?? 0) && py >= 0 && py < (selected?.height ?? 0)) {
+                    setHoverPixel({ x: px, y: py });
+                    // Update highlight overlay
+                    if (highlightRef.current) {
+                      highlightRef.current.style.left = `${px * zoom}px`;
+                      highlightRef.current.style.top = `${py * zoom}px`;
+                      highlightRef.current.style.width = `${zoom}px`;
+                      highlightRef.current.style.height = `${zoom}px`;
+                      highlightRef.current.style.opacity = "1";
+                    }
+                    if (coordsRef.current) coordsRef.current.textContent = `${px},${py}`;
+                  } else {
+                    setHoverPixel(null);
+                    if (highlightRef.current) highlightRef.current.style.opacity = "0";
+                    if (coordsRef.current) coordsRef.current.textContent = "";
+                  }
+                  if (drawing) handleCanvasInteraction(e, false);
+                }}
                 onMouseUp={handleCanvasMouseUp}
-                onMouseLeave={() => { setDrawing(false); setMovingSelection(false); }}
+                onMouseLeave={() => {
+                  setDrawing(false);
+                  setMovingSelection(false);
+                  setHoverPixel(null);
+                  if (highlightRef.current) highlightRef.current.style.opacity = "0";
+                  if (coordsRef.current) coordsRef.current.textContent = "";
+                }}
                 onContextMenu={handleContextMenu}
+              />
+              {/* Pixel highlight cursor */}
+              <div
+                ref={highlightRef}
+                className="absolute pointer-events-none border border-white/50 mix-blend-difference"
+                style={{ opacity: 0, transition: "opacity 0.05s" }}
+              />
+              {/* Coordinate display */}
+              <div
+                ref={coordsRef}
+                className="absolute -bottom-5 left-0 font-mono text-[9px] text-white/30 pointer-events-none"
               />
               {/* Image overlay */}
               {imageOverlay && (
@@ -1365,24 +1515,79 @@ export function SpriteEditor() {
             const expected = EXPECTED_STATES[selected.category] ?? EXPECTED_STATES.custom;
             const isExpected = expected.includes(frame.name);
             return (
-              <button
-                key={`${frame.name}-${i}`}
-                onClick={() => setFrameIndex(i)}
-                className={`w-full flex items-center gap-2 p-1.5 rounded mb-1 transition-colors ${
-                  frameIndex === i ? "bg-white/15" : "hover:bg-white/8"
-                }`}
-              >
-                <div className="bg-[#1a1a2e] rounded p-0.5 flex items-center justify-center" style={{ minWidth: 24, minHeight: 24 }}>
-                  <SpritePreview pixels={fp} width={selected.width} height={selected.height} scale={1} />
+              <div key={`${frame.name}-${i}`} className="relative mb-1">
+                <div
+                  onClick={() => setFrameIndex(i)}
+                  className={`w-full flex items-center gap-2 p-1.5 rounded cursor-pointer transition-colors ${
+                    frameIndex === i ? "bg-white/15" : "hover:bg-white/8"
+                  }`}
+                >
+                  <div className="bg-[#1a1a2e] rounded p-0.5 flex items-center justify-center" style={{ minWidth: 24, minHeight: 24 }}>
+                    <SpritePreview pixels={fp} width={selected.width} height={selected.height} scale={1} />
+                  </div>
+                  <div className="flex flex-col items-start flex-1 min-w-0">
+                    <span className="text-[9px] text-white/50">{frame.name}</span>
+                    {!isExpected && <span className="text-[7px] text-white/20">custom</span>}
+                  </div>
+                  {frame.pixels.length === 0 && (
+                    <span className="text-[7px] text-yellow-400/40">empty</span>
+                  )}
+                  <button
+                    onClick={e => { e.stopPropagation(); setFrameMenuIdx(frameMenuIdx === i ? null : i); }}
+                    className="p-0.5 rounded text-white/20 hover:text-white/50 hover:bg-white/10"
+                  >
+                    <MoreVertical size={10} />
+                  </button>
                 </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-[9px] text-white/50">{frame.name}</span>
-                  {!isExpected && <span className="text-[7px] text-white/20">custom</span>}
-                </div>
-                {frame.pixels.length === 0 && (
-                  <span className="text-[7px] text-yellow-400/40 ml-auto">empty</span>
+
+                {/* Frame context menu */}
+                {frameMenuIdx === i && (
+                  <div ref={frameMenuRef} className="absolute right-0 top-8 z-50 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[130px] shadow-lg">
+                    <button
+                      onClick={() => {
+                        const name = prompt("Rename to:", frame.name);
+                        if (name && name !== frame.name) renameFrame(i, name);
+                        setFrameMenuIdx(null);
+                      }}
+                      className="block w-full text-left font-mono text-[9px] px-3 py-1.5 text-white/50 hover:bg-white/10 hover:text-white/80"
+                    >
+                      Rename
+                    </button>
+                    <div className="border-t border-white/5 my-0.5" />
+                    <div className="px-3 py-1 text-[8px] text-white/25">Remap to...</div>
+                    {expected.filter(s => s !== frame.name).map(s => (
+                      <button
+                        key={s}
+                        onClick={() => {
+                          swapFrameNames(i, s);
+                          setFrameMenuIdx(null);
+                        }}
+                        className="block w-full text-left font-mono text-[9px] px-3 py-1 text-white/50 hover:bg-white/10 hover:text-white/80 flex items-center gap-1.5"
+                      >
+                        <ArrowUpDown size={9} className="text-white/25" />
+                        {s}
+                        {selected.frames.some(f => f.name === s) && (
+                          <span className="text-[7px] text-yellow-400/40 ml-auto">swap</span>
+                        )}
+                      </button>
+                    ))}
+                    {selected.frames.length > 1 && (
+                      <>
+                        <div className="border-t border-white/5 my-0.5" />
+                        <button
+                          onClick={() => {
+                            deleteFrame(i);
+                            setFrameMenuIdx(null);
+                          }}
+                          className="block w-full text-left font-mono text-[9px] px-3 py-1.5 text-red-400/60 hover:bg-red-400/10 hover:text-red-400"
+                        >
+                          Delete frame
+                        </button>
+                      </>
+                    )}
+                  </div>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
