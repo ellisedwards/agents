@@ -330,7 +330,10 @@ export function SpriteEditor() {
     const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / zoom);
     const y = Math.floor((e.clientY - rect.top) / zoom);
-    if (x < 0 || x >= selected.width || y < 0 || y >= selected.height) return;
+    if (x < 0 || x >= selected.width || y < 0 || y >= selected.height) {
+      if (isStart && selection) clearSelection();
+      return;
+    }
 
     // Right-click eyedropper
     if (e.button === 2) {
@@ -433,6 +436,11 @@ export function SpriteEditor() {
       return;
     }
     if (tool === "select" && selection && selectionStart) {
+      // Single click (1x1 with no real drag) = deselect
+      if (selection.w <= 1 && selection.h <= 1) {
+        clearSelection();
+        return;
+      }
       // Capture pixels within the selection
       const captured = new Map<string, string>();
       for (let py = selection.y; py < selection.y + selection.h; py++) {
@@ -445,7 +453,7 @@ export function SpriteEditor() {
       setSelectedPixels(captured);
       setSelectionStart(null);
     }
-  }, [tool, selection, selectionStart, pixels, movingSelection]);
+  }, [tool, selection, selectionStart, pixels, movingSelection, clearSelection]);
 
   // Right-click handler to prevent context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -763,8 +771,12 @@ export function SpriteEditor() {
           </div>
         </div>
 
-        {/* Canvas area */}
-        <div className="flex-1 flex items-center justify-center overflow-auto p-4" style={{ backgroundColor: canvasBg }}>
+        {/* Canvas area — click on empty space to deselect */}
+        <div
+          className="flex-1 flex items-center justify-center overflow-auto p-4"
+          style={{ backgroundColor: canvasBg }}
+          onClick={e => { if (e.target === e.currentTarget) clearSelection(); }}
+        >
           {selected ? (
             <div className="relative">
               <canvas
