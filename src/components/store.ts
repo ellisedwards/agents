@@ -61,6 +61,10 @@ function saveTowerPrefs(prefs: TowerPrefs) {
 const THEME_STORAGE_KEY = "agent-office-theme";
 const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "tropical-island", "lunar-base", "pallet-town", "pokemoon"];
 
+function loadGameMode(): boolean {
+  try { return localStorage.getItem("agent-office-game-mode") === "true"; } catch { return false; }
+}
+
 function loadThemeId(): ThemeId {
   if (typeof window === "undefined") return "forest";
   try {
@@ -91,6 +95,7 @@ interface AgentOfficeStore {
   towerPos: { x: number; y: number };
   towerOpacity: number;
   editMode: EditMode;
+  gameModeOn: boolean;
   setAgents: (agents: AgentState[]) => void;
   selectAgent: (id: string | null) => void;
   setConnectionStatus: (status: AgentOfficeStore["connectionStatus"]) => void;
@@ -110,6 +115,7 @@ interface AgentOfficeStore {
   setTowerPos: (pos: { x: number; y: number }) => void;
   setTowerOpacity: (opacity: number) => void;
   setEditMode: (mode: EditMode) => void;
+  setGameModeOn: (on: boolean) => void;
 }
 
 const initialTower = loadTowerPrefs();
@@ -135,6 +141,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   towerPos: { x: initialTower.x, y: initialTower.y },
   towerOpacity: initialTower.opacity,
   editMode: "none",
+  gameModeOn: loadGameMode(),
   setAgents: (incoming) => {
     const now = Date.now();
     const prev = get().agents;
@@ -193,4 +200,23 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
     saveTowerPrefs({ visible: s.towerVisible, size: s.towerSize, x: s.towerPos.x, y: s.towerPos.y, opacity });
   },
   setEditMode: (editMode) => set({ editMode }),
+  setGameModeOn: (on) => {
+    set({ gameModeOn: on });
+    localStorage.setItem("agent-office-game-mode", String(on));
+    fetch("/api/game-mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: on }),
+    }).catch(() => {});
+  },
 }));
+
+// On app init, sync game mode to server
+const gameOn = loadGameMode();
+if (gameOn) {
+  fetch("/api/game-mode", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled: true }),
+  }).catch(() => {});
+}

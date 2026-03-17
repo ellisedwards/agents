@@ -69,6 +69,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const setTowerOpacity = useAgentOfficeStore((s) => s.setTowerOpacity);
   const editMode = useAgentOfficeStore((s) => s.editMode);
   const setEditMode = useAgentOfficeStore((s) => s.setEditMode);
+  const gameModeOn = useAgentOfficeStore((s) => s.gameModeOn);
+  const setGameModeOn = useAgentOfficeStore((s) => s.setGameModeOn);
   const deskEligible = agents.filter((a) =>
     a.state !== "lounging" && a.state !== "departing" &&
     (a.subagentClass === null || a.subagentClass === undefined)
@@ -324,6 +326,23 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 <span
                   className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
                     healthPosterOn ? "left-[13px]" : "left-[3px]"
+                  }`}
+                />
+              </button>
+            </label>
+
+            {/* Game Mode toggle */}
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <span className="font-mono text-[10px] text-white/50">Game Mode</span>
+              <button
+                onClick={() => setGameModeOn(!gameModeOn)}
+                className={`w-7 h-4 rounded-full transition-colors relative ${
+                  gameModeOn ? "bg-green-500/70" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
+                    gameModeOn ? "left-[13px]" : "left-[3px]"
                   }`}
                 />
               </button>
