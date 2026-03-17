@@ -815,6 +815,56 @@ export function drawMonolithSurrounds(ctx: CanvasRenderingContext2D, theme: Scen
     ctx.fillRect(baseCX - 9, baseY + 9, 13, 1);
   }
 
+  // Lunar base: scattered lunar rocks + crater ring around monolith base
+  if (theme.id === "lunar-base") {
+    const baseY = oy + slabH;
+    const baseCX = cx;
+    const rockDark = "#383840";
+    const rockMid = "#484850";
+    const rockLight = "#585860";
+    const rockHighlight = "#686870";
+
+    ctx.fillStyle = "#303038";
+    ctx.fillRect(baseCX - 16, baseY + 2, 32, 3);
+    ctx.fillRect(baseCX - 14, baseY + 5, 28, 2);
+    ctx.fillStyle = "#3a3a42";
+    ctx.fillRect(baseCX - 14, baseY + 3, 28, 2);
+    ctx.fillStyle = rockLight;
+    ctx.fillRect(baseCX - 16, baseY + 1, 32, 1);
+
+    const rocks = [
+      { dx: -20, dy: -2, w: 5, h: 4 },
+      { dx: -24, dy: 3, w: 4, h: 3 },
+      { dx: -18, dy: 6, w: 3, h: 2 },
+      { dx: -26, dy: 0, w: 3, h: 2 },
+      { dx: 16, dy: -2, w: 5, h: 4 },
+      { dx: 22, dy: 3, w: 4, h: 3 },
+      { dx: 14, dy: 6, w: 3, h: 2 },
+      { dx: 24, dy: 1, w: 3, h: 2 },
+      { dx: -8, dy: 8, w: 3, h: 2 },
+      { dx: 5, dy: 9, w: 4, h: 2 },
+      { dx: -3, dy: 10, w: 2, h: 2 },
+    ];
+    for (let ri = 0; ri < rocks.length; ri++) {
+      const r = rocks[ri];
+      const rx = baseCX + r.dx;
+      const ry = baseY + r.dy;
+      ctx.fillStyle = rockDark;
+      ctx.fillRect(rx, ry, r.w, r.h);
+      ctx.fillStyle = ri < 8 ? rockMid : rockDark;
+      ctx.fillRect(rx, ry, r.w, r.h - 1);
+      ctx.fillStyle = rockHighlight;
+      ctx.fillRect(rx, ry, r.w, 1);
+    }
+
+    ctx.fillStyle = "#303038";
+    ctx.fillRect(baseCX - 22, baseY + 7, 3, 2);
+    ctx.fillRect(baseCX + 20, baseY + 8, 2, 2);
+    ctx.fillStyle = "#282830";
+    ctx.fillRect(baseCX - 21, baseY + 7, 1, 1);
+    ctx.fillRect(baseCX + 21, baseY + 8, 1, 1);
+  }
+
   // Pokemoon: scattered lunar rocks + crater ring around monolith base
   if (theme.id === "pokemoon") {
     const baseY = oy + slabH;
@@ -1770,6 +1820,18 @@ export function renderScene(
 
   // 9. Draw desk fronts (tables + laptops) on top of agents
   drawDeskFronts();
+
+  // 9b. Debug desk numbers
+  if (useAgentOfficeStore.getState().debugOn) {
+    ctx.font = "bold 6px monospace";
+    ctx.textAlign = "center";
+    for (let i = 0; i < DESK_POSITIONS.length; i++) {
+      const d = DESK_POSITIONS[i];
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.fillText(String(i), d.x, d.y + oY - 6);
+    }
+    ctx.textAlign = "start";
+  }
 
   // 10. Laptop glow — on top of desk fronts
   const towerInfo = getPixelTowerData();

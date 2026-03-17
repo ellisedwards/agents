@@ -51,12 +51,13 @@ function pixelKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-function formatExport(pixels: DecoPixel[]): string {
-  if (pixels.length === 0) return "const decorations: PixelRect[] = [];";
+function formatExport(pixels: DecoPixel[], themeId?: string, mode?: string): string {
+  const header = themeId ? `// theme: ${themeId}, layer: ${mode || "unknown"}\n` : "";
+  if (pixels.length === 0) return `${header}const decorations: PixelRect[] = [];`;
   const lines = pixels.map(
     (p) => `  { x: ${p.x}, y: ${p.y}, w: 1, h: 1, color: "${p.color}" },`
   );
-  return `const decorations: PixelRect[] = [\n${lines.join("\n")}\n];`;
+  return `${header}const decorations: PixelRect[] = [\n${lines.join("\n")}\n];`;
 }
 
 /** Adjust hex color brightness by a factor (-1 to +1, 0 = no change) */
@@ -382,7 +383,7 @@ export function PixelEditor({ canvasRef }: PixelEditorProps) {
   const [exportLabel, setExportLabel] = useState("Export");
   const handleExport = useCallback(() => {
     const arr = Array.from(pixelsRef.current.values());
-    const text = formatExport(arr);
+    const text = formatExport(arr, themeId, editMode);
     navigator.clipboard.writeText(text).then(() => {
       setExportLabel("Copied!");
       setTimeout(() => setExportLabel("Export"), 1200);

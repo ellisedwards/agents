@@ -21,8 +21,9 @@ const dSpX = Math.floor(dW / 3);
 const DESK_TOP_OFFSET = 43; // push desks down to center 2 rows in the floor
 const dSpY = Math.floor((FLOOR_H - DESK_TOP_OFFSET - 4) / 2);
 
+// Front row (bottom) = desks 0,1,2 — Back row (top) = desks 3,4,5
 const DESK_POSITIONS: DeskPosition[] = [];
-for (let row = 0; row < 2; row++) {
+for (let row = 1; row >= 0; row--) {
   for (let col = 0; col < 3; col++) {
     const x = dLeft + Math.floor(dSpX / 2) + col * dSpX;
     const y = FLOOR_Y + DESK_TOP_OFFSET + row * dSpY;
@@ -75,8 +76,8 @@ export function assignDesks(
     if (activeIds.has(id)) taken.add(deskIdx);
   }
 
-  // Reserve bottom-right desk (index 5) for openclaw
-  const OPENCLAW_DESK = 5;
+  // Reserve front-right desk (index 2) for openclaw
+  const OPENCLAW_DESK = 2;
   if (activeIds.has("openclaw-main") && !stickyDesks.has("openclaw-main")) {
     stickyDesks.set("openclaw-main", OPENCLAW_DESK);
     taken.add(OPENCLAW_DESK);
@@ -99,9 +100,9 @@ export function assignDesks(
       }
     }
 
-    // Fallback — fill desks front row first (indices 3,4,5 then 0,1,2)
+    // Fallback — fill desks front row first (indices 0,1,2 then 3,4,5)
     if (deskIdx === -1) {
-      const fillOrder = [3, 4, 5, 0, 1, 2];
+      const fillOrder = [0, 1, 2, 3, 4, 5];
       for (const i of fillOrder) {
         if (!taken.has(i)) { deskIdx = i; break; }
       }
