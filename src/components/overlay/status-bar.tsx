@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAgentOfficeStore } from "../store";
+import { TEAM_COLORS } from "@/shared/types";
 
 export function StatusBar() {
   const agents = useAgentOfficeStore((s) => s.agents);
@@ -8,6 +9,7 @@ export function StatusBar() {
   const relayMessages = useAgentOfficeStore((s) => s.relayMessages);
   const relaySeenCount = useAgentOfficeStore((s) => s.relaySeenCount);
   const markRelaySeen = useAgentOfficeStore((s) => s.markRelaySeen);
+  const gameModeOn = useAgentOfficeStore((s) => s.gameModeOn);
   const relayUnread = relayMessages.length - relaySeenCount;
 
   const ccMain = agents.filter((a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)).length;
@@ -133,6 +135,54 @@ export function StatusBar() {
           clr
         </button>
       )}
+
+      {/* Game mode per-agent EXP display */}
+      {gameModeOn && (() => {
+        const ccMains = agents.filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined));
+        const record = parseInt(localStorage.getItem("game-mode-record") ?? "1", 10);
+
+        // Update record if any agent beats it
+        const maxLevel = Math.max(...ccMains.map(a => a.level ?? 1), 1);
+        if (maxLevel > record) localStorage.setItem("game-mode-record", String(maxLevel));
+
+        return (
+          <div className="flex items-center gap-3">
+            {ccMains.map(a => {
+              const teamHex = TEAM_COLORS[a.teamColor] ?? "#88cc88";
+              const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
+              const isRecord = (a.level ?? 1) >= record && record > 1;
+              return (
+                <div key={a.id} className="flex items-center gap-1.5">
+                  <span style={{ color: teamHex }} className="text-[10px]">●</span>
+                  <span className="font-mono text-[10px] text-white/60">
+                    {a.gameName ?? a.name}
+                  </span>
+                  {isRecord && <span className="text-[8px]">👑</span>}
+                  <span className="font-mono text-[10px] text-white/40">
+                    Lv{a.level ?? 1}
+                  </span>
+                  <div style={{ width: "40px", height: "3px", position: "relative", borderRadius: "1px", overflow: "hidden" }}>
+                    <div style={{
+                      position: "absolute", inset: 0,
+                      background: `${teamHex}33`,
+                    }} />
+                    <div style={{
+                      position: "absolute", top: 0, left: 0, bottom: 0,
+                      width: `${fill * 100}%`,
+                      background: teamHex,
+                    }} />
+                    <div style={{
+                      position: "absolute", bottom: 0, left: 0,
+                      width: `${fill * 100}%`, height: "1px",
+                      background: `${teamHex}99`,
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Relay indicator */}
       {relayMessages.length > 0 && (
