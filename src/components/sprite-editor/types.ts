@@ -1,6 +1,18 @@
 import type { PixelRect } from "../characters/clawd";
 
-export type SpriteCategory = "agent" | "pet" | "subagent" | "custom";
+export type SpriteCategory = "agent" | "pet" | "subagent" | "manager" | "custom";
+
+// Default dimensions per category
+export const CATEGORY_DEFAULTS: Record<SpriteCategory, { width: number; height: number; description: string }> = {
+  agent: { width: 16, height: 17, description: "Main agent (starter pokemon size)" },
+  pet: { width: 14, height: 14, description: "Pet companion" },
+  subagent: { width: 16, height: 14, description: "Subagent (mage/claw size)" },
+  manager: { width: 20, height: 20, description: "Manager/trainer (larger, assigned to claw)" },
+  custom: { width: 16, height: 16, description: "Custom sprite" },
+};
+
+// Evolution adds 4px in each dimension per stage
+export const EVOLUTION_SIZE_STEP = 4;
 
 export interface SpriteFrame {
   name: string; // e.g. "idle", "typing", "walk1"
@@ -15,6 +27,9 @@ export interface SpriteDefinition {
   height: number;
   frames: SpriteFrame[];
   builtIn: boolean; // true = from code, false = user-created
+  // Evolution chain
+  evolutionOf?: string; // parent sprite id (this is an evolution of that sprite)
+  evolutionStage?: number; // 0 = base, 1 = stage 1, 2 = stage 2
 }
 
 export type EditorTool = "pencil" | "eraser" | "eyedropper" | "fill" | "select";
@@ -26,7 +41,6 @@ export interface EditorState {
   color: string;
   zoom: number; // pixels per cell
   showGrid: boolean;
-  // Pixel data for the current frame being edited
   pixels: Map<string, string>; // "x,y" -> color
   undoStack: Array<Map<string, string>>;
   redoStack: Array<Map<string, string>>;

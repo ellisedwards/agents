@@ -74,7 +74,7 @@ export function getBuiltInSprites(): SpriteDefinition[] {
 
   // Trainer (OpenClaw)
   sprites.push({
-    id: "trainer", name: "Trainer", category: "agent",
+    id: "trainer", name: "Trainer", category: "manager",
     width: TRAINER_WIDTH, height: TRAINER_HEIGHT,
     frames: [
       ...agentFrames(TRAINER_SPRITES),

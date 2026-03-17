@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { SpriteDefinition, SpriteFrame, EditorTool, SpriteCategory } from "./types";
-import { pixelKey, parsePixelKey, pixelRectsToMap, mapToPixelRects } from "./types";
+import { pixelKey, parsePixelKey, pixelRectsToMap, mapToPixelRects, CATEGORY_DEFAULTS, EVOLUTION_SIZE_STEP } from "./types";
 import { getBuiltInSprites, loadCustomSprites, saveCustomSprites } from "./sprite-library";
 import {
   Pencil, Eraser, Pipette, PaintBucket, BoxSelect,
@@ -16,6 +16,7 @@ const EXPECTED_STATES: Record<SpriteCategory, string[]> = {
   agent: ["idle", "typing", "reading", "thinking", "waiting", "walk1", "walk2", "blink"],
   subagent: ["idle", "typing", "reading", "thinking", "waiting", "walk1", "walk2"],
   pet: ["idle", "walk1", "walk2", "sleep", "startled"],
+  manager: ["idle", "typing", "reading", "thinking", "waiting", "walk1", "walk2", "blink"],
   custom: ["idle", "typing", "reading", "thinking", "waiting", "walk1", "walk2", "sleep", "startled"],
 };
 
@@ -232,6 +233,7 @@ function SpriteThumbnail({ sprite, selected, onClick }: {
         <SpritePreview pixels={pixels} width={sprite.width} height={sprite.height} scale={2} />
       </div>
       <span className="font-mono text-[9px] text-white/50 truncate max-w-[60px]">{sprite.name}</span>
+      <span className="font-mono text-[7px] text-white/20">{sprite.width}x{sprite.height}</span>
     </button>
   );
 }
@@ -803,15 +805,21 @@ export function SpriteEditor() {
       return { ...s, frames };
     });
     setAllSprites(updatedSprites);
-    // Save custom sprites
+    // Save custom sprites to localStorage
     const customs = updatedSprites.filter(s => !s.builtIn);
     saveCustomSprites(customs);
-  }, [selected, pixels, frameIndex, allSprites, markDirty]);
+    showToast("Frame saved");
+  }, [selected, pixels, frameIndex, allSprites, markDirty, showToast]);
 
   // Export as TypeScript
   // Export patch — compact format for Claude to apply to source files
   // Includes ALL sprites edited this session
   const [exportLabel, setExportLabel] = useState("Export Patch");
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = useCallback((msg: string, ms = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), ms);
+  }, []);
   const exportPatch = useCallback(() => {
     // Save current frame first so it's included
     if (selected) markDirty();
@@ -861,26 +869,69 @@ export function SpriteEditor() {
     navigator.clipboard.writeText(text);
     setExportLabel(`Copied ${patches.length}!`);
     setTimeout(() => setExportLabel("Export Patch"), 1200);
+    showToast(`Copied ${patches.length} sprite${patches.length > 1 ? "s" : ""} to clipboard — paste to Claude Code`);
   }, [selected, selectedId, pixels, frameIndex, allSprites, dirtySprites, markDirty]);
 
-  // Create new custom sprite
+  // New sprite dialog state
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [newCategory, setNewCategory] = useState<SpriteCategory>("agent");
+  const [newName, setNewName] = useState("");
+  const [newWidth, setNewWidth] = useState(16);
+  const [newHeight, setNewHeight] = useState(17);
+
+  // Update dimensions when category changes
+  useEffect(() => {
+    const d = CATEGORY_DEFAULTS[newCategory];
+    setNewWidth(d.width);
+    setNewHeight(d.height);
+  }, [newCategory]);
+
   const createNew = useCallback(() => {
+    if (!newName.trim()) return;
     const id = `custom-${Date.now()}`;
     const sprite: SpriteDefinition = {
       id,
-      name: "New Sprite",
-      category: "custom",
-      width: 16,
-      height: 16,
+      name: newName.trim(),
+      category: newCategory,
+      width: newWidth,
+      height: newHeight,
       frames: [{ name: "idle", pixels: [] }],
       builtIn: false,
+      evolutionStage: 0,
     };
     const updated = [...allSprites, sprite];
     setAllSprites(updated);
     saveCustomSprites(updated.filter(s => !s.builtIn));
     setSelectedId(id);
     setFrameIndex(0);
-  }, [allSprites]);
+    setShowNewDialog(false);
+    setNewName("");
+  }, [allSprites, newName, newCategory, newWidth, newHeight]);
+
+  // Add evolution to current sprite
+  const addEvolution = useCallback(() => {
+    if (!selected) return;
+    const parentStage = selected.evolutionStage ?? 0;
+    const nextStage = parentStage + 1;
+    const id = `${selected.id}-evo${nextStage}`;
+    const sprite: SpriteDefinition = {
+      id,
+      name: `${selected.name} Evo ${nextStage + 1}`,
+      category: selected.category,
+      width: selected.width + EVOLUTION_SIZE_STEP,
+      height: selected.height + EVOLUTION_SIZE_STEP,
+      frames: [{ name: "idle", pixels: [] }],
+      builtIn: false,
+      evolutionOf: selected.id,
+      evolutionStage: nextStage,
+    };
+    const updated = [...allSprites, sprite];
+    setAllSprites(updated);
+    saveCustomSprites(updated.filter(s => !s.builtIn));
+    setSelectedId(id);
+    setFrameIndex(0);
+    showToast(`Evolution stage ${nextStage + 1} created (${sprite.width}x${sprite.height})`);
+  }, [selected, allSprites, showToast]);
 
   // Add frame to current sprite
   const addFrame = useCallback((name: string) => {
@@ -1062,14 +1113,14 @@ export function SpriteEditor() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] text-white/60 font-bold tracking-wider">SPRITES</span>
             <button
-              onClick={createNew}
+              onClick={() => setShowNewDialog(true)}
               className="text-[10px] bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded transition-colors"
             >
               + New
             </button>
           </div>
           <div className="flex gap-1 flex-wrap">
-            {(["all", "agent", "subagent", "pet", "custom"] as const).map(cat => (
+            {(["all", "agent", "subagent", "pet", "manager", "custom"] as const).map(cat => (
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
@@ -1306,10 +1357,23 @@ export function SpriteEditor() {
 
         {/* Canvas area — click on empty space to deselect */}
         <div
-          className="flex-1 flex items-center justify-center overflow-auto p-4"
+          className="flex-1 flex items-center justify-center overflow-auto p-4 relative"
           style={{ backgroundColor: canvasBg }}
           onClick={e => { if (e.target === e.currentTarget) clearSelection(); }}
         >
+          {/* Canvas info label */}
+          {selected && (
+            <div className="absolute top-3 left-3 font-mono text-[10px] text-black/30 pointer-events-none z-10">
+              <span className="font-semibold">{selected.name}</span>
+              <span className="mx-1.5">·</span>
+              <span>{selected.category}</span>
+              <span className="mx-1.5">·</span>
+              <span>{selected.width}×{selected.height}</span>
+              {selected.evolutionStage !== undefined && selected.evolutionStage > 0 && (
+                <span className="ml-1.5 text-purple-500/50">evo {selected.evolutionStage + 1}</span>
+              )}
+            </div>
+          )}
           {selected ? (
             <div className="relative">
               <canvas
@@ -1652,12 +1716,45 @@ export function SpriteEditor() {
           })}
         </div>
 
-        {/* Sprite info */}
+        {/* Sprite info + evolution */}
         {selected && (
-          <div className="p-3 border-t border-white/10 space-y-1">
-            <div className="text-[10px] text-white/40">{selected.name}</div>
-            <div className="text-[8px] text-white/20">{selected.category} {selected.builtIn ? "(built-in)" : "(custom)"}</div>
-            <div className="flex gap-1">
+          <div className="p-3 border-t border-white/10 space-y-2">
+            <div>
+              <div className="text-[10px] text-white/40">{selected.name}</div>
+              <div className="text-[8px] text-white/20">
+                {selected.category} {selected.builtIn ? "(built-in)" : "(custom)"}
+                {selected.evolutionStage !== undefined && ` · evo ${selected.evolutionStage + 1}`}
+              </div>
+            </div>
+            {/* Evolution chain */}
+            {(() => {
+              const chain = allSprites.filter(s =>
+                s.id === selected.id ||
+                s.evolutionOf === selected.id ||
+                (selected.evolutionOf && (s.id === selected.evolutionOf || s.evolutionOf === selected.evolutionOf))
+              ).sort((a, b) => (a.evolutionStage ?? 0) - (b.evolutionStage ?? 0));
+              if (chain.length > 1) {
+                return (
+                  <div className="flex gap-1 items-center">
+                    <span className="text-[8px] text-white/20">Chain:</span>
+                    {chain.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => { setSelectedId(s.id); setFrameIndex(0); }}
+                        className={`text-[8px] px-1 py-0.5 rounded ${s.id === selected.id ? "bg-purple-500/30 text-purple-300" : "bg-white/5 text-white/30 hover:text-white/60"}`}
+                      >
+                        {s.evolutionStage !== undefined ? `Evo ${s.evolutionStage + 1}` : s.name}
+                      </button>
+                    ))}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+            <div className="flex gap-1 flex-wrap">
+              {selected.category === "agent" && (
+                <button onClick={addEvolution} className="text-[8px] text-purple-300/60 hover:text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded">+ Evolution</button>
+              )}
               {!selected.builtIn && (
                 <>
                   <button onClick={resizeSprite} className="text-[8px] text-white/30 hover:text-white/60 bg-white/5 px-1.5 py-0.5 rounded">Resize</button>
@@ -1669,12 +1766,86 @@ export function SpriteEditor() {
         )}
       </div>
 
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#1e1e2e] border border-white/10 rounded-lg px-4 py-2 text-[12px] text-white/70 shadow-xl animate-[fadeInUp_0.2s_ease-out]">
+          {toast}
+        </div>
+      )}
+
+      {/* New sprite dialog */}
+      {showNewDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowNewDialog(false)}>
+          <div className="bg-[#1e1e2e] border border-white/10 rounded-lg p-5 min-w-[300px] space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="text-[13px] text-white/70 font-semibold">New Sprite</div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] text-white/40 block">Name</label>
+              <input
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder="My Sprite"
+                className="w-full bg-white/5 text-white/80 text-[11px] rounded px-2 py-1.5 border border-white/10 outline-none focus:border-white/30"
+                autoFocus
+                onKeyDown={e => { if (e.key === "Enter") createNew(); }}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9px] text-white/40 block">Type</label>
+              <div className="flex gap-1 flex-wrap">
+                {(["agent", "pet", "subagent", "manager", "custom"] as SpriteCategory[]).map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setNewCategory(cat)}
+                    className={`text-[9px] px-2 py-1 rounded transition-colors ${
+                      newCategory === cat ? "bg-white/20 text-white/80" : "bg-white/5 text-white/30 hover:text-white/50"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <div className="text-[8px] text-white/20">{CATEGORY_DEFAULTS[newCategory].description}</div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="space-y-1 flex-1">
+                <label className="text-[9px] text-white/40 block">Width</label>
+                <input
+                  type="number" min={4} max={64} value={newWidth}
+                  onChange={e => setNewWidth(Number(e.target.value))}
+                  className="w-full bg-white/5 text-white/80 text-[11px] rounded px-2 py-1.5 border border-white/10 outline-none"
+                />
+              </div>
+              <div className="space-y-1 flex-1">
+                <label className="text-[9px] text-white/40 block">Height</label>
+                <input
+                  type="number" min={4} max={64} value={newHeight}
+                  onChange={e => setNewHeight(Number(e.target.value))}
+                  className="w-full bg-white/5 text-white/80 text-[11px] rounded px-2 py-1.5 border border-white/10 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={() => setShowNewDialog(false)} className="text-[10px] px-3 py-1 rounded text-white/40 hover:text-white/60">Cancel</button>
+              <button onClick={createNew} disabled={!newName.trim()} className="text-[10px] px-3 py-1 rounded bg-blue-600/40 text-blue-200 hover:bg-blue-600/60 disabled:opacity-30">Create</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Marching ants animation */}
       <style>{`
         @keyframes marching-ants {
           0% { border-color: rgba(255,255,255,0.8); }
           50% { border-color: rgba(0,0,0,0.8); }
           100% { border-color: rgba(255,255,255,0.8); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
     </div>
@@ -1734,7 +1905,7 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
 
     // Grid
     if (showGrid && zoom >= 8) {
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.strokeStyle = "rgba(0,0,0,0.15)";
       ctx.lineWidth = 1;
       for (let x = 0; x <= width; x++) {
         ctx.beginPath();
