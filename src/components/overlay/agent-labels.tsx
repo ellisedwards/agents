@@ -613,9 +613,9 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     left: domPos.x,
                     top: domPos.y - 30 * transform.scale,
                     transform: "translateX(-50%)",
-                    fontSize: "12px",
-                    color: teamHex,
-                    textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+                    fontSize: "14px",
+                    color: "#ffffff",
+                    textShadow: `0 0 6px ${teamHex}, 0 1px 4px rgba(0,0,0,0.8)`,
                     animation: "expFloat 1.5s ease-out forwards",
                   }}
                 >

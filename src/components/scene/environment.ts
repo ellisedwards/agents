@@ -1595,25 +1595,24 @@ function drawDeskFront(
       // Left/right edges
       rect(ctx, bx, by + 1, 1, 5, BK);
       rect(ctx, bx + 6, by + 1, 1, 5, BK);
-      // Golden pokeball evolution
+      // Pokeball evolution tiers: Lv20 blue top, Lv30 gold top, Lv50 full gold
       const agentLevel = getAgentLevelAtDesk(deskIndex);
-      const isGold = agentLevel >= 10;
-      const isFullGold = agentLevel >= 20;
+      const isBlue = agentLevel >= 20;
+      const isGold = agentLevel >= 30;
+      const isFullGold = agentLevel >= 50;
 
-      // Red top half (rows 1-2) — gold if evolved
-      const topColor = isGold ? "#cc8800" : "#cc2222";
-      const topHighlight = isGold ? "#ddaa22" : "#dd3333";
+      // Top half (rows 1-2)
+      const topColor = isGold ? "#cc8800" : isBlue ? "#3366cc" : "#cc2222";
+      const topHighlight = isGold ? "#ddaa22" : isBlue ? "#4488ee" : "#dd3333";
       rect(ctx, bx + 1, by + 1, 5, 2, topColor);
-      // Highlight on red/gold
       rect(ctx, bx + 2, by + 1, 3, 1, topHighlight);
-      // White bottom half (rows 4-5) — gold if full evolution
+      // Bottom half (rows 4-5)
       const bottomColor = isFullGold ? "#ddaa22" : "#e8e0d8";
       const bottomShadow = isFullGold ? "#ccaa00" : "#d0c8c0";
       rect(ctx, bx + 1, by + 4, 5, 2, bottomColor);
-      // Slight shadow on bottom
       rect(ctx, bx + 1, by + 5, 3, 1, bottomShadow);
 
-      // Full gold shimmer
+      // Full gold shimmer at Lv50+
       if (isFullGold) {
         const frame = getCurrentFrame();
         const shimmerPhase = Math.floor(frame / 12) % 4;
