@@ -256,12 +256,13 @@ export class ClaudeCodeWatcher extends EventEmitter {
         session.state = event.state;
         session.currentTool = event.toolName ?? null;
         session.hasBeenActive = true;
-        // EXP tracking
+        // EXP tracking — key by project dir so progress persists across sessions
         const currentAgents = this.getAgentList();
+        const expId = session.subagentClass !== null ? session.filePath : path.dirname(session.filePath);
         if (event.toolName) {
-          this.expTracker.onToolUse(session.filePath, event.toolName, currentAgents);
+          this.expTracker.onToolUse(expId, event.toolName, currentAgents);
         } else if (event.state === "thinking") {
-          this.expTracker.onThinking(session.filePath, currentAgents);
+          this.expTracker.onThinking(expId, currentAgents);
         }
       } else if (event.type === "sub_agent_spawn") {
         session.pendingSubAgents++;
@@ -379,7 +380,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
         subagentClass: session.subagentClass,
         teamColor: session.teamColor,
         lastActivity: session.lastActivity,
-        ...this.expTracker.getExpFields(filePath, session.subagentClass !== null),
+        ...this.expTracker.getExpFields(session.subagentClass !== null ? filePath : path.dirname(filePath), session.subagentClass !== null),
       });
     }
     this.emit("update", agents);
