@@ -194,31 +194,32 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
                 const isRecord = (a.level ?? 1) >= record && record > 1;
                 return (
-                  <div key={a.id} className="group relative flex items-center gap-[12px]">
-                    {/* Team dot */}
-                    <div className="w-[9px] h-[9px] rounded-full shrink-0" style={{ backgroundColor: teamHex }} />
+                  <div key={a.id} className="group relative">
+                    {/* Top row: dot, name+title, LV, bar, ellipsis */}
+                    <div className="flex items-center gap-[10px]">
+                      {/* Team dot */}
+                      <div className="w-[9px] h-[9px] rounded-full shrink-0" style={{ backgroundColor: teamHex }} />
 
-                    {/* Name + title + flame */}
-                    <div className="flex flex-col gap-px w-[96px] shrink-0">
-                      <span className="font-semibold text-[14px] text-white truncate leading-tight">
-                        {a.gameName ?? a.name}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
-                      </span>
-                      {a.title && (
-                        <span className="text-[11px] text-[#636363] truncate leading-tight">
-                          {a.title}
+                      {/* Name + title */}
+                      <div className="flex flex-col gap-px w-[96px] shrink-0">
+                        <span className="font-semibold text-[14px] text-white truncate leading-tight">
+                          {a.gameName ?? a.name}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
                         </span>
-                      )}
-                    </div>
+                        {a.title && (
+                          <span className="text-[11px] text-[#636363] truncate leading-tight">
+                            {a.title}
+                          </span>
+                        )}
+                      </div>
 
-                    {/* Level */}
-                    <span className="font-semibold text-[14px] whitespace-nowrap shrink-0">
-                      <span className="text-[#787878]">LV</span>
-                      <span className="text-white">{a.level ?? 1}</span>
-                    </span>
+                      {/* Level */}
+                      <span className="font-semibold text-[14px] whitespace-nowrap shrink-0">
+                        <span className="text-[#787878]">LV</span>
+                        <span className="text-white">{a.level ?? 1}</span>
+                      </span>
 
-                    {/* EXP bar + counter */}
-                    <div className="flex flex-col shrink-0" style={{ width: "120px" }}>
-                      <div className="relative" style={{ width: "120px", height: "14px" }}>
+                      {/* EXP bar */}
+                      <div className="relative shrink-0" style={{ width: "120px", height: "14px" }}>
                         <div className="absolute inset-0 rounded-[3.5px]" style={{
                           backgroundColor: teamHex,
                           opacity: 0.33,
@@ -231,19 +232,15 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                         )}
                         <div className="absolute inset-0 rounded-[3.5px] border-[1.5px] border-[#696969]" />
                       </div>
-                      <span className="text-[10px] text-[#636363] text-right leading-tight mt-[2px]">
-                        {a.exp ?? 0}/{a.expToNext ?? 100}
-                      </span>
-                    </div>
 
-                    {/* Hover-reveal menu */}
-                    <div className="relative shrink-0 w-[8px]">
-                      <button
-                        onClick={e => { e.stopPropagation(); setHudMenuId(hudMenuId === a.id ? null : a.id); }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-white/30 hover:text-white/60"
-                      >
-                        <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="2" r="1" fill="currentColor"/><circle cx="5" cy="5" r="1" fill="currentColor"/><circle cx="5" cy="8" r="1" fill="currentColor"/></svg>
-                      </button>
+                      {/* Hover-reveal menu */}
+                      <div className="relative shrink-0 w-[8px]">
+                        <button
+                          onClick={e => { e.stopPropagation(); setHudMenuId(hudMenuId === a.id ? null : a.id); }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-white/30 hover:text-white/60"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="2" r="1" fill="currentColor"/><circle cx="5" cy="5" r="1" fill="currentColor"/><circle cx="5" cy="8" r="1" fill="currentColor"/></svg>
+                        </button>
                       {hudMenuId === a.id && (
                         <div className="absolute right-0 top-5 z-50 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[90px] shadow-lg">
                           <button
@@ -270,7 +267,13 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                         </div>
                       )}
                     </div>
-
+                    </div>
+                    {/* Bottom row: exp counter right-aligned under the bar */}
+                    <div className="flex justify-end pr-[12px]">
+                      <span className="text-[10px] text-[#636363] leading-tight">
+                        {a.exp ?? 0}/{a.expToNext ?? 100}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
