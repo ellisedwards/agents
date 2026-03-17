@@ -103,6 +103,14 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [settingsOpen, editOpen]);
 
+  // Close HUD agent menu on outside click
+  useEffect(() => {
+    if (hudMenuId === null) return;
+    function handleClick() { setHudMenuId(null); }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [hudMenuId]);
+
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -194,56 +202,55 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
                 const isRecord = (a.level ?? 1) >= record && record > 1;
                 return (
-                  <div key={a.id} className="group relative flex flex-col gap-[2px]">
-                    {/* Row 1: dot · name · flame · LV · bar · ellipsis */}
-                    <div className="flex items-center gap-[10px]">
-                      <div className="w-[9px] h-[9px] rounded-full shrink-0" style={{ backgroundColor: teamHex }} />
-                      <span className="font-semibold text-[14px] text-white truncate leading-tight w-[96px] shrink-0">
-                        {a.gameName ?? a.name}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
-                      </span>
-                      <span className="font-semibold text-[14px] whitespace-nowrap shrink-0">
-                        <span className="text-[#787878]">LV</span>
-                        <span className="text-white">{a.level ?? 1}</span>
-                      </span>
-                      <div className="relative shrink-0" style={{ width: "120px", height: "14px" }}>
-                        <div className="absolute inset-0 rounded-[3.5px]" style={{ backgroundColor: teamHex, opacity: 0.33 }} />
-                        {fill > 0 && (
-                          <div className="absolute top-0 left-0 h-full rounded-[3.5px]" style={{ width: `${Math.max(fill * 100, 5)}%`, backgroundColor: teamHex }} />
-                        )}
-                        <div className="absolute inset-0 rounded-[3.5px] border-[1.5px] border-[#696969]" />
-                      </div>
-                      <div className="relative shrink-0 w-[8px]">
-                        <button
-                          onClick={e => { e.stopPropagation(); setHudMenuId(hudMenuId === a.id ? null : a.id); }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-white/30 hover:text-white/60"
-                        >
-                          <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="2" r="1" fill="currentColor"/><circle cx="5" cy="5" r="1" fill="currentColor"/><circle cx="5" cy="8" r="1" fill="currentColor"/></svg>
-                        </button>
-                        {hudMenuId === a.id && (
-                          <div className="absolute right-0 top-5 z-50 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[90px] shadow-lg">
-                            <button
-                              onClick={() => { const name = prompt("Rename:", a.gameName ?? a.name); if (name) { /* TODO */ } setHudMenuId(null); }}
-                              className="block w-full text-left text-[9px] px-3 py-1 text-white/50 hover:bg-white/10 hover:text-white/80"
-                            >Rename</button>
-                            <button
-                              onClick={() => { killAgent(a.id); setHudMenuId(null); }}
-                              className="block w-full text-left text-[9px] px-3 py-1 text-red-400/60 hover:bg-red-400/10 hover:text-red-400"
-                            >Kill</button>
-                          </div>
-                        )}
-                      </div>
+                  <div key={a.id} className="group relative grid gap-x-[10px] gap-y-0 items-center"
+                    style={{ gridTemplateColumns: "9px 96px auto 120px 8px" }}>
+                    {/* Row 1 */}
+                    <div className="w-[9px] h-[9px] rounded-full" style={{ backgroundColor: teamHex }} />
+                    <span className="font-semibold text-[14px] text-white truncate leading-tight">
+                      {a.gameName ?? a.name}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
+                    </span>
+                    <span className="font-semibold text-[14px] whitespace-nowrap">
+                      <span className="text-[#787878]">LV</span>
+                      <span className="text-white">{a.level ?? 1}</span>
+                    </span>
+                    <div className="relative" style={{ height: "14px" }}>
+                      <div className="absolute inset-0 rounded-[3.5px]" style={{ backgroundColor: teamHex, opacity: 0.33 }} />
+                      {fill > 0 && (
+                        <div className="absolute top-0 left-0 h-full rounded-[3.5px]" style={{ width: `${Math.max(fill * 100, 5)}%`, backgroundColor: teamHex }} />
+                      )}
+                      <div className="absolute inset-0 rounded-[3.5px] border-[1.5px] border-[#696969]" />
                     </div>
-                    {/* Row 2: title (left-aligned under name) · exp XX/XX (right-aligned under bar) */}
-                    <div className="flex items-center gap-[10px]">
-                      <div className="w-[9px] shrink-0" />
-                      <span className="text-[11px] text-[#636363] truncate leading-tight w-[96px] shrink-0">
-                        {a.title ?? ""}
-                      </span>
-                      <span className="text-[10px] text-[#636363] shrink-0 invisible">LV99</span>
-                      <span className="text-[10px] text-[#636363] text-right leading-tight shrink-0" style={{ width: "120px" }}>
-                        {a.exp ?? 0}/{a.expToNext ?? 100}
-                      </span>
+                    <div className="relative">
+                      <button
+                        onClick={e => { e.stopPropagation(); setHudMenuId(hudMenuId === a.id ? null : a.id); }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-white/30 hover:text-white/60"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="2" r="1" fill="currentColor"/><circle cx="5" cy="5" r="1" fill="currentColor"/><circle cx="5" cy="8" r="1" fill="currentColor"/></svg>
+                      </button>
+                      {hudMenuId === a.id && (
+                        <div className="absolute right-0 top-5 z-50 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[90px] shadow-lg">
+                          <button
+                            onClick={() => { const name = prompt("Rename:", a.gameName ?? a.name); if (name) { /* TODO */ } setHudMenuId(null); }}
+                            className="block w-full text-left text-[9px] px-3 py-1 text-white/50 hover:bg-white/10 hover:text-white/80"
+                          >Rename</button>
+                          <button
+                            onClick={() => { killAgent(a.id); setHudMenuId(null); }}
+                            className="block w-full text-left text-[9px] px-3 py-1 text-red-400/60 hover:bg-red-400/10 hover:text-red-400"
+                          >Kill</button>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Row 2: title under name, exp under bar */}
+                    <div />
+                    <span className="text-[11px] text-[#636363] truncate leading-tight">
+                      {a.title ?? ""}
+                    </span>
+                    <div />
+                    <span className="text-[10px] text-[#636363] text-right leading-tight">
+                      {a.exp ?? 0}/{a.expToNext ?? 100}
+                    </span>
+                    <div />
                   </div>
                 );
               })}
