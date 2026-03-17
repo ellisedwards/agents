@@ -223,8 +223,20 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         );
       })()}
 
-      {/* Edit + Settings buttons */}
+      {/* Play / Edit / Settings buttons */}
       <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
+        {/* Play/Stop game button */}
+        <button
+          onClick={() => setGameModeOn(!gameModeOn)}
+          className={`font-mono text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+            gameModeOn
+              ? "text-yellow-300/70 hover:text-yellow-300"
+              : "text-white/20 hover:text-white/50"
+          }`}
+        >
+          {gameModeOn ? "stop" : "play"}
+        </button>
+
         {/* Edit button + dropdown */}
         <div ref={editPanelRef} className="relative">
           <button
@@ -236,7 +248,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             edit
           </button>
           {editOpen && (
-            <div className="absolute top-6 right-0 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[110px]">
+            <div className="absolute top-6 right-0 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[120px]">
               {([
                 ["none", "Off"],
                 ["background", "Background"],
@@ -256,6 +268,13 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                   {label}
                 </button>
               ))}
+              <div className="border-t border-white/5 my-1" />
+              <button
+                onClick={() => { setEditOpen(false); window.location.href = "/?sprite-editor=true"; }}
+                className="block w-full text-left font-mono text-[10px] px-3 py-1 transition-colors text-white/50 hover:bg-white/10 hover:text-white/80"
+              >
+                Sprite Editor
+              </button>
             </div>
           )}
         </div>
