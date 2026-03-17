@@ -659,17 +659,10 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 >
                   {gameModeOn && agent.gameName ? agent.gameName : agent.name}
                 </span>
-                {gameModeOn && agent.level !== undefined && (
-                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", marginTop: "2px" }}>
-                    {agent.title && <span style={{ fontStyle: "italic" }}>&ldquo;{agent.title}&rdquo; </span>}
-                    <span>Lv{agent.level}</span>
-                  </span>
-                )}
                 {debugOn && (() => {
                   const slot = getAgentSlot(agent.id);
-                  const deskIdx = deskEligible.indexOf(agent);
-                  if (deskIdx < 0) return null;
-                  return <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>d{deskIdx}{slot !== undefined ? ` s${slot}` : ""}</span>;
+                  if (slot === undefined) return null;
+                  return <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>d{slot} s{slot}</span>;
                 })()}
               </div>
             )}
