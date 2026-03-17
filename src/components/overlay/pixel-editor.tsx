@@ -422,7 +422,7 @@ export function PixelEditor({ canvasRef }: PixelEditorProps) {
       setExportLabel("Copied!");
       setTimeout(() => setExportLabel("Export"), 1200);
     });
-  }, []);
+  }, [themeId, editMode]);
 
   if (editMode === "none") return null;
 

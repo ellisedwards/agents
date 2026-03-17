@@ -7,6 +7,10 @@ import {
   expForLevel, getLevelTitle,
 } from "../../shared/game-constants";
 import type { AgentState } from "../../shared/types";
+import fs from "fs";
+
+const STATE_FILE = "/tmp/agent-office-game-mode";
+const EXP_FILE = "/tmp/agent-office-exp.json";
 
 interface AgentExpData {
   exp: number;
@@ -23,17 +27,99 @@ interface AgentExpData {
   leveledUp: boolean; // flag for current tick, cleared after read
 }
 
+/** Serializable subset of AgentExpData for persistence */
+interface PersistedAgent {
+  exp: number;
+  level: number;
+  expToNext: number;
+  totalExp: number;
+  toolCounts: Record<string, number>;
+  firstBloodAwarded: boolean;
+  gameName: string;
+}
+
 export class ExpTracker {
   private data = new Map<string, AgentExpData>();
   private usedNames = new Set<string>();
-  private enabled = false;
+  private enabled: boolean;
+  private savePending = false;
+  private lastSaveTime = 0;
+  private static readonly SAVE_INTERVAL_MS = 5000; // debounce saves to every 5s
+
+  constructor() {
+    // Restore game mode state from previous server run
+    try { this.enabled = fs.readFileSync(STATE_FILE, "utf-8").trim() === "true"; }
+    catch { this.enabled = false; }
+    // Restore exp data
+    if (this.enabled) this.loadFromDisk();
+  }
 
   setEnabled(on: boolean) {
     if (!on) {
       this.data.clear();
       this.usedNames.clear();
+      this.deleteFromDisk();
     }
     this.enabled = on;
+    try { fs.writeFileSync(STATE_FILE, String(on)); } catch {}
+  }
+
+  private loadFromDisk(): void {
+    try {
+      const raw = fs.readFileSync(EXP_FILE, "utf-8");
+      const saved: Record<string, PersistedAgent> = JSON.parse(raw);
+      for (const [id, p] of Object.entries(saved)) {
+        this.usedNames.add(p.gameName);
+        this.data.set(id, {
+          exp: p.exp,
+          level: p.level,
+          expToNext: p.expToNext,
+          totalExp: p.totalExp,
+          streak: false,
+          streakStart: 0,
+          lastToolTime: 0,
+          recentTools: [],
+          toolCounts: p.toolCounts ?? {},
+          firstBloodAwarded: p.firstBloodAwarded,
+          gameName: p.gameName,
+          leveledUp: false, // never flash on restore
+        });
+      }
+      console.log(`[exp-tracker] restored ${this.data.size} agents from disk`);
+    } catch {
+      // No saved data or corrupt — start fresh
+    }
+  }
+
+  private scheduleSave(): void {
+    if (this.savePending) return;
+    const elapsed = Date.now() - this.lastSaveTime;
+    if (elapsed >= ExpTracker.SAVE_INTERVAL_MS) {
+      this.saveToDisk();
+    } else {
+      this.savePending = true;
+      setTimeout(() => {
+        this.savePending = false;
+        this.saveToDisk();
+      }, ExpTracker.SAVE_INTERVAL_MS - elapsed);
+    }
+  }
+
+  private saveToDisk(): void {
+    this.lastSaveTime = Date.now();
+    const out: Record<string, PersistedAgent> = {};
+    for (const [id, d] of this.data) {
+      out[id] = {
+        exp: d.exp, level: d.level, expToNext: d.expToNext,
+        totalExp: d.totalExp, toolCounts: d.toolCounts,
+        firstBloodAwarded: d.firstBloodAwarded, gameName: d.gameName,
+      };
+    }
+    try { fs.writeFileSync(EXP_FILE, JSON.stringify(out)); } catch {}
+  }
+
+  private deleteFromDisk(): void {
+    try { fs.unlinkSync(EXP_FILE); } catch {}
   }
 
   isEnabled(): boolean { return this.enabled; }
@@ -141,12 +227,17 @@ export class ExpTracker {
   private awardExp(d: AgentExpData, amount: number): void {
     d.exp += amount;
     d.totalExp += amount;
+    let didLevel = false;
     while (d.exp >= d.expToNext) {
       d.exp -= d.expToNext;
       d.level++;
       d.expToNext = expForLevel(d.level);
       d.leveledUp = true;
+      didLevel = true;
     }
+    // Save immediately on level-up, debounced otherwise
+    if (didLevel) this.saveToDisk();
+    else this.scheduleSave();
   }
 
   /** Get EXP fields to merge into AgentState. Returns null if no data or subagent. */
@@ -193,11 +284,13 @@ export class ExpTracker {
     const d = this.data.get(agentId);
     if (d) this.usedNames.delete(d.gameName);
     this.data.delete(agentId);
+    this.scheduleSave();
   }
 
   clearAll(): void {
     this.data.clear();
     this.usedNames.clear();
+    this.deleteFromDisk();
   }
 }
 

@@ -26,8 +26,9 @@ export interface ClawHealth {
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
 export type TowerSize = "small" | "medium" | "large" | "monolith";
-export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base" | "pallet-town" | "pokemoon";
+export type ThemeId = "forest" | "golden-ruins" | "tropical-island" | "lunar-base" | "pallet-town" | "pokemoon" | "jungle-ruins";
 export type EditMode = "none" | "background" | "tower-decor" | "lounge" | "posters";
+export type HudPosition = "top-left" | "bottom-left" | "bottom-right";
 
 interface TowerPrefs {
   visible: boolean;
@@ -59,7 +60,7 @@ function saveTowerPrefs(prefs: TowerPrefs) {
 }
 
 const THEME_STORAGE_KEY = "agent-office-theme";
-const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "tropical-island", "lunar-base", "pallet-town", "pokemoon"];
+const VALID_THEMES: ThemeId[] = ["forest", "golden-ruins", "tropical-island", "lunar-base", "pallet-town", "pokemoon", "jungle-ruins"];
 
 function loadGameMode(): boolean {
   try { return localStorage.getItem("agent-office-game-mode") === "true"; } catch { return false; }
@@ -96,6 +97,9 @@ interface AgentOfficeStore {
   towerOpacity: number;
   editMode: EditMode;
   gameModeOn: boolean;
+  hudPosition: HudPosition;
+  levelUpEvents: Array<{ id: string; agentId: string; name: string; level: number; teamColor: string; ts: number }>;
+  addLevelUp: (agentId: string, name: string, level: number, teamColor: string) => void;
   setAgents: (agents: AgentState[]) => void;
   selectAgent: (id: string | null) => void;
   setConnectionStatus: (status: AgentOfficeStore["connectionStatus"]) => void;
@@ -116,6 +120,7 @@ interface AgentOfficeStore {
   setTowerOpacity: (opacity: number) => void;
   setEditMode: (mode: EditMode) => void;
   setGameModeOn: (on: boolean) => void;
+  setHudPosition: (pos: HudPosition) => void;
 }
 
 const initialTower = loadTowerPrefs();
@@ -142,6 +147,16 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   towerOpacity: initialTower.opacity,
   editMode: "none",
   gameModeOn: loadGameMode(),
+  hudPosition: (localStorage.getItem("agent-office-hud-pos") as HudPosition) || "top-left",
+  levelUpEvents: [],
+  addLevelUp: (agentId, name, level, teamColor) => {
+    const ev = { id: `${agentId}-${level}-${Date.now()}`, agentId, name, level, teamColor, ts: Date.now() };
+    set({ levelUpEvents: [...get().levelUpEvents, ev] });
+    // Auto-remove after 3s
+    setTimeout(() => {
+      set({ levelUpEvents: get().levelUpEvents.filter(e => e.id !== ev.id) });
+    }, 3000);
+  },
   setAgents: (incoming) => {
     const now = Date.now();
     const prev = get().agents;
@@ -208,6 +223,10 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled: on }),
     }).catch(() => {});
+  },
+  setHudPosition: (pos) => {
+    set({ hudPosition: pos });
+    localStorage.setItem("agent-office-hud-pos", pos);
   },
 }));
 

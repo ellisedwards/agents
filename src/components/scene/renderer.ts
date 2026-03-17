@@ -2,7 +2,7 @@ import { TEAM_COLORS, type AgentState } from "@/shared/types";
 import type { CharacterType } from "../characters/sprite-cache";
 import { getSprite, type buildSpriteCache } from "../characters/sprite-cache";
 import { assignDesks, DESK_POSITIONS } from "./desk-layout";
-import { drawEnvironment, drawDeskFronts, getPalletTownBg } from "./environment";
+import { drawEnvironment, drawDeskFronts, getPalletTownBg, getJungleRuinsBg } from "./environment";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../canvas-transform";
 import {
   createWalkState,
@@ -1186,8 +1186,9 @@ export function renderScene(
   ctx.imageSmoothingEnabled = false;
   currentFrame = frame;
 
-  // Pallet Town: don't render anything until the background PNG is loaded
+  // PNG-backed themes: don't render anything until the background PNG is loaded
   if (theme.id === "pallet-town" && !getPalletTownBg()) return;
+  if (theme.id === "jungle-ruins" && !getJungleRuinsBg()) return;
 
   // 0. Per-theme vertical offset for agents and desks
   const oY = theme.floorOffsetY ?? 0;
@@ -1332,6 +1333,12 @@ export function renderScene(
     const decorAlpha = Math.max(0, (monolithTransition - 0.4) / 0.6);
     if (_tv && _ts === "monolith" && decorAlpha > 0) {
       ctx.globalAlpha = decorAlpha;
+      // Jungle Ruins hardcoded tower decoration
+      if (theme.id === "jungle-ruins") {
+        ctx.fillStyle = "#57575b";
+        ctx.fillRect(147, 53, 1, 2);
+        ctx.fillRect(166, 53, 1, 2);
+      }
       const towerPixels = loadDecoPixels(theme.id, "tower-decor");
       for (const p of towerPixels) {
         ctx.fillStyle = p.color;
@@ -1339,31 +1346,29 @@ export function renderScene(
       }
       ctx.globalAlpha = 1;
     }
+
+    // Posters/signs drawn here so they sit behind the time-of-day tint
+    const { statusPosterOn: _sp, healthPosterOn: _hp } = useAgentOfficeStore.getState();
+    const _clawHealth = useAgentOfficeStore.getState().clawHealth;
+    const _posterBaseX = BUILDING_X + 33 + 5;
+    const _posterContentW = 3 * 3 + 1 + 2;
+    const _posterTotalW = _posterContentW + 2 * 2 + 2;
+    const _showStatus = _sp && monitors && monitors.length > 0;
+
+    if (_showStatus) {
+      renderStatusPoster(ctx, monitors!, theme);
+    }
+    if (_hp && _clawHealth) {
+      const _healthX = _showStatus ? _posterBaseX + _posterTotalW + 4 : _posterBaseX;
+      renderHealthPoster(ctx, _clawHealth, theme, _healthX);
+    }
+    // Poster decoration pixels
+    const posterPixels = loadDecoPixels(theme.id, "posters");
+    for (const p of posterPixels) {
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x, p.y, 1, 1);
+    }
   }, editMode !== "none");
-
-  // 4.5. Posters on the back wall
-  const { statusPosterOn, healthPosterOn } = useAgentOfficeStore.getState();
-  const clawHealth = useAgentOfficeStore.getState().clawHealth;
-  const posterBaseX = BUILDING_X + 33 + 5;
-  const posterContentW = 3 * 3 + 1 + 2;
-  const posterTotalW = posterContentW + 2 * 2 + 2; // contentW + pad*2 + border
-  const showStatusPoster = statusPosterOn && monitors && monitors.length > 0;
-
-  if (showStatusPoster) {
-    renderStatusPoster(ctx, monitors!, theme);
-  }
-
-  if (healthPosterOn && clawHealth) {
-    const healthX = showStatusPoster ? posterBaseX + posterTotalW + 4 : posterBaseX;
-    renderHealthPoster(ctx, clawHealth, theme, healthX);
-  }
-
-  // 4.55. Poster decoration pixels (on top of posters, on back wall)
-  const posterPixels = loadDecoPixels(theme.id, "posters");
-  for (const p of posterPixels) {
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y, 1, 1);
-  }
 
   // 4.6. Monolith (in-scene pixel tower) with materialize transition
   const { towerSize, towerVisible } = useAgentOfficeStore.getState();
@@ -2057,7 +2062,8 @@ export function renderScene(
 
       // Filled portion
       ctx.globalAlpha = 0.8;
-      ctx.fillRect(barX, barY, Math.max(1, Math.floor(barW * fill)), 1);
+      const fillW = Math.round(barW * fill);
+      if (fillW > 0) ctx.fillRect(barX, barY, fillW, 1);
       ctx.globalAlpha = 1;
 
       // Streak flame
@@ -2083,7 +2089,7 @@ export function renderScene(
     for (const agent of agents) {
       if (agent.level === undefined) continue;
       const prev = previousLevels.get(agent.id) ?? agent.level;
-      if (agent.level > prev) {
+      if (agent.level > prev && agent.level - prev === 1) {
         pokeballFlashes.set(agent.id, 20);
         const wsPos = getAgentPosition(agent.id);
         const deskPos = deskMap.get(agent.id);
@@ -2093,6 +2099,9 @@ export function renderScene(
           const py = "characterY" in pos ? (pos as { characterY: number }).characterY : pos.y;
           triggerLevelUp(px, py, TEAM_COLORS[agent.teamColor] ?? "#88cc88");
         }
+        // Emit to store for HTML overlay
+        const displayName = agent.gameName ?? agent.name;
+        useAgentOfficeStore.getState().addLevelUp(agent.id, displayName, agent.level, agent.teamColor);
       }
       previousLevels.set(agent.id, agent.level);
     }
@@ -2157,18 +2166,7 @@ export function renderScene(
 
     const t = lu.frame / 60;
 
-    // Rising "LEVEL UP!" text
-    ctx.globalAlpha = Math.max(0, 1 - t);
-    ctx.fillStyle = "#000000";
-    ctx.font = "bold 5px monospace";
-    ctx.textAlign = "center";
-    const textY = lu.y - 10 - lu.frame * 0.33;
-    ctx.fillText("LEVEL UP!", lu.x + 1, textY + 1); // shadow
-    ctx.fillStyle = "#ffcc44";
-    ctx.fillText("LEVEL UP!", lu.x, textY);
-    ctx.textAlign = "start";
-
-    // Sparkle particles
+    // Sparkle particles (text moved to HTML overlay)
     for (const p of lu.particles) {
       const spread = lu.frame * p.speed;
       const px = lu.x + Math.cos(p.angle) * spread;

@@ -71,6 +71,9 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const setEditMode = useAgentOfficeStore((s) => s.setEditMode);
   const gameModeOn = useAgentOfficeStore((s) => s.gameModeOn);
   const setGameModeOn = useAgentOfficeStore((s) => s.setGameModeOn);
+  const hudPosition = useAgentOfficeStore((s) => s.hudPosition);
+  const setHudPosition = useAgentOfficeStore((s) => s.setHudPosition);
+  const levelUpEvents = useAgentOfficeStore((s) => s.levelUpEvents);
   const deskEligible = agents.filter((a) =>
     a.state !== "lounging" && a.state !== "departing" &&
     (a.subagentClass === null || a.subagentClass === undefined)
@@ -167,29 +170,39 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       style={{ pointerEvents: "auto" }}
     >
       {/* Game mode floating stats panel */}
-      {gameModeOn && (() => {
+      {gameModeOn && editMode === "none" && (() => {
         const ccMains = agents.filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined));
         if (ccMains.length === 0) return null;
         const record = parseInt(localStorage.getItem("game-mode-record") ?? "1", 10);
         const maxLevel = Math.max(...ccMains.map(a => a.level ?? 1), 1);
         if (maxLevel > record) localStorage.setItem("game-mode-record", String(maxLevel));
         return (
-          <div className="absolute top-2 left-2 z-30 bg-[#1e1e2e]/90 border border-white/10 rounded-md px-3 py-2 space-y-1.5">
+          <div className={`absolute z-30 bg-[#1e1e2e]/90 border border-white/10 rounded-md px-3 py-2 space-y-1.5 ${
+            hudPosition === "top-left" ? "top-2 left-2" :
+            hudPosition === "bottom-left" ? "left-2" :
+            "right-2"
+          }`} style={hudPosition !== "top-left" ? { bottom: "calc(1.5rem + 8px)" } : undefined}>
             {ccMains.map(a => {
               const teamHex = TEAM_COLORS[a.teamColor] ?? "#88cc88";
               const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
               const isRecord = (a.level ?? 1) >= record && record > 1;
               return (
-                <div key={a.id} className="grid items-center gap-x-2" style={{ gridTemplateColumns: "10px 50px 14px 28px 50px auto" }}>
+                <div key={a.id} className="grid items-center gap-x-2" style={{ gridTemplateColumns: "10px 95px 32px 70px 16px" }}>
                   <span style={{ color: teamHex }} className="text-[11px]">●</span>
-                  <span className="font-mono text-[11px] text-white/70 truncate">
-                    {a.gameName ?? a.name}
-                  </span>
-                  <span className="text-[9px] text-center">{isRecord ? "👑" : ""}</span>
+                  <div className="flex flex-col">
+                    <span className="font-mono text-[11px] text-white/70 truncate">
+                      {a.gameName ?? a.name}
+                    </span>
+                    {a.title && (
+                      <span className="font-mono text-[8px] text-white/30 italic truncate -mt-0.5">
+                        {a.title}
+                      </span>
+                    )}
+                  </div>
                   <span className="font-mono text-[10px] text-white/40 text-right">
                     Lv{a.level ?? 1}
                   </span>
-                  <div style={{ width: "50px", height: "4px", position: "relative", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ width: "70px", height: "5px", position: "relative", borderRadius: "2px", overflow: "hidden" }}>
                     <div style={{ position: "absolute", inset: 0, background: `${teamHex}33` }} />
                     <div style={{
                       position: "absolute", top: 0, left: 0, bottom: "1px",
@@ -202,11 +215,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                       background: `${teamHex}80`,
                     }} />
                   </div>
-                  {a.title ? (
-                    <span className="font-mono text-[9px] text-white/30 italic truncate">
-                      {a.title}
-                    </span>
-                  ) : <span />}
+                  <span className="text-[9px] text-center">{isRecord ? "👑" : ""}</span>
                 </div>
               );
             })}
@@ -396,6 +405,22 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
               </button>
             </label>
 
+            {/* HUD position */}
+            {gameModeOn && (
+              <div className="space-y-1">
+                <span className="font-mono text-[10px] text-white/50 block">HUD Position</span>
+                <select
+                  value={hudPosition}
+                  onChange={(e) => setHudPosition(e.target.value as import("../store").HudPosition)}
+                  className="w-full bg-white/10 text-white/70 font-mono text-[10px] rounded px-1.5 py-1 border border-white/10 outline-none"
+                >
+                  <option value="top-left" className="bg-[#1e1e2e]">Top Left</option>
+                  <option value="bottom-left" className="bg-[#1e1e2e]">Bottom Left</option>
+                  <option value="bottom-right" className="bg-[#1e1e2e]">Bottom Right</option>
+                </select>
+              </div>
+            )}
+
             {/* Tower size */}
             <div className="space-y-1">
               <span className="font-mono text-[10px] text-white/50 block">Tower Size</span>
@@ -573,6 +598,52 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
           </div>
         );
       })}
+
+      {/* Level-up toasts */}
+      {levelUpEvents.map((ev) => {
+        const teamHex = TEAM_COLORS[ev.teamColor] ?? "#88cc88";
+        const age = Date.now() - ev.ts;
+        return (
+          <div
+            key={ev.id}
+            className="absolute left-1/2 z-40 pointer-events-none font-mono text-center"
+            style={{
+              top: "30%",
+              transform: "translateX(-50%)",
+              animation: "levelUpFloat 3s ease-out forwards",
+            }}
+          >
+            <div
+              className="text-[18px] font-bold tracking-wide"
+              style={{
+                color: "#ffcc44",
+                textShadow: `0 0 12px ${teamHex}, 0 0 24px ${teamHex}80, 0 2px 4px rgba(0,0,0,0.8)`,
+              }}
+            >
+              LEVEL UP!
+            </div>
+            <div
+              className="text-[13px] mt-0.5"
+              style={{
+                color: teamHex,
+                textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+              }}
+            >
+              {ev.name} reached Lv{ev.level}
+            </div>
+          </div>
+        );
+      })}
+
+      <style>{`
+        @keyframes levelUpFloat {
+          0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.8); }
+          10% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
+          20% { transform: translateX(-50%) translateY(0) scale(1); }
+          70% { opacity: 1; }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(0.95); }
+        }
+      `}</style>
     </div>
   );
 }

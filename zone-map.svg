@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 320 200">
+  <defs>
+    <style>
+      text { font-family: monospace; font-size: 4px; fill: white; }
+      .label { font-size: 5px; font-weight: bold; }
+      .coords { font-size: 3px; fill: rgba(255,255,255,0.7); }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="320" height="200" fill="#1a2a1a"/>
+
+  <!-- Border zone -->
+  <rect x="0" y="0" width="320" height="200" fill="none" stroke="#444" stroke-width="0.5" stroke-dasharray="2,2"/>
+  <text x="2" y="6" class="coords">canvas: 320x200</text>
+
+  <!-- Building bounds -->
+  <rect x="22" y="26" width="276" height="148" fill="none" stroke="#5588aa" stroke-width="1"/>
+  <text x="24" y="24" class="label" fill="#5588aa">BUILDING (22,26 276x148)</text>
+
+  <!-- Floor area -->
+  <rect x="22" y="52" width="276" height="122" fill="#2a3a2a" stroke="#66aa66" stroke-width="0.5" stroke-dasharray="1,1"/>
+  <text x="24" y="50" class="coords" fill="#66aa66">FLOOR (22,52 276x122)</text>
+
+  <!-- Fire/Campfire -->
+  <rect x="27" y="28" width="24" height="20" fill="none" stroke="#ff6622" stroke-width="1"/>
+  <circle cx="39" cy="42" r="8" fill="none" stroke="#ff6622" stroke-width="0.3" stroke-dasharray="1,1"/>
+  <text x="27" y="27" class="label" fill="#ff6622">FIRE</text>
+  <text x="27" y="51" class="coords" fill="#ff6622">(27,28) glow@(39,42)</text>
+
+  <!-- Tower (default position) -->
+  <rect x="12" y="0" width="20" height="60" fill="none" stroke="#aa44ff" stroke-width="1"/>
+  <text x="12" y="64" class="label" fill="#aa44ff">TOWER</text>
+  <text x="12" y="68" class="coords" fill="#aa44ff">(12,0) user-moveable</text>
+
+  <!-- Desk grid area -->
+  <rect x="40" y="70" width="214" height="90" fill="none" stroke="#ffcc44" stroke-width="0.5" stroke-dasharray="2,1"/>
+
+  <!-- Back row (top visually) desks 0,1,2 -->
+  <!-- Desk 0 - Front-Left -->
+  <rect x="58" y="82" width="20" height="16" fill="none" stroke="#44ddff" stroke-width="0.8"/>
+  <circle cx="68" cy="92" r="3" fill="none" stroke="#ff4444" stroke-width="0.6"/>
+  <text x="58" y="80" class="label" fill="#44ddff">D0</text>
+  <text x="58" y="102" class="coords" fill="#44ddff">desk(75,95) char(68,92)</text>
+
+  <!-- Desk 1 - Front-Center -->
+  <rect x="129" y="82" width="20" height="16" fill="none" stroke="#44ddff" stroke-width="0.8"/>
+  <circle cx="139" cy="92" r="3" fill="none" stroke="#ff4444" stroke-width="0.6"/>
+  <text x="129" y="80" class="label" fill="#44ddff">D1</text>
+  <text x="129" y="102" class="coords" fill="#44ddff">desk(146,95) char(139,92)</text>
+
+  <!-- Desk 2 - Front-Right -->
+  <rect x="200" y="82" width="20" height="16" fill="none" stroke="#44ddff" stroke-width="0.8"/>
+  <circle cx="210" cy="92" r="3" fill="none" stroke="#ff4444" stroke-width="0.6"/>
+  <text x="200" y="80" class="label" fill="#44ddff">D2</text>
+  <text x="200" y="102" class="coords" fill="#44ddff">desk(217,95) char(210,92)</text>
+
+  <!-- Desk 3 - Back-Left -->
+  <rect x="58" y="122" width="20" height="16" fill="none" stroke="#44ffaa" stroke-width="0.8"/>
+  <circle cx="68" cy="132" r="3" fill="none" stroke="#ff4444" stroke-width="0.6"/>
+  <text x="58" y="120" class="label" fill="#44ffaa">D3</text>
+  <text x="58" y="142" class="coords" fill="#44ffaa">desk(75,135) char(68,132)</text>
+
+  <!-- Desk 4 - Back-Center -->
+  <rect x="129" y="122" width="20" height="16" fill="none" stroke="#44ffaa" stroke-width="0.8"/>
+  <circle cx="139" cy="132" r="3" fill="none" stroke="#ff4444" stroke-width="0.6"/>
+  <text x="129" y="120" class="label" fill="#44ffaa">D4</text>
+  <text x="129" y="142" class="coords" fill="#44ffaa">desk(146,135) char(139,132)</text>
+
+  <!-- Desk 5 - Back-Right -->
+  <rect x="200" y="122" width="20" height="16" fill="none" stroke="#44ffaa" stroke-width="0.8"/>
+  <circle cx="210" cy="132" r="3" fill="none" stroke="#ff4444" stroke-width="0.6"/>
+  <text x="200" y="120" class="label" fill="#44ffaa">D5</text>
+  <text x="200" y="142" class="coords" fill="#44ffaa">desk(217,135) char(210,132)</text>
+
+  <!-- Legend -->
+  <rect x="220" y="2" width="96" height="48" fill="#111" fill-opacity="0.8" rx="2"/>
+  <text x="224" y="8" class="label" fill="white">LEGEND</text>
+  <line x1="224" y1="14" x2="232" y2="14" stroke="#5588aa" stroke-width="1"/>
+  <text x="234" y="16" class="coords" fill="white">Building</text>
+  <line x1="224" y1="20" x2="232" y2="20" stroke="#66aa66" stroke-width="0.5" stroke-dasharray="1,1"/>
+  <text x="234" y="22" class="coords" fill="white">Floor</text>
+  <line x1="224" y1="26" x2="232" y2="26" stroke="#ff6622" stroke-width="1"/>
+  <text x="234" y="28" class="coords" fill="white">Fire/Campfire</text>
+  <line x1="224" y1="32" x2="232" y2="32" stroke="#aa44ff" stroke-width="1"/>
+  <text x="234" y="34" class="coords" fill="white">Tower (default)</text>
+  <line x1="224" y1="38" x2="232" y2="38" stroke="#44ddff" stroke-width="0.8"/>
+  <text x="234" y="40" class="coords" fill="white">Front desks (0-2)</text>
+  <line x1="224" y1="44" x2="232" y2="44" stroke="#44ffaa" stroke-width="0.8"/>
+  <text x="234" y="46" class="coords" fill="white">Back desks (3-5)</text>
+
+  <!-- Red dots = character positions -->
+  <text x="224" y="54" class="coords" fill="#ff4444">● = character position</text>
+</svg>

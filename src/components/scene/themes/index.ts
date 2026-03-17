@@ -5,6 +5,7 @@ export { tropicalIslandTheme } from "./tropical-island";
 export { lunarBaseTheme } from "./lunar-base";
 export { palletTownTheme } from "./pallet-town";
 export { pokemoonTheme } from "./pokemoon";
+export { jungleRuinsTheme } from "./jungle-ruins";
 
 import { forestTheme } from "./forest";
 import { goldenRuinsTheme } from "./golden-ruins";
@@ -12,6 +13,7 @@ import { tropicalIslandTheme } from "./tropical-island";
 import { lunarBaseTheme } from "./lunar-base";
 import { palletTownTheme } from "./pallet-town";
 import { pokemoonTheme } from "./pokemoon";
+import { jungleRuinsTheme } from "./jungle-ruins";
 import type { SceneTheme } from "./types";
 
 export const ALL_THEMES: SceneTheme[] = [
@@ -21,6 +23,7 @@ export const ALL_THEMES: SceneTheme[] = [
   lunarBaseTheme,
   palletTownTheme,
   pokemoonTheme,
+  jungleRuinsTheme,
 ];
 
 export function getThemeById(id: string): SceneTheme {

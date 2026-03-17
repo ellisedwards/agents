@@ -2,6 +2,7 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../canvas-transform";
 import type { SceneTheme } from "./themes/types";
 import { forestTheme } from "./themes/forest";
 import palletTownBgUrl from "../../assets/pallet-town-bg.png";
+import jungleRuinsBgUrl from "../../assets/jungle-ruins-bg.png";
 import { getAgentLevelAtDesk, getCurrentFrame } from "./renderer";
 
 const W = CANVAS_WIDTH;
@@ -9,18 +10,23 @@ const H = CANVAS_HEIGHT;
 const BORDER = 22;
 
 // Preloaded background images
-let palletTownBg: HTMLImageElement | null = null;
-let palletTownBgLoading = false;
-export function getPalletTownBg(): HTMLImageElement | null {
-  if (palletTownBg) return palletTownBg;
-  if (!palletTownBgLoading) {
-    palletTownBgLoading = true;
-    const img = new Image();
-    img.src = palletTownBgUrl;
-    img.onload = () => { palletTownBg = img; };
-  }
-  return null;
+function preloadBg(url: string): () => HTMLImageElement | null {
+  let img: HTMLImageElement | null = null;
+  let loading = false;
+  return () => {
+    if (img) return img;
+    if (!loading) {
+      loading = true;
+      const el = new Image();
+      el.src = url;
+      el.onload = () => { img = el; };
+    }
+    return null;
+  };
 }
+
+export const getPalletTownBg = preloadBg(palletTownBgUrl);
+export const getJungleRuinsBg = preloadBg(jungleRuinsBgUrl);
 
 // --- Lunar shooting stars ---
 interface ShootingStar {
@@ -909,8 +915,8 @@ function drawFireVessel(ctx: CanvasRenderingContext2D, fpx: number, fpy: number,
     const cyanGlow = 0.03 + 0.02 * Math.sin(frame * 0.06);
     rect(ctx, fpx - 2, fpy + 22, 28, 6, `rgba(34,170,204,${cyanGlow.toFixed(3)})`);
     return; // skip the default orange glow below
-  } else if (fv.style === "fire-pit" && theme.id === "pallet-town") {
-    // Pallet town: flames only, no stone — fire pit is in the bg image
+  } else if (fv.style === "fire-pit" && (theme.id === "pallet-town" || theme.id === "jungle-ruins")) {
+    // PNG-backed themes: flames only, no stone — fire pit is in the bg image
     drawFlames(ctx, fpx - 1, fpy + 2, frame);
   } else {
     // Fire pit — stone ring on ground
@@ -1570,7 +1576,7 @@ function drawDeskFront(
     rect(ctx, dx + 7, dy + 8, 2, 3, d.legColor);
   }
   if (hasLaptop) {
-    if (theme.id === "pallet-town" || theme.id === "pokemoon") {
+    if (theme.id === "pallet-town" || theme.id === "pokemoon" || theme.id === "jungle-ruins") {
       // Pokeball — 7x7 centered at dx+3, dy-1
       const bx = dx + 1;
       const by = dy - 1;
@@ -1823,17 +1829,19 @@ export function drawEnvironment(
 ) {
   const tod = timeOverride ?? getTimeOfDay();
 
-  // Pallet Town: use preloaded background image if available
-  const useBgImage = theme.id === "pallet-town" && getPalletTownBg();
+  // PNG-backed themes: use preloaded background image if available
+  const palletBg = theme.id === "pallet-town" && getPalletTownBg();
+  const jungleBg = theme.id === "jungle-ruins" && getJungleRuinsBg();
+  const useBgImage = palletBg || jungleBg;
 
   // Always draw sky first — bg image has transparent sky so it shows through
   drawSky(ctx, tod, theme);
 
   if (useBgImage) {
     // Draw PNG on top — transparent sky lets the procedural sky show through
-    ctx.drawImage(palletTownBg!, 0, 1, W, H);
-  } else if (theme.id === "pallet-town") {
-    // Pallet Town without PNG loaded — just show sky, skip everything
+    ctx.drawImage(useBgImage, 0, 1, W, H);
+  } else if (theme.id === "pallet-town" || theme.id === "jungle-ruins") {
+    // PNG-backed theme without image loaded — just show sky, skip everything
     return;
   } else {
     for (const feat of theme.backgroundFeatures) {

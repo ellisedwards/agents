@@ -16,19 +16,37 @@ else
   timeout 5 bash -c 'source "$HOME/.zshrc" 2>/dev/null' || true
 fi
 
+# --- Fast path: if server is already running and healthy, just open browser ---
+if curl -s "http://localhost:$PORT/api/build-id" > /dev/null 2>&1; then
+  open -a "Google Chrome" "http://localhost:$PORT?t=$(date +%s)"
+  exit 0
+fi
+
+# --- Slow path: build + start server ---
+
 # Prevent concurrent launches (macOS-compatible using mkdir as atomic lock)
 # Clean up any non-directory lockfile left by previous script versions
 [ -f "$LOCKFILE" ] && rm -f "$LOCKFILE"
 if ! mkdir "$LOCKFILE" 2>/dev/null; then
-  # Check if lock is stale (older than 2 minutes)
-  if find "$LOCKFILE" -maxdepth 0 -mmin +2 2>/dev/null | grep -q .; then
+  # Check if lock is stale (older than 30 seconds)
+  if find "$LOCKFILE" -maxdepth 0 -mmin +0.5 2>/dev/null | grep -q .; then
     rm -rf "$LOCKFILE"
     mkdir "$LOCKFILE" 2>/dev/null || true
   else
-    osascript -e 'display alert "Agent Office" message "Another launch is already in progress."'
+    # Another launch is in progress — just wait for it and open browser
+    for i in $(seq 1 40); do
+      if curl -s "http://localhost:$PORT/api/build-id" > /dev/null 2>&1; then
+        open -a "Google Chrome" "http://localhost:$PORT?t=$(date +%s)"
+        exit 0
+      fi
+      sleep 0.5
+    done
+    osascript -e 'display alert "Agent Office" message "Launch timed out. Check /tmp/agent-office.log"'
     exit 1
   fi
 fi
+# Always clean up lock on exit — write PID so we can detect stale locks
+echo $$ > "$LOCKFILE/pid"
 trap 'rm -rf "$LOCKFILE"' EXIT
 
 # Kill previous server — saved PID first
@@ -57,6 +75,13 @@ echo "=== Build started $(date) ===" > "$LOG"
 if ! npm run build >> "$LOG" 2>&1; then
   echo "=== BUILD FAILED ===" >> "$LOG"
   osascript -e 'display alert "Agent Office" message "Build failed. Check /tmp/agent-office.log"'
+  exit 1
+fi
+
+# Verify build output exists before starting server
+if [ ! -f "$APP_DIR/dist/client/index.html" ]; then
+  echo "=== BUILD OUTPUT MISSING (dist/client/index.html) ===" >> "$LOG"
+  osascript -e 'display alert "Agent Office" message "Build succeeded but output missing. Check /tmp/agent-office.log"'
   exit 1
 fi
 
