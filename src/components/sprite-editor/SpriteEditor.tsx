@@ -2,6 +2,14 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { SpriteDefinition, SpriteFrame, EditorTool, SpriteCategory } from "./types";
 import { pixelKey, parsePixelKey, pixelRectsToMap, mapToPixelRects } from "./types";
 import { getBuiltInSprites, loadCustomSprites, saveCustomSprites } from "./sprite-library";
+import {
+  Pencil, Eraser, Pipette, PaintBucket, BoxSelect,
+  FlipHorizontal2, FlipVertical2,
+  Trash2, Undo2, Redo2, Save, ClipboardCopy,
+  ImagePlus, Sparkles, Settings, X, ArrowLeft,
+  Grid3x3, Eye, EyeOff, ZoomIn, Copy, Plus,
+  Play, Square,
+} from "lucide-react";
 
 // ─── Expected states per category ───────────────────────────────────────────
 const EXPECTED_STATES: Record<SpriteCategory, string[]> = {
@@ -908,7 +916,7 @@ export function SpriteEditor() {
               className="text-[10px] text-white/40 hover:text-white/80 transition-colors flex items-center gap-1"
               title="Back to Office"
             >
-              <span className="text-[12px]">&larr;</span> Back to Office
+              <ArrowLeft size={12} /> <span>Back to Office</span>
             </button>
           </div>
           <div className="flex items-center justify-between mb-2">
@@ -953,23 +961,23 @@ export function SpriteEditor() {
         {/* Toolbar */}
         <div className="h-10 bg-[#12121e] border-b border-white/10 flex items-center px-3 gap-3">
           {/* Tools */}
-          <div className="flex gap-1">
+          <div className="flex gap-0.5">
             {([
-              ["pencil", "B"],
-              ["eraser", "E"],
-              ["eyedropper", "I"],
-              ["fill", "F"],
-              ["select", "S"],
-            ] as [EditorTool, string][]).map(([t, key]) => (
+              ["pencil", "B", Pencil],
+              ["eraser", "E", Eraser],
+              ["eyedropper", "I", Pipette],
+              ["fill", "F", PaintBucket],
+              ["select", "S", BoxSelect],
+            ] as [EditorTool, string, typeof Pencil][]).map(([t, key, Icon]) => (
               <button
                 key={t}
                 onClick={() => setTool(t)}
-                className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                className={`p-1.5 rounded transition-colors ${
                   tool === t ? "bg-white/20 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/8"
                 }`}
                 title={`${t} (${key})`}
               >
-                {t}
+                <Icon size={14} />
               </button>
             ))}
           </div>
@@ -977,20 +985,12 @@ export function SpriteEditor() {
           <div className="w-px h-5 bg-white/10" />
 
           {/* Flip buttons */}
-          <div className="flex gap-1">
-            <button
-              onClick={flipH}
-              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors"
-              title="Flip Horizontal"
-            >
-              Flip H
+          <div className="flex gap-0.5">
+            <button onClick={flipH} className="p-1.5 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors" title="Flip Horizontal">
+              <FlipHorizontal2 size={14} />
             </button>
-            <button
-              onClick={flipV}
-              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors"
-              title="Flip Vertical"
-            >
-              Flip V
+            <button onClick={flipV} className="p-1.5 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors" title="Flip Vertical">
+              <FlipVertical2 size={14} />
             </button>
           </div>
 
@@ -1017,7 +1017,7 @@ export function SpriteEditor() {
 
           {/* Zoom */}
           <div className="flex items-center gap-1">
-            <span className="text-[9px] text-white/30">Zoom</span>
+            <ZoomIn size={12} className="text-white/30" />
             <input
               type="range"
               min={8}
@@ -1029,15 +1029,12 @@ export function SpriteEditor() {
             <span className="text-[9px] text-white/40">{zoom}x</span>
           </div>
 
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input type="checkbox" checked={showGrid} onChange={e => setShowGrid(e.target.checked)} className="w-3 h-3" />
-            <span className="text-[9px] text-white/40">Grid</span>
-          </label>
-
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input type="checkbox" checked={showCheckerboard} onChange={e => setShowCheckerboard(e.target.checked)} className="w-3 h-3" />
-            <span className="text-[9px] text-white/40">Transparency</span>
-          </label>
+          <button onClick={() => setShowGrid(v => !v)} className={`p-1.5 rounded transition-colors ${showGrid ? "bg-white/15 text-white/70" : "text-white/30 hover:text-white/50"}`} title="Toggle Grid (G)">
+            <Grid3x3 size={14} />
+          </button>
+          <button onClick={() => setShowCheckerboard(v => !v)} className={`p-1.5 rounded transition-colors ${showCheckerboard ? "bg-white/15 text-white/70" : "text-white/30 hover:text-white/50"}`} title="Toggle Transparency">
+            {showCheckerboard ? <Eye size={14} /> : <EyeOff size={14} />}
+          </button>
 
           <div className="w-px h-5 bg-white/10" />
 
@@ -1073,10 +1070,11 @@ export function SpriteEditor() {
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors"
+              className="p-1.5 rounded text-white/40 hover:text-white/70 hover:bg-white/8 transition-colors flex items-center gap-1"
               title="Import an image to trace"
             >
-              Import
+              <ImagePlus size={14} />
+              <span className="text-[9px]">Import</span>
             </button>
             {imageOverlay && (
               <>
@@ -1092,8 +1090,8 @@ export function SpriteEditor() {
                     disabled={aiLoading}
                     className="text-[10px] px-2 py-1 rounded bg-cyan-600/30 text-cyan-300 hover:bg-cyan-600/50 transition-colors disabled:opacity-50 flex items-center gap-1"
                   >
-                    {aiLoading && <span className="inline-block w-3 h-3 border border-cyan-300 border-t-transparent rounded-full animate-spin" />}
-                    AI Clean
+                    {aiLoading ? <span className="inline-block w-3 h-3 border border-cyan-300 border-t-transparent rounded-full animate-spin" /> : <Sparkles size={12} />}
+                    <span className="text-[9px]">AI Clean</span>
                   </button>
                 )}
                 <input
@@ -1110,7 +1108,7 @@ export function SpriteEditor() {
                   className="text-[10px] px-1 py-1 rounded text-red-400/50 hover:text-red-400 transition-colors"
                   title="Remove overlay"
                 >
-                  X
+                  <X size={12} />
                 </button>
               </>
             )}
@@ -1119,38 +1117,34 @@ export function SpriteEditor() {
               className={`text-[10px] px-1.5 py-1 rounded transition-colors ${showSettings ? "bg-white/15 text-white/70" : "text-white/30 hover:text-white/50"}`}
               title="API Settings"
             >
-              gear
+              <Settings size={14} />
             </button>
           </div>
 
           <div className="flex-1" />
 
           {/* Actions */}
-          <div className="flex gap-1">
-            <button onClick={clearFrame}
-              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8"
-              title="Clear all pixels in this frame">
-              Clear
+          <div className="flex gap-0.5">
+            <button onClick={clearFrame} className="p-1.5 rounded text-white/40 hover:text-white/70 hover:bg-white/8" title="Clear frame">
+              <Trash2 size={14} />
             </button>
-            <button onClick={undo} disabled={undoStack.length === 0}
-              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 disabled:opacity-20">
-              Undo
+            <button onClick={undo} disabled={undoStack.length === 0} className="p-1.5 rounded text-white/40 hover:text-white/70 hover:bg-white/8 disabled:opacity-20" title="Undo (Cmd+Z)">
+              <Undo2 size={14} />
             </button>
-            <button onClick={redo} disabled={redoStack.length === 0}
-              className="text-[10px] px-2 py-1 rounded text-white/40 hover:text-white/70 hover:bg-white/8 disabled:opacity-20">
-              Redo
+            <button onClick={redo} disabled={redoStack.length === 0} className="p-1.5 rounded text-white/40 hover:text-white/70 hover:bg-white/8 disabled:opacity-20" title="Redo (Cmd+Shift+Z)">
+              <Redo2 size={14} />
             </button>
-            <button onClick={saveFrame}
-              className="text-[10px] px-2 py-1 rounded bg-green-600/30 text-green-300 hover:bg-green-600/50 transition-colors">
-              Save
+            <button onClick={saveFrame} className="p-1.5 rounded bg-green-600/30 text-green-300 hover:bg-green-600/50 transition-colors" title="Save frame">
+              <Save size={14} />
             </button>
             <button onClick={exportPatch}
-              className={`text-[10px] px-2 py-1 rounded transition-colors ${
+              className={`p-1.5 rounded transition-colors flex items-center gap-1 ${
                 dirtySprites.size > 0
                   ? "bg-blue-600/30 text-blue-300 hover:bg-blue-600/50"
                   : "text-white/40 hover:text-white/70 hover:bg-white/8"
-              }`}>
-              {exportLabel}{dirtySprites.size > 0 && ` (${dirtySprites.size})`}
+              }`} title="Export Patch">
+              <ClipboardCopy size={14} />
+              {dirtySprites.size > 0 && <span className="text-[9px]">{dirtySprites.size}</span>}
             </button>
           </div>
         </div>
@@ -1311,7 +1305,7 @@ export function SpriteEditor() {
                     animating ? "bg-yellow-500/30 text-yellow-300" : "bg-white/8 text-white/40 hover:text-white/60"
                   }`}
                 >
-                  {animating ? "Stop" : "Animate"}
+                  {animating ? <Square size={10} /> : <Play size={10} />}
                 </button>
               </div>
             )}
@@ -1322,7 +1316,9 @@ export function SpriteEditor() {
         <div className="flex-1 overflow-y-auto p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] text-white/40">FRAMES</span>
-            <button onClick={duplicateFrame} className="text-[9px] text-white/30 hover:text-white/60" title="Duplicate current frame">dup</button>
+            <button onClick={duplicateFrame} className="p-1 rounded text-white/30 hover:text-white/60 hover:bg-white/8" title="Duplicate current frame">
+              <Copy size={12} />
+            </button>
           </div>
 
           {/* Expected states dropdown */}
