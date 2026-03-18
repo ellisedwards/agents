@@ -1872,9 +1872,18 @@ export function renderScene(
       }
     }
 
-    // Trainer blink — swap to blink sprite randomly
+    // Detect sleeping CC agents (idle 15+ min) — must happen before blink
     let effectiveSpriteState = entity.spriteState;
-    if (entity.spriteKey === "trainer" && !entity.isUnreachable) {
+    const sleepAgentData = agentById.get(entity.agentId);
+    const sleepIdleDuration = sleepAgentData ? Date.now() - sleepAgentData.lastActivity : 0;
+    const isAgentSleeping = entity.activityState === "idle" && entity.source === "cc"
+        && sleepIdleDuration > 15 * 60 * 1000;
+
+    if (isAgentSleeping) {
+      // Use closed/half-lidded eyes for sleeping agents
+      effectiveSpriteState = "reading";
+    } else if (entity.spriteKey === "trainer" && !entity.isUnreachable) {
+      // Trainer blink — swap to blink sprite randomly (skip when sleeping)
       if (!blinkTimers.has(entity.agentId)) {
         blinkTimers.set(entity.agentId, 60 + Math.floor(Math.random() * 150));
       }
@@ -1892,14 +1901,6 @@ export function renderScene(
           blinkTimers.set(entity.agentId, timer);
         }
       }
-    }
-
-    // Use closed-eyes sprite for sleeping CC agents (idle 15+ min)
-    const sleepAgentData = agentById.get(entity.agentId);
-    const sleepIdleDuration = sleepAgentData ? Date.now() - sleepAgentData.lastActivity : 0;
-    if (entity.activityState === "idle" && entity.source === "cc"
-        && sleepIdleDuration > 15 * 60 * 1000) {
-      effectiveSpriteState = "waiting"; // closed eyes
     }
 
     const sprite = getSprite(
@@ -1973,12 +1974,8 @@ export function renderScene(
     }
 
     // Idle CC agent "zzz" — only after 15+ minutes of no activity
-    const agentData = agentById.get(entity.agentId);
-    const idleDuration = agentData ? Date.now() - agentData.lastActivity : 0;
-    const isSleeping = entity.activityState === "idle" && entity.source === "cc"
-      && !entity.isUnreachable && entity.agentId !== "__cat__"
-      && entity.agentId !== "__cat_float__" && idleDuration > 15 * 60 * 1000;
-    if (isSleeping) {
+    if (isAgentSleeping && !entity.isUnreachable
+      && entity.agentId !== "__cat__" && entity.agentId !== "__cat_float__") {
       const zPhase = Math.floor((frame + hashForPhase(entity.agentId)) / 40) % 3;
       ctx.fillStyle = "#8888aa";
       ctx.font = "4px monospace";
