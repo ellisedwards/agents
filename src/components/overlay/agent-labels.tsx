@@ -92,6 +92,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const hudPosition = useAgentOfficeStore((s) => s.hudPosition);
   const setHudPosition = useAgentOfficeStore((s) => s.setHudPosition);
   const killAgent = useAgentOfficeStore((s) => s.killAgent);
+  const storageWarning = useAgentOfficeStore((s) => s.storageWarning);
+  const dismissStorageWarning = useAgentOfficeStore((s) => s.dismissStorageWarning);
   const levelUpEvents = useAgentOfficeStore((s) => s.levelUpEvents);
   const expGainEvents = useAgentOfficeStore((s) => s.expGainEvents);
   const achievementEvents = useAgentOfficeStore((s) => s.achievementEvents);
@@ -199,6 +201,12 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       onClick={handleClick}
       style={{ pointerEvents: "auto" }}
     >
+      {storageWarning && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-yellow-900/90 border border-yellow-500/30 rounded px-3 py-1.5 flex items-center gap-2">
+          <span className="font-mono text-[10px] text-yellow-300/80">Storage full — settings may not persist</span>
+          <button onClick={dismissStorageWarning} className="font-mono text-[9px] text-yellow-500/60 hover:text-yellow-300">dismiss</button>
+        </div>
+      )}
       {/* Game mode floating stats panel */}
       {gameModeOn && editMode === "none" && (() => {
         const ccMains = agents.filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined));

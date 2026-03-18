@@ -56,7 +56,7 @@ function loadTowerPrefs(): TowerPrefs {
 function saveTowerPrefs(prefs: TowerPrefs) {
   try {
     localStorage.setItem(TOWER_STORAGE_KEY, JSON.stringify(prefs));
-  } catch {}
+  } catch { useAgentOfficeStore.setState({ storageWarning: true }); }
 }
 
 const THEME_STORAGE_KEY = "agent-office-theme";
@@ -126,6 +126,8 @@ interface AgentOfficeStore {
   setGameModeOn: (on: boolean) => void;
   setHudPosition: (pos: HudPosition) => void;
   killAgent: (agentId: string) => void;
+  storageWarning: boolean;
+  dismissStorageWarning: () => void;
 }
 
 const initialTower = loadTowerPrefs();
@@ -152,6 +154,8 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   towerOpacity: initialTower.opacity,
   editMode: "none",
   gameModeOn: loadGameMode(),
+  storageWarning: false,
+  dismissStorageWarning: () => set({ storageWarning: false }),
   hudPosition: (localStorage.getItem("agent-office-hud-pos") as HudPosition) || "top-left",
   levelUpEvents: [],
   addLevelUp: (agentId, name, level, teamColor) => {
@@ -212,14 +216,14 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   markRelaySeen: () => {
     const count = get().relayMessages.length;
     set({ relaySeenCount: count });
-    try { localStorage.setItem("relay-seen", String(count)); } catch {}
+    try { localStorage.setItem("relay-seen", String(count)); } catch { set({ storageWarning: true }); }
   },
   setLabelsOn: (labelsOn) => set({ labelsOn }),
   setDebugOn: (debugOn) => set({ debugOn }),
   setTimeMode: (timeMode) => set({ timeMode }),
   setThemeId: (themeId) => {
     set({ themeId });
-    try { localStorage.setItem(THEME_STORAGE_KEY, themeId); } catch {}
+    try { localStorage.setItem(THEME_STORAGE_KEY, themeId); } catch { set({ storageWarning: true }); }
   },
   setTowerSize: (size) => {
     set({ towerSize: size });

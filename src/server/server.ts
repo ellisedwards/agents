@@ -7,12 +7,45 @@ import { loadConfig, clawBaseUrl } from "./config";
 import { createWatcher } from "./agents/watcher-singleton";
 import type { AgentState } from "../shared/types";
 
+// --- Claw API response types ---
+interface ClawStatus {
+  connected: boolean;
+  brightness?: number;
+  claw_activity?: string;
+  animation_running?: boolean;
+  agent_slots?: { slots: string[] };
+}
+
+interface ClawPixels {
+  panels?: { top?: string[]; bottom?: string[] };
+  clawActivity?: string;
+  slotsDetail?: Array<{ session_id?: string; name?: string }>;
+}
+
+interface ClawSlots {
+  slots_detail?: Array<{ session_id?: string; name?: string }>;
+}
+
+interface ClawRelay {
+  messages?: Array<{ from?: string; msg: string; time: string }>;
+}
+
+interface ClawReplyRelay {
+  replies?: Array<{ msg: string; time: string }>;
+}
+
+interface RelayMessage {
+  from: string;
+  msg: string;
+  time: string;
+}
+
 // --- Claw communication via curl ---
 // Node's networking gets permanently poisoned when a destination becomes
 // temporarily unreachable (macOS per-process routing cache). Both fetch()
 // and http.get fail with EHOSTUNREACH even after the host comes back.
 // curl is immune because each invocation is a fresh process.
-function clawGet(claw: string, urlPath: string, timeoutSec = 2): Promise<any> {
+function clawGet(claw: string, urlPath: string, timeoutSec = 2): Promise<unknown> {
   const url = `${claw}${urlPath}`;
   return new Promise((resolve, reject) => {
     execFile("curl", [
@@ -31,7 +64,7 @@ function clawGet(claw: string, urlPath: string, timeoutSec = 2): Promise<any> {
 }
 
 // POST to claw via curl (for sparkle endpoint etc.)
-function clawPost(claw: string, urlPath: string, body: object, timeoutSec = 3): Promise<any> {
+function clawPost(claw: string, urlPath: string, body: object, timeoutSec = 3): Promise<unknown> {
   const url = `${claw}${urlPath}`;
   return new Promise((resolve, reject) => {
     execFile("curl", [
@@ -56,7 +89,7 @@ let clawLastFailTime = 0;
 const CLAW_FAIL_THRESHOLD = 3;
 const CLAW_RECOVERY_MS = 30_000;
 
-async function clawGetSafe(urlPath: string, timeoutSec = 2): Promise<any> {
+async function clawGetSafe(urlPath: string, timeoutSec = 2): Promise<unknown> {
   if (clawCircuitOpen) {
     if (Date.now() - clawLastFailTime < CLAW_RECOVERY_MS) {
       throw new Error("claw circuit open");
@@ -100,7 +133,7 @@ function checkAndAutoRecover(claw: string) {
   setInterval(async () => {
     if (autoRecoveryInProgress) return;
     try {
-      const data = await clawGet(claw, "/status");
+      const data = await clawGet(claw, "/status") as ClawStatus;
       const connected = data.connected === true;
       if (!connected && lastMatrixConnected) {
         console.log("[auto-recovery] Yeelight disconnected, running tower-reset...");
@@ -250,7 +283,7 @@ app.post("/api/game-mode", express.json(), (req, res) => {
 // --- Light brightness ---
 app.get("/api/brightness", async (_req, res) => {
   try {
-    const data = await clawGetSafe("/status");
+    const data = await clawGetSafe("/status") as ClawStatus;
     res.json({ brightness: data.brightness ?? null });
   } catch {
     res.status(502).json({ error: "claw unreachable" });
@@ -274,8 +307,8 @@ app.get("/api/brightness/:level", async (req, res) => {
 app.get("/api/claw-health", async (_req, res) => {
   try {
     const [statusData, pixelsData] = await Promise.all([
-      clawGetSafe("/status"),
-      clawGetSafe("/pixels").catch(() => null),
+      clawGetSafe("/status") as Promise<ClawStatus>,
+      clawGetSafe("/pixels").catch(() => null) as Promise<ClawPixels | null>,
     ]);
     // Derive slot status from actual pixel data (source of truth)
     const quadrantIndices = [[15,16,20,21],[18,19,23,24],[0,1,5,6],[3,4,8,9]];
@@ -304,14 +337,14 @@ app.get("/api/claw-health", async (_req, res) => {
 app.get("/api/relay", async (_req, res) => {
   try {
     const [outData, inData] = await Promise.all([
-      clawGetSafe("/relay").catch(() => ({ messages: [] })),
-      clawGetSafe("/relay/reply").catch(() => ({ replies: [] })),
+      clawGetSafe("/relay").catch(() => ({ messages: [] })) as Promise<ClawRelay>,
+      clawGetSafe("/relay/reply").catch(() => ({ replies: [] })) as Promise<ClawReplyRelay>,
     ]);
     // Normalize into unified format
-    const messages = [
-      ...(outData.messages || []).filter((m: any) => m.msg).map((m: any) => ({ from: m.from || "agent-office", msg: m.msg, time: m.time })),
-      ...(inData.replies || []).map((m: any) => ({ from: "claw", msg: m.msg, time: m.time })),
-    ].sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    const messages: RelayMessage[] = [
+      ...(outData.messages || []).filter((m) => m.msg).map((m) => ({ from: m.from || "agent-office", msg: m.msg, time: m.time })),
+      ...(inData.replies || []).map((m) => ({ from: "claw" as const, msg: m.msg, time: m.time })),
+    ].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
     res.json({ messages, count: messages.length });
   } catch (e) {
     console.error("[proxy] /api/relay error:", e);
@@ -335,9 +368,9 @@ app.post("/api/tower-reset", (_req, res) => {
 app.get("/api/pixels", async (_req, res) => {
   try {
     const [pixelsData, statusData, slotsData] = await Promise.all([
-      clawGetSafe("/pixels"),
-      clawGetSafe("/status").catch(() => null),
-      clawGetSafe("/hook/agent-slots").catch(() => null),
+      clawGetSafe("/pixels") as Promise<ClawPixels>,
+      clawGetSafe("/status").catch(() => null) as Promise<ClawStatus | null>,
+      clawGetSafe("/hook/agent-slots").catch(() => null) as Promise<ClawSlots | null>,
     ]);
     if (!pixelsData?.panels) return res.status(502).json({ error: "claw unreachable" });
     const data = pixelsData;
