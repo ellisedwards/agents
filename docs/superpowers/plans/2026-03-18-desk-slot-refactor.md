@@ -195,13 +195,16 @@ export function computeAssignments(
   }
 
   // 6. Openclaw-main always gets desk 2
-  if (activeIds.has("openclaw-main")) {
+  if (retainIds.has("openclaw-main")) {
     stickyAssignments.set("openclaw-main", TRAINER_DESK);
   }
 
-  // 7. Build result
+  // 7. Build result — includes desk-eligible CC agents AND openclaw-main
   const assignments = new Map<string, AgentAssignment>();
-  for (const id of agentIds) {
+  // Include openclaw-main explicitly (it's not in agentIds since source !== "cc")
+  const resultIds = [...agentIds];
+  if (retainIds.has("openclaw-main")) resultIds.push("openclaw-main");
+  for (const id of resultIds) {
     const deskIdx = stickyAssignments.get(id);
     if (deskIdx !== undefined && deskIdx < DESK_POSITIONS.length) {
       assignments.set(id, {
@@ -308,10 +311,13 @@ const allCCMains = agents.filter((a) =>
 const deskEligible = allCCMains.filter((a) =>
   a.state !== "lounging" && a.state !== "departing"
 );
+// Include openclaw-main in the retain set so it gets desk 2 in the result
+const allMainIds = [...allCCMains.map((a) => a.id)];
+if (agents.some((a) => a.id === "openclaw-main")) allMainIds.push("openclaw-main");
 const towerInfo = getPixelTowerData();
 const assignResult = computeAssignments(
   deskEligible.map((a) => a.id),
-  allCCMains.map((a) => a.id),
+  allMainIds,
   towerInfo.data.slotsDetail,
 );
 const deskMap = new Map<string, { x: number; y: number; characterX: number; characterY: number }>();
