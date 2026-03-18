@@ -357,7 +357,8 @@ interface LevelUpEffect {
 }
 const activeLevelUps: LevelUpEffect[] = [];
 const previousLevels = new Map<string, number>();
-const previousExp = new Map<string, number>(); // agentId → total exp (exp + level*expToNext approx)
+const previousExp = new Map<string, number>();
+const previousAchievements = new Map<string, Set<string>>();
 
 const pokeballFlashes = new Map<string, number>(); // agentId → remaining frames
 
@@ -2267,6 +2268,29 @@ export function renderScene(
         if (gain > 0) useAgentOfficeStore.getState().addExpGain(agent.id, gain, agent.teamColor);
       }
       previousExp.set(agent.id, currentExp);
+
+      // Detect new achievements
+      const currentAch = new Set(agent.achievements ?? []);
+      const prevAch = previousAchievements.get(agent.id);
+      if (prevAch) {
+        for (const achId of currentAch) {
+          if (!prevAch.has(achId)) {
+            const ACH_INFO: Record<string, { icon: string; name: string }> = {
+              "centurion": { icon: "\u{1F451}", name: "Centurion" },
+              "polymath": { icon: "\u{1F9E0}", name: "Polymath" },
+              "marathon": { icon: "\u{1F3C3}", name: "Marathon" },
+              "shell-shocked": { icon: "\u{1F41A}", name: "Shell Shocked" },
+              "critical-mass": { icon: "\u{1F4A5}", name: "Critical Mass" },
+            };
+            const info = ACH_INFO[achId];
+            if (info) {
+              const displayName = agent.gameName ?? agent.name;
+              useAgentOfficeStore.getState().addAchievement(displayName, achId, info.icon, info.name, agent.teamColor);
+            }
+          }
+        }
+      }
+      previousAchievements.set(agent.id, currentAch);
     }
   }
 

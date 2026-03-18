@@ -102,6 +102,8 @@ interface AgentOfficeStore {
   addLevelUp: (agentId: string, name: string, level: number, teamColor: string) => void;
   expGainEvents: Array<{ id: string; agentId: string; amount: number; teamColor: string; ts: number }>;
   addExpGain: (agentId: string, amount: number, teamColor: string) => void;
+  achievementEvents: Array<{ id: string; agentName: string; achievementId: string; icon: string; name: string; teamColor: string; ts: number }>;
+  addAchievement: (agentName: string, achievementId: string, icon: string, name: string, teamColor: string) => void;
   setAgents: (agents: AgentState[]) => void;
   selectAgent: (id: string | null) => void;
   setConnectionStatus: (status: AgentOfficeStore["connectionStatus"]) => void;
@@ -158,6 +160,14 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
     setTimeout(() => {
       set({ levelUpEvents: get().levelUpEvents.filter(e => e.id !== ev.id) });
     }, 3000);
+  },
+  achievementEvents: [],
+  addAchievement: (agentName, achievementId, icon, name, teamColor) => {
+    const ev = { id: `${achievementId}-${Date.now()}`, agentName, achievementId, icon, name, teamColor, ts: Date.now() };
+    set({ achievementEvents: [...get().achievementEvents, ev] });
+    setTimeout(() => {
+      set({ achievementEvents: get().achievementEvents.filter(e => e.id !== ev.id) });
+    }, 4000);
   },
   expGainEvents: [],
   addExpGain: (agentId, amount, teamColor) => {

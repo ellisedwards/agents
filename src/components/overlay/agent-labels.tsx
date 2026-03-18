@@ -94,6 +94,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const killAgent = useAgentOfficeStore((s) => s.killAgent);
   const levelUpEvents = useAgentOfficeStore((s) => s.levelUpEvents);
   const expGainEvents = useAgentOfficeStore((s) => s.expGainEvents);
+  const achievementEvents = useAgentOfficeStore((s) => s.achievementEvents);
   const deskEligible = agents.filter((a) =>
     a.state !== "lounging" && a.state !== "departing" &&
     (a.subagentClass === null || a.subagentClass === undefined)
@@ -229,6 +230,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 const teamHex = TEAM_COLORS[a.teamColor] ?? "#88cc88";
                 const fill = (a.exp ?? 0) / (a.expToNext ?? 100);
                 const isRecord = (a.level ?? 1) >= record && record > 1;
+                const isDupe = nameSuffix.has(a.id);
                 return (
                   <div key={a.id} className="group relative grid gap-x-[10px] gap-y-0 items-center"
                     style={{ gridTemplateColumns: "9px 96px auto 120px 8px" }}>
@@ -237,11 +239,11 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     <span className="font-semibold text-[14px] text-white truncate leading-tight">
                       {(a.gameName ?? a.name) + (nameSuffix.get(a.id) ?? "")}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
                     </span>
-                    <span className="font-semibold text-[14px] whitespace-nowrap">
+                    <span className="font-semibold text-[14px] whitespace-nowrap" style={{ opacity: isDupe ? 0.25 : 1 }}>
                       <span className="text-[#787878]">LV</span>
                       <span className="text-white">{a.level ?? 1}</span>
                     </span>
-                    <div className="relative" style={{ height: "14px" }}>
+                    <div className="relative" style={{ height: "14px", opacity: isDupe ? 0.25 : 1 }}>
                       <div className="absolute inset-0 rounded-[3.5px]" style={{ backgroundColor: teamHex, opacity: 0.33 }} />
                       {fill > 0 && (
                         <div className="absolute top-0 left-0 h-full rounded-[3.5px]" style={{ width: `${Math.max(fill * 100, 5)}%`, backgroundColor: teamHex }} />
@@ -291,7 +293,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                       })}
                     </span>
                     <span className="text-[10px] text-[#636363] text-right leading-tight">
-                      {a.exp ?? 0}/{a.expToNext ?? 100}
+                      {isDupe ? "" : `${a.exp ?? 0}/${a.expToNext ?? 100}`}
                     </span>
                     <div />
                   </div>
@@ -779,7 +781,57 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         );
       })}
 
+      {/* Achievement earned toasts */}
+      {achievementEvents.map((ev) => {
+        const teamHex = TEAM_COLORS[ev.teamColor] ?? "#88cc88";
+        return (
+          <div
+            key={ev.id}
+            className="absolute left-1/2 z-40 pointer-events-none font-mono text-center"
+            style={{
+              top: "38%",
+              transform: "translateX(-50%)",
+              animation: "achievementFloat 4s ease-out forwards",
+            }}
+          >
+            <div
+              className="text-[22px]"
+              style={{
+                filter: `drop-shadow(0 0 8px ${teamHex})`,
+              }}
+            >
+              {ev.icon}
+            </div>
+            <div
+              className="text-[14px] font-bold tracking-wide mt-0.5"
+              style={{
+                color: "#ffffff",
+                textShadow: `0 0 10px ${teamHex}, 0 2px 4px rgba(0,0,0,0.8)`,
+              }}
+            >
+              {ev.name}
+            </div>
+            <div
+              className="text-[11px] mt-0.5"
+              style={{
+                color: teamHex,
+                textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+              }}
+            >
+              {ev.agentName} earned a badge!
+            </div>
+          </div>
+        );
+      })}
+
       <style>{`
+        @keyframes achievementFloat {
+          0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.5); }
+          8% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.2); }
+          15% { transform: translateX(-50%) translateY(0) scale(1); }
+          75% { opacity: 1; }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(0.95); }
+        }
         @keyframes levelUpFloat {
           0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.8); }
           10% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.1); }
