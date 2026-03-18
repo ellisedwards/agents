@@ -1,7 +1,7 @@
 import { TEAM_COLORS, type AgentState } from "@/shared/types";
 import type { CharacterType } from "../characters/sprite-cache";
 import { getSprite, type buildSpriteCache } from "../characters/sprite-cache";
-import { assignDesks, DESK_POSITIONS } from "./desk-layout";
+import { computeAssignments, DESK_POSITIONS, DESK_TO_SLOT, TRAINER_DESK, type AssignmentResult } from "./desk-layout";
 import { drawEnvironment, drawDeskFronts, getPalletTownBg, getJungleRuinsBg } from "./environment";
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from "../canvas-transform";
 import {
@@ -93,18 +93,9 @@ export function getLastDeskPos(agentId: string): { x: number; y: number } | unde
 }
 // Track known agents to detect first appearance (beam-in)
 const knownAgentIds = new Set<string>();
-// Sticky quadrant assignment — each CC keeps its slot for the session
-const stickyQuadrants = new Map<string, number>();
-
 // Trainer blink state — random blinking for openclaw "trainer" characters
 const blinkTimers = new Map<string, number>(); // frames until next blink
 const blinkActive = new Map<string, number>(); // frames remaining in blink
-export function getAgentSlot(agentId: string): number | undefined {
-  return stickyQuadrants.get(agentId);
-}
-export function getSlotMap(): Map<string, number> {
-  return stickyQuadrants;
-}
 // Pallet Town background pixel decorations (merged from sprite editor exports)
 const PALLET_TOWN_BG: { x: number; y: number; color: string }[] = [
   // #0e1414 — dark horizontal window/shelf lines
@@ -1375,22 +1366,33 @@ export function renderScene(
   }));
 
   // 2. Assign desks only to main agents (not subagents, lounging, or departing)
-  const deskEligible = agents.filter((a) =>
-    a.state !== "lounging" && a.state !== "departing" &&
-    (a.subagentClass === null || a.subagentClass === undefined)
+  const allCCMains = agents.filter((a) =>
+    a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
   );
-  const rawDeskMap = assignDesks(deskEligible.map((a) => a.id), stickyQuadrants);
+  const deskEligible = allCCMains.filter((a) =>
+    a.state !== "lounging" && a.state !== "departing"
+  );
+  // Include openclaw-main in the retain set so it gets desk 2 in the result
+  const allMainIds = [...allCCMains.map((a) => a.id)];
+  if (agents.some((a) => a.id === "openclaw-main")) allMainIds.push("openclaw-main");
+  const towerInfo = getPixelTowerData();
+  const assignResult = computeAssignments(
+    deskEligible.map((a) => a.id),
+    allMainIds,
+    towerInfo.data.slotsDetail,
+  );
   const deskMap = new Map<string, { x: number; y: number; characterX: number; characterY: number }>();
-  for (const [id, pos] of rawDeskMap) {
-    deskMap.set(id, { x: pos.x, y: pos.y + oY, characterX: pos.characterX, characterY: pos.characterY + oY });
+  for (const [id, asgn] of assignResult.assignments) {
+    const d = asgn.desk;
+    deskMap.set(id, { x: d.x, y: d.y + oY, characterX: d.characterX, characterY: d.characterY + oY });
   }
 
   // 3. Determine which desk indices have laptops
   const occupiedDeskIndices = new Set<number>();
   for (const agent of deskEligible) {
-    const rawPos = rawDeskMap.get(agent.id);
-    if (!rawPos) continue;
-    const idx = DESK_POSITIONS.indexOf(rawPos);
+    const asgn = assignResult.assignments.get(agent.id);
+    if (!asgn) continue;
+    const idx = asgn.deskIndex;
     if (idx >= 0) occupiedDeskIndices.add(idx);
   }
 
@@ -1398,9 +1400,9 @@ export function renderScene(
   if (useAgentOfficeStore.getState().gameModeOn) {
     agentLevelAtDesk.clear();
     for (const agent of deskEligible) {
-      const rawPos = rawDeskMap.get(agent.id);
-      if (!rawPos) continue;
-      const idx = DESK_POSITIONS.indexOf(rawPos);
+      const asgn = assignResult.assignments.get(agent.id);
+      if (!asgn) continue;
+      const idx = asgn.deskIndex;
       if (idx >= 0 && agent.level !== undefined) {
         agentLevelAtDesk.set(idx, agent.level);
       }
@@ -2046,7 +2048,6 @@ export function renderScene(
   }
 
   // 10. Laptop glow — on top of desk fronts
-  const towerInfo = getPixelTowerData();
   if (towerInfo.connected) {
     const topPixels = towerInfo.data.panels.top;
     const SLOT_PIXELS = [
@@ -2059,54 +2060,8 @@ export function renderScene(
       (a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
     );
 
-    // --- Authoritative slot assignment from claw's slots_detail ---
-    // Rule: claw is the source of truth. Slot N = Desk N = Quadrant N.
-    // Don't clear every frame — only clean up departed agents, update from claw.
-
-    // 1. Remove agents that are no longer active
-    const activeMainIds = new Set(mainCCs.map(a => a.id));
-    for (const id of stickyQuadrants.keys()) {
-      if (!activeMainIds.has(id)) stickyQuadrants.delete(id);
-    }
-
-    // 2. Match agents to slots from claw data (authoritative)
-    const slotsDetail = towerInfo.data.slotsDetail;
-    if (slotsDetail && slotsDetail.length > 0) {
-      const matchedAgentIds = new Set<string>(); // prevent double-matching
-      for (let s = 0; s < slotsDetail.length && s < 4; s++) {
-        const detail = slotsDetail[s];
-        if (!detail.session_id && !detail.name) continue;
-        // Find matching agent — skip agents already matched to another slot
-        for (const agent of mainCCs) {
-          if (matchedAgentIds.has(agent.id)) continue;
-          const matchById = detail.session_id && agent.id.includes(detail.session_id);
-          const matchByName = detail.name && agent.id.includes(detail.name);
-          if (matchById || matchByName) {
-            matchedAgentIds.add(agent.id);
-            const currentSlot = stickyQuadrants.get(agent.id);
-            if (currentSlot !== s) {
-              stickyQuadrants.set(agent.id, s);
-            }
-            break;
-          }
-        }
-      }
-    }
-
-    // 3. Fallback: assign unmatched agents to remaining slots (sequential fill)
-    const takenSlots = new Set(stickyQuadrants.values());
     for (const agent of mainCCs) {
-      if (stickyQuadrants.has(agent.id)) continue;
-      for (let s = 0; s < 4; s++) {
-        if (!takenSlots.has(s)) {
-          stickyQuadrants.set(agent.id, s);
-          takenSlots.add(s);
-          break;
-        }
-      }
-    }
-    for (const agent of mainCCs) {
-      const slot = stickyQuadrants.get(agent.id);
+      const slot = assignResult.getSlot(agent.id);
       if (slot === undefined) continue;
       const quadrantLit = SLOT_PIXELS[slot].some((i) => topPixels[i] !== "#000000");
       if (!quadrantLit) continue;
@@ -2230,7 +2185,7 @@ export function renderScene(
         const displayName = agent.gameName ?? agent.name;
         useAgentOfficeStore.getState().addLevelUp(agent.id, displayName, agent.level, agent.teamColor);
         // Trigger claw sparkle on the agent's slot — client-driven, perfectly timed
-        const sparkleSlot = stickyQuadrants.get(agent.id);
+        const sparkleSlot = assignResult.getSlot(agent.id);
         if (sparkleSlot !== undefined) {
           fetch(`/api/sparkle`, {
             method: "POST",
@@ -2385,8 +2340,8 @@ export function renderScene(
   for (const id of pokeballFlashes.keys()) {
     if (!activeIds.has(id)) pokeballFlashes.delete(id);
   }
-  for (const id of stickyQuadrants.keys()) {
-    if (!activeIds.has(id)) stickyQuadrants.delete(id);
+  for (const id of lastDeskPos.keys()) {
+    if (!activeIds.has(id)) lastDeskPos.delete(id);
   }
   // agentLevelAtDesk is cleared and rebuilt each frame, no per-agent cleanup needed
 

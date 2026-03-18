@@ -8,8 +8,8 @@ import {
   domToCanvas,
   type CanvasTransform,
 } from "../canvas-transform";
-import { assignDesks } from "../scene/desk-layout";
-import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, getAgentSlot, getSlotMap, setAgentCharacter, getAgentCharacter, STARTERS, getLastDeskPos } from "../scene/renderer";
+import { getCachedAssignments } from "../scene/desk-layout";
+import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, setAgentCharacter, getAgentCharacter, STARTERS, getLastDeskPos } from "../scene/renderer";
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
 
@@ -97,11 +97,13 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const levelUpEvents = useAgentOfficeStore((s) => s.levelUpEvents);
   const expGainEvents = useAgentOfficeStore((s) => s.expGainEvents);
   const achievementEvents = useAgentOfficeStore((s) => s.achievementEvents);
-  const deskEligible = agents.filter((a) =>
-    a.state !== "lounging" && a.state !== "departing" &&
-    (a.subagentClass === null || a.subagentClass === undefined)
-  );
-  const deskMap = assignDesks(deskEligible.map((a) => a.id), getSlotMap());
+  const cached = getCachedAssignments();
+  const deskMap = new Map<string, { x: number; y: number; characterX: number; characterY: number }>();
+  if (cached) {
+    for (const [id, asgn] of cached.assignments) {
+      deskMap.set(id, asgn.desk);
+    }
+  }
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [hudMenuId, setHudMenuId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -745,9 +747,12 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                   {gameModeOn && agent.gameName ? agent.gameName : agent.name}
                 </span>
                 {debugOn && (() => {
-                  const slot = getAgentSlot(agent.id);
-                  if (slot === undefined) return null;
-                  return <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>d{slot} s{slot}</span>;
+                  const deskIdx = cached?.getDeskIndex(agent.id);
+                  const slot = cached?.getSlot(agent.id);
+                  if (deskIdx === undefined) return null;
+                  return <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>
+                    d{deskIdx}{slot !== undefined ? ` q${slot}` : ""}
+                  </span>;
                 })()}
               </div>
             )}

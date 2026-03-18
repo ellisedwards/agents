@@ -5,6 +5,7 @@ import {
   FLOOR_H,
 } from "./environment";
 import { CANVAS_HEIGHT } from "../canvas-transform";
+import type { SlotDetail } from "../../hooks/use-pixel-tower";
 
 export interface DeskPosition {
   x: number;
@@ -44,92 +45,161 @@ export function getOverflowPosition(index: number): DeskPosition {
   return { x, y, characterX: x - 7, characterY: y - 4 };
 }
 
-// Slot N = Desk N. Claw is the source of truth.
-// stickyDesks only remembers the LAST assignment so agents don't jump
-// when slotMap is temporarily unavailable (claw disconnect).
-const stickyDesks = new Map<string, number>();
+// Claw slot → physical desk (skip desk 2 = trainer)
+export const SLOT_TO_DESK = [0, 1, 3, 4] as const;
 
-const OPENCLAW_DESK = 2;
+// Physical desk → claw slot (inverse, only for desks with quadrants)
+export const DESK_TO_SLOT: Partial<Record<number, number>> = { 0: 0, 1: 1, 3: 2, 4: 3 };
 
-export function assignDesks(
-  agentIds: string[],
-  slotMap?: Map<string, number> // agentId → claw slot number (authoritative)
-): Map<string, DeskPosition> {
-  const assignments = new Map<string, DeskPosition>();
-  const activeIds = new Set(agentIds);
+// Desk 2 is ALWAYS the trainer. This is structural, not a reservation.
+export const TRAINER_DESK = 2;
 
-  // Clean up departed agents
-  for (const id of stickyDesks.keys()) {
-    if (!activeIds.has(id)) stickyDesks.delete(id);
+// CC agents fill these desks in order when no claw slot is available
+const CC_FILL_ORDER = [0, 1, 3, 4, 5];
+
+export interface AgentAssignment {
+  desk: DeskPosition;    // physical desk position
+  deskIndex: number;     // physical desk index (0-5)
+  clawSlot?: number;     // claw quadrant (0-3), undefined for overflow agents
+}
+
+export interface AssignmentResult {
+  assignments: Map<string, AgentAssignment>;  // agentId → assignment
+  getDesk(agentId: string): DeskPosition | undefined;
+  getSlot(agentId: string): number | undefined;
+  getDeskIndex(agentId: string): number | undefined;
+}
+
+// Single sticky map — replaces both stickyDesks and stickyQuadrants
+const stickyAssignments = new Map<string, number>(); // agentId → deskIndex
+
+// Cache the last result so multiple consumers can read it without recomputing
+let cachedResult: AssignmentResult | null = null;
+
+export function computeAssignments(
+  agentIds: string[],          // desk-eligible agent IDs (no subagents, no lounging/departing)
+  allCCMainIds: string[],      // ALL CC main agent IDs (including lounging/departing) — for sticky preservation
+  slotsDetail?: SlotDetail[],  // raw claw data — NOT a pre-processed map
+): AssignmentResult {
+  const retainIds = new Set(allCCMainIds); // broad set: keep sticky assignments for lounging agents
+  retainIds.add("openclaw-main");
+
+  // 1. Clean up only truly departed agents (not lounging — they keep their desk)
+  for (const id of stickyAssignments.keys()) {
+    if (!retainIds.has(id)) stickyAssignments.delete(id);
   }
 
-  // Seed `taken` with all surviving sticky assignments so no desk is double-booked
+  // 2. Build taken set from surviving assignments
   const taken = new Set<number>();
-  for (const deskIdx of stickyDesks.values()) taken.add(deskIdx);
+  for (const deskIdx of stickyAssignments.values()) taken.add(deskIdx);
 
-  // Desk 2 is ALWAYS reserved for openclaw — evict any CC agent squatting on it
-  for (const [id, deskIdx] of stickyDesks) {
-    if (id !== "openclaw-main" && deskIdx === OPENCLAW_DESK) {
-      stickyDesks.delete(id);
+  // 3. Trainer desk is ALWAYS taken — also evict any CC agent stuck there
+  taken.add(TRAINER_DESK);
+  for (const [id, deskIdx] of stickyAssignments) {
+    if (id !== "openclaw-main" && deskIdx === TRAINER_DESK) {
+      stickyAssignments.delete(id);
     }
   }
-  taken.add(OPENCLAW_DESK);
-  if (activeIds.has("openclaw-main")) {
-    stickyDesks.set("openclaw-main", OPENCLAW_DESK);
+
+  // 4. Match agents to desks from claw slotsDetail (authoritative)
+  //    Two-phase approach to handle swaps:
+  //    Phase A: determine desired moves (agentId → targetDesk)
+  //    Phase B: execute moves, freeing old desks first for agents that are moving
+  if (slotsDetail && slotsDetail.length > 0) {
+    // Phase A: match claw slots to agents, build desired moves
+    const desiredMoves = new Map<string, number>(); // agentId → targetDesk
+    const matchedAgentIds = new Set<string>();
+    for (let s = 0; s < slotsDetail.length && s < SLOT_TO_DESK.length; s++) {
+      const detail = slotsDetail[s];
+      if (!detail.session_id && !detail.name) continue;
+
+      for (const id of agentIds) {
+        if (matchedAgentIds.has(id)) continue;
+        if (id === "openclaw-main") continue;
+        const matchById = detail.session_id && id.includes(detail.session_id);
+        const matchByName = !matchById && detail.name && id.includes(detail.name);
+        if (!matchById && !matchByName) continue;
+
+        matchedAgentIds.add(id);
+        const targetDesk = SLOT_TO_DESK[s];
+        const currentDesk = stickyAssignments.get(id);
+        if (currentDesk !== targetDesk) {
+          desiredMoves.set(id, targetDesk);
+        }
+        break;
+      }
+    }
+
+    // Phase B: free old desks for ALL moving agents first, then assign new desks
+    for (const [id] of desiredMoves) {
+      const oldDesk = stickyAssignments.get(id);
+      if (oldDesk !== undefined) {
+        taken.delete(oldDesk);
+        stickyAssignments.delete(id);
+      }
+    }
+    for (const [id, targetDesk] of desiredMoves) {
+      if (!taken.has(targetDesk)) {
+        stickyAssignments.set(id, targetDesk);
+        taken.add(targetDesk);
+      }
+    }
   }
 
-  // Slot-based assignment: slot N = desk N, but skip already-taken desks
-  // When slotMap is authoritative (claw connected), update sticky desks to match
+  // 5. Fallback: assign unmatched CC agents to first available desk (skip desk 2)
   for (const id of agentIds) {
     if (id === "openclaw-main") continue;
-    const slot = slotMap?.get(id);
-    // Never let a CC agent sit on the openclaw desk
-    const slotOk = slot !== undefined && slot >= 0 && slot < DESK_POSITIONS.length
-      && slot !== OPENCLAW_DESK;
-    if (stickyDesks.has(id)) {
-      // Already has a desk — update if claw says different slot AND target is free
-      if (slotOk && slot !== stickyDesks.get(id) && !taken.has(slot!)) {
-        const oldDesk = stickyDesks.get(id)!;
-        taken.delete(oldDesk);
-        stickyDesks.set(id, slot!);
-        taken.add(slot!);
+    if (stickyAssignments.has(id)) continue;
+
+    for (const deskIdx of CC_FILL_ORDER) {
+      if (!taken.has(deskIdx)) {
+        stickyAssignments.set(id, deskIdx);
+        taken.add(deskIdx);
+        break;
       }
-      continue;
-    }
-    if (slotOk) {
-      if (taken.has(slot!)) continue; // collision — will get fallback
-      stickyDesks.set(id, slot!);
-      taken.add(slot!);
     }
   }
 
-  // Second pass: fallback for agents without claw slots
-  for (const id of agentIds) {
-    if (stickyDesks.has(id)) continue; // already assigned above
-
-    // Fill first available desk
-    let deskIdx = -1;
-    const fillOrder = [0, 1, 2, 3, 4, 5];
-    for (const i of fillOrder) {
-      if (!taken.has(i)) { deskIdx = i; break; }
-    }
-
-    if (deskIdx >= 0 && deskIdx < DESK_POSITIONS.length) {
-      taken.add(deskIdx);
-      stickyDesks.set(id, deskIdx);
-    }
+  // 6. Openclaw-main always gets desk 2
+  if (retainIds.has("openclaw-main")) {
+    stickyAssignments.set("openclaw-main", TRAINER_DESK);
   }
 
-  // Build final assignments
-  for (const id of agentIds) {
-    const deskIdx = stickyDesks.get(id);
+  // 7. Build result — includes desk-eligible CC agents AND openclaw-main
+  const assignments = new Map<string, AgentAssignment>();
+  // Include openclaw-main explicitly (it's not in agentIds since source !== "cc")
+  const resultIds = [...agentIds];
+  if (retainIds.has("openclaw-main")) resultIds.push("openclaw-main");
+  for (const id of resultIds) {
+    const deskIdx = stickyAssignments.get(id);
     if (deskIdx !== undefined && deskIdx < DESK_POSITIONS.length) {
-      assignments.set(id, DESK_POSITIONS[deskIdx]);
+      assignments.set(id, {
+        desk: DESK_POSITIONS[deskIdx],
+        deskIndex: deskIdx,
+        clawSlot: DESK_TO_SLOT[deskIdx],
+      });
     } else {
-      const overflowIdx = Math.max(0, agentIds.indexOf(id) - DESK_POSITIONS.length);
-      assignments.set(id, getOverflowPosition(overflowIdx));
+      // Count how many agents are already in overflow to avoid stacking
+      let overflowCount = 0;
+      for (const a of assignments.values()) if (a.deskIndex === -1) overflowCount++;
+      assignments.set(id, {
+        desk: getOverflowPosition(overflowCount),
+        deskIndex: -1,
+        clawSlot: undefined,
+      });
     }
   }
 
-  return assignments;
+  cachedResult = {
+    assignments,
+    getDesk: (id) => assignments.get(id)?.desk,
+    getSlot: (id) => assignments.get(id)?.clawSlot,
+    getDeskIndex: (id) => assignments.get(id)?.deskIndex,
+  };
+
+  return cachedResult;
+}
+
+export function getCachedAssignments(): AssignmentResult | null {
+  return cachedResult;
 }
