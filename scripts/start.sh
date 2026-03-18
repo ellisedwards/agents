@@ -16,11 +16,15 @@ else
   timeout 5 bash -c 'source "$HOME/.zshrc" 2>/dev/null' || true
 fi
 
-# --- Fast path: if server is already running and healthy, just open browser ---
-if curl -s "http://localhost:$PORT/api/build-id" > /dev/null 2>&1; then
+# --- Fast path: if server is running with CURRENT build, just open browser ---
+# Compare running server's build ID with the last build output
+RUNNING_BUILD=$(curl -s --connect-timeout 1 "http://localhost:$PORT/api/build-id" 2>/dev/null | grep -o '"buildId":"[^"]*"' | cut -d'"' -f4)
+DISK_BUILD=$(cat "$APP_DIR/dist/.build-id" 2>/dev/null)
+if [ -n "$RUNNING_BUILD" ] && [ "$RUNNING_BUILD" = "$DISK_BUILD" ]; then
   open -a "Google Chrome" "http://localhost:$PORT?t=$(date +%s)"
   exit 0
 fi
+# Server is either not running, or running a stale build — fall through to rebuild
 
 # --- Slow path: build + start server ---
 

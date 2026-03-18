@@ -7,6 +7,7 @@
     "dev": "concurrently -n server,client \"tsx watch src/server/server.ts\" \"vite\"",
     "build": "vite build && node scripts/build-server.mjs",
     "start": "npm run build && node dist/server.js",
+    "restart": "kill $(lsof -t -i :4747) 2>/dev/null; npm run build && node dist/server.js",
     "install-app": "cp -r app-bundle/Agent\\ Office.app /Applications/"
   },
   "dependencies": {
