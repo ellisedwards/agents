@@ -234,6 +234,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
           }`} style={{
             backgroundColor: "rgba(31, 31, 36, 0.94)",
             ...(hudPosition !== "top-left" ? { bottom: "calc(1.5rem + 8px)" } : {}),
+            animation: "panelReveal 0.25s ease-out",
           }}>
             <div className="flex flex-col gap-[15px]">
               {ccMains.map(a => {
@@ -345,7 +346,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             edit
           </button>
           {editOpen && (
-            <div className="absolute top-6 right-0 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[120px]">
+            <div className="absolute top-6 right-0 rounded-[7px] py-1 min-w-[120px]" style={{ backgroundColor: "rgba(31, 31, 36, 0.94)", animation: "panelReveal 0.15s ease-out" }}>
               {([
                 ["none", "Off"],
                 ["background", "Background"],
@@ -386,7 +387,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         </button>
 
         {settingsOpen && (
-          <div className="absolute top-6 right-0 bg-[#1e1e2e]/95 border border-white/10 rounded-md px-3 py-2.5 min-w-[140px] space-y-2.5">
+          <div className="absolute top-6 right-0 rounded-[7px] px-[14px] py-[12px] min-w-[190px] space-y-2.5" style={{ backgroundColor: "rgba(31, 31, 36, 0.94)", animation: "panelReveal 0.15s ease-out" }}>
             {/* Labels toggle */}
             <label className="flex items-center justify-between gap-3 cursor-pointer">
               <span className="font-mono text-[10px] text-white/50">Labels</span>
@@ -597,31 +598,26 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             {/* Light Test */}
             <div className="pt-1 border-t border-white/5 space-y-1">
               <span className="font-mono text-[10px] text-white/50 block">Light Test</span>
-              <div className="grid grid-cols-4 gap-1">
-                {[0, 1, 2, 3].map(slot => (
-                  <div key={slot} className="flex flex-col items-center gap-0.5">
-                    <span className="font-mono text-[8px] text-white/30">S{slot}</span>
-                    <div className="flex flex-col gap-0.5">
+              {([
+                ["sparkle", "level up", "✦", "text-yellow-300/70", "hover:bg-yellow-500/20"],
+                ["thinking", "thinking", "◆", "text-amber-300/70", "hover:bg-amber-500/20"],
+                ["active", "active", "●", "text-green-300/70", "hover:bg-green-500/20"],
+                ["off", "off", "○", "text-white/25", "hover:bg-white/10"],
+              ] as const).map(([action, label, icon, color, hover]) => (
+                <div key={action} className="flex items-center gap-1">
+                  <span className={`font-mono text-[7px] ${color} w-[36px] shrink-0`}>{label}</span>
+                  <div className="flex gap-0.5 flex-1">
+                    {[0, 1, 2, 3].map(slot => (
                       <button
-                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action: "sparkle" }) })}
-                        className="font-mono text-[7px] text-yellow-300/60 bg-yellow-500/10 hover:bg-yellow-500/20 rounded px-1 py-0.5 transition-colors"
-                      >sparkle</button>
-                      <button
-                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action: "thinking" }) })}
-                        className="font-mono text-[7px] text-amber-300/60 bg-amber-500/10 hover:bg-amber-500/20 rounded px-1 py-0.5 transition-colors"
-                      >think</button>
-                      <button
-                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action: "active" }) })}
-                        className="font-mono text-[7px] text-green-300/60 bg-green-500/10 hover:bg-green-500/20 rounded px-1 py-0.5 transition-colors"
-                      >active</button>
-                      <button
-                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action: "off" }) })}
-                        className="font-mono text-[7px] text-white/30 bg-white/5 hover:bg-white/10 rounded px-1 py-0.5 transition-colors"
-                      >off</button>
-                    </div>
+                        key={slot}
+                        onClick={() => fetch("/api/light-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slot, action }) })}
+                        className={`flex-1 font-mono text-[9px] ${color} bg-white/5 ${hover} rounded py-0.5 transition-colors text-center`}
+                        title={`${action} S${slot}`}
+                      >{icon}</button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
 
             {/* Character picker — only for starter themes */}
@@ -690,16 +686,17 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             {/* Tool label — always visible when active, colored by team */}
             {isActive && (
               <div
-                className="absolute font-mono font-bold px-2 py-1 bg-[#181825]/90 rounded whitespace-nowrap pointer-events-none transition-opacity duration-150"
+                className="absolute font-mono font-bold px-2 py-1 bg-[#181825]/90 rounded whitespace-nowrap pointer-events-none"
                 style={{
                   left: domPos.x,
-                  top: domPos.y - 22 * transform.scale,
+                  top: domPos.y - 32 * transform.scale,
                   transform: "translateX(-50%)",
                   fontSize: "15px",
                   color: teamHex,
                   opacity: isHovered ? 1 : 0.8,
                   textShadow: "0 1px 3px rgba(0,0,0,0.6)",
                   letterSpacing: "0.02em",
+                  animation: "labelReveal 0.2s ease-out",
                 }}
               >
                 {agent.currentTool}
@@ -729,12 +726,13 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             {/* Name tag — below character (subagents only in debug mode) */}
             {(isHovered || (labelsOn && (!isSubagent || debugOn)) || debugOn) && (
               <div
-                className="absolute font-mono font-bold whitespace-nowrap pointer-events-none transition-opacity duration-150 flex flex-col items-center"
+                className="absolute font-mono font-bold whitespace-nowrap pointer-events-none flex flex-col items-center"
                 style={{
                   left: domPos.x,
                   top: domPos.y + 16 * transform.scale,
                   transform: "translateX(-50%)",
                   opacity: isHovered ? 1 : (labelsOn || debugOn) ? 0.7 : 0,
+                  animation: "labelReveal 0.2s ease-out",
                 }}
               >
                 <span
@@ -859,6 +857,14 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         @keyframes expFloat {
           0% { opacity: 1; transform: translateX(-50%) translateY(0); }
           100% { opacity: 0; transform: translateX(-50%) translateY(-25px); }
+        }
+        @keyframes labelReveal {
+          0% { opacity: 0; transform: translateX(-50%) translateY(3px); }
+          100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes panelReveal {
+          0% { opacity: 0; transform: translateY(3px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
