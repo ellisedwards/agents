@@ -290,6 +290,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     </div>
 
                     {/* Row 2: title under name, achievements under LV, exp under bar */}
+                    {!isDupe && <>
                     <div />
                     <span className="text-[11px] text-[#636363] truncate leading-tight">
                       {a.title ?? ""}
@@ -301,9 +302,10 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                       })}
                     </span>
                     <span className="text-[10px] text-[#636363] text-right leading-tight">
-                      {isDupe ? "" : `${a.exp ?? 0}/${a.expToNext ?? 100}`}
+                      {`${a.exp ?? 0}/${a.expToNext ?? 100}`}
                     </span>
                     <div />
+                    </>}
                   </div>
                 );
               })}

@@ -2208,21 +2208,6 @@ export function renderScene(
       if (fillW > 0) ctx.fillRect(barX, barY, fillW, 1);
       ctx.globalAlpha = 1;
 
-      // Streak flame
-      if (agent.streak) {
-        const flameX = barX + Math.floor(barW / 2);
-        const flameY = barY - 1;
-        const flicker = Math.floor(frame / 8) % 2;
-        ctx.fillStyle = "#ff8844";
-        ctx.fillRect(flameX, flameY, 1, 1);
-        if (flicker === 0) {
-          ctx.fillRect(flameX - 1, flameY, 1, 1);
-        } else {
-          ctx.fillRect(flameX + 1, flameY, 1, 1);
-        }
-        ctx.fillStyle = "#ffcc44";
-        ctx.fillRect(flameX, flameY - 1, 1, 1);
-      }
     }
   }
 

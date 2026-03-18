@@ -67,21 +67,39 @@ export function assignDesks(
   const taken = new Set<number>();
   for (const deskIdx of stickyDesks.values()) taken.add(deskIdx);
 
-  // Reserve openclaw desk (always wins)
+  // Desk 2 is ALWAYS reserved for openclaw — evict any CC agent squatting on it
+  for (const [id, deskIdx] of stickyDesks) {
+    if (id !== "openclaw-main" && deskIdx === OPENCLAW_DESK) {
+      stickyDesks.delete(id);
+    }
+  }
+  taken.add(OPENCLAW_DESK);
   if (activeIds.has("openclaw-main")) {
     stickyDesks.set("openclaw-main", OPENCLAW_DESK);
-    taken.add(OPENCLAW_DESK);
   }
 
   // Slot-based assignment: slot N = desk N, but skip already-taken desks
+  // When slotMap is authoritative (claw connected), update sticky desks to match
   for (const id of agentIds) {
     if (id === "openclaw-main") continue;
-    if (stickyDesks.has(id)) continue; // already has a sticky desk, keep it
     const slot = slotMap?.get(id);
-    if (slot !== undefined && slot >= 0 && slot < DESK_POSITIONS.length) {
-      if (taken.has(slot)) continue; // collision — will get fallback
-      stickyDesks.set(id, slot);
-      taken.add(slot);
+    // Never let a CC agent sit on the openclaw desk
+    const slotOk = slot !== undefined && slot >= 0 && slot < DESK_POSITIONS.length
+      && slot !== OPENCLAW_DESK;
+    if (stickyDesks.has(id)) {
+      // Already has a desk — update if claw says different slot AND target is free
+      if (slotOk && slot !== stickyDesks.get(id) && !taken.has(slot!)) {
+        const oldDesk = stickyDesks.get(id)!;
+        taken.delete(oldDesk);
+        stickyDesks.set(id, slot!);
+        taken.add(slot!);
+      }
+      continue;
+    }
+    if (slotOk) {
+      if (taken.has(slot!)) continue; // collision — will get fallback
+      stickyDesks.set(id, slot!);
+      taken.add(slot!);
     }
   }
 
