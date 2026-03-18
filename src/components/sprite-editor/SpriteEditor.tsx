@@ -7,7 +7,7 @@ import {
   FlipHorizontal2, FlipVertical2,
   Trash2, Undo2, Redo2, Save, ClipboardCopy,
   ImagePlus, Sparkles, Settings, X, ArrowLeft,
-  Grid3x3, Eye, EyeOff, ZoomIn, Copy, Plus,
+  Grid3x3, Eye, EyeOff, ZoomIn, Copy, Plus, Layers,
   Play, Square, MoreVertical, ArrowUpDown,
 } from "lucide-react";
 
@@ -269,8 +269,17 @@ export function SpriteEditor() {
   const [movingSelection, setMovingSelection] = useState(false);
   const [moveStart, setMoveStart] = useState<{ x: number; y: number } | null>(null);
 
+  // Symmetry drawing mode
+  const [symmetryX, setSymmetryX] = useState(false);
+
+  // Onion skin — ghost of previous animation frame
+  const [onionSkin, setOnionSkin] = useState(false);
+
   // Clipboard for copy/paste frames
   const clipboardRef = useRef<Map<string, string> | null>(null);
+
+  // Evolution size guide — dashed outline of next evolution size
+  const [showSizeGuide, setShowSizeGuide] = useState(false);
 
   // Evolution overlay — ghost of previous form + A/B/C compare
   const [evoOverlayOn, setEvoOverlayOn] = useState(false);
@@ -327,6 +336,14 @@ export function SpriteEditor() {
     if (!idleFrame) return null;
     return { pixels: pixelRectsToMap(idleFrame.pixels), width: sprite.width, height: sprite.height };
   }, [evoCompareIdx, evoChain, selected, frameIndex]);
+
+  // Previous frame pixels for onion skin overlay
+  const prevFramePixels = useMemo(() => {
+    if (!onionSkin || !selected || frameIndex <= 0) return null;
+    const prevFrame = selected.frames[frameIndex - 1];
+    if (!prevFrame) return null;
+    return pixelRectsToMap(prevFrame.pixels);
+  }, [onionSkin, selected, frameIndex]);
 
   // Load frame pixels when selection changes
   useEffect(() => {
@@ -617,6 +634,8 @@ export function SpriteEditor() {
       else if (e.key === "i") setTool("eyedropper");
       else if (e.key === "g") setShowGrid(v => !v);
       else if (e.key === "f") setTool("fill");
+      else if (e.key === "m") setSymmetryX(v => !v);
+      else if (e.key === "o") setOnionSkin(v => !v);
       else if (e.key === "s") setTool("select");
       else if (e.key === "Escape") clearSelection();
       else if (e.key === "[") setColor(c => adjustBrightness(c, -0.1));
@@ -777,12 +796,20 @@ export function SpriteEditor() {
       const next = new Map(prev);
       if (tool === "eraser") {
         next.delete(pixelKey(x, y));
+        if (symmetryX && selected) {
+          const mirrorX = selected.width - 1 - x;
+          if (mirrorX !== x) next.delete(pixelKey(mirrorX, y));
+        }
       } else {
         next.set(pixelKey(x, y), color);
+        if (symmetryX && selected) {
+          const mirrorX = selected.width - 1 - x;
+          if (mirrorX !== x) next.set(pixelKey(mirrorX, y), color);
+        }
       }
       return next;
     });
-  }, [selected, zoom, tool, color, pixels, pushUndo, floodFill, selection, selectionStart, selectedPixels, movingSelection, moveStart, isInSelection, clearSelection, altHeld]);
+  }, [selected, zoom, tool, color, pixels, pushUndo, floodFill, selection, selectionStart, selectedPixels, movingSelection, moveStart, isInSelection, clearSelection, altHeld, symmetryX]);
 
   // Finalize selection on mouseUp (capture pixels inside selection)
   const handleCanvasMouseUp = useCallback(() => {
@@ -907,6 +934,58 @@ export function SpriteEditor() {
     setTimeout(() => setExportLabel("Export Patch"), 1200);
     showToast(`Copied ${patches.length} sprite${patches.length > 1 ? "s" : ""} to clipboard — paste to Claude Code`);
   }, [selected, selectedId, pixels, frameIndex, allSprites, dirtySprites, markDirty]);
+
+  // Save directly to codebase via server endpoint
+  const saveToCode = useCallback(async () => {
+    if (selectedId) markDirty();
+    const idsToExport = new Set(dirtySprites);
+    if (selectedId) idsToExport.add(selectedId);
+    if (idsToExport.size === 0) {
+      showToast("No changes to save");
+      return;
+    }
+
+    const patches: Array<Record<string, unknown>> = [];
+    for (const id of idsToExport) {
+      const sprite = allSprites.find(s => s.id === id);
+      if (!sprite) continue;
+      const frames: Record<string, Array<[number, number, string]>> = {};
+      for (const frame of sprite.frames) {
+        const pixelMap = pixelRectsToMap(frame.pixels);
+        const tuples: Array<[number, number, string]> = [];
+        for (const [key, color] of pixelMap) {
+          const { x, y } = parsePixelKey(key);
+          tuples.push([x, y, color]);
+        }
+        frames[frame.name] = tuples;
+      }
+      patches.push({
+        sprite: sprite.id,
+        name: sprite.name,
+        category: sprite.category,
+        size: [sprite.width, sprite.height],
+        builtIn: sprite.builtIn,
+        frames,
+      });
+    }
+
+    try {
+      const res = await fetch("/api/save-sprite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patches }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast(`Saved ${patches.length} sprite(s) to code`);
+        setDirtySprites(new Set());
+      } else {
+        showToast(data.error || "Save failed");
+      }
+    } catch {
+      showToast("Save failed — server unreachable");
+    }
+  }, [selectedId, allSprites, dirtySprites, markDirty, showToast]);
 
   // New sprite dialog state
   const [showNewDialog, setShowNewDialog] = useState(false);
@@ -1225,6 +1304,16 @@ export function SpriteEditor() {
             </button>
           </div>
 
+          {/* Symmetry toggle */}
+          <button
+            onClick={() => setSymmetryX(!symmetryX)}
+            className={`relative px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide transition-colors ${symmetryX ? "bg-blue-500/30 text-blue-300 border border-blue-400/40" : "text-white/40 hover:text-white/70 hover:bg-white/8 border border-transparent"}`}
+            title="Symmetry mode [M] (mirror left↔right)"
+          >
+            SYM
+            {symmetryX && <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-400 rounded-full" />}
+          </button>
+
           <div className="w-px h-5 bg-white/10" />
 
           {/* Color */}
@@ -1265,6 +1354,9 @@ export function SpriteEditor() {
           </button>
           <button onClick={() => setShowCheckerboard(v => !v)} className={`p-1.5 rounded transition-colors ${showCheckerboard ? "bg-white/15 text-white/70" : "text-white/30 hover:text-white/50"}`} title="Toggle Transparency">
             {showCheckerboard ? <Eye size={14} /> : <EyeOff size={14} />}
+          </button>
+          <button onClick={() => setOnionSkin(v => !v)} className={`p-1.5 rounded transition-colors ${onionSkin ? "bg-orange-500/30 text-orange-300" : "text-white/30 hover:text-white/50"}`} title="Onion skin — show previous frame (O)">
+            <Layers size={14} />
           </button>
 
           <div className="w-px h-5 bg-white/10" />
@@ -1377,6 +1469,13 @@ export function SpriteEditor() {
               <ClipboardCopy size={14} />
               {dirtySprites.size > 0 && <span className="text-[9px]">{dirtySprites.size}</span>}
             </button>
+            <button
+              onClick={saveToCode}
+              className="p-1.5 rounded text-white/40 hover:text-green-300 hover:bg-green-500/10 transition-colors"
+              title="Save to codebase"
+            >
+              <Save size={14} />
+            </button>
           </div>
         </div>
 
@@ -1426,6 +1525,14 @@ export function SpriteEditor() {
                     title="Toggle ghost overlay of previous evolution (10% opacity)"
                   >
                     Ghost
+                  </button>
+                  {/* Evolution size guide toggle */}
+                  <button
+                    onClick={() => setShowSizeGuide(!showSizeGuide)}
+                    className={`p-1.5 rounded transition-colors ${showSizeGuide ? "bg-cyan-500/30 text-cyan-300" : "text-black/30 hover:text-black/50 hover:bg-black/10"}`}
+                    title="Evolution size guide (next stage outline)"
+                  >
+                    <ArrowUpDown size={16} />
                   </button>
                   {/* A/B/C compare buttons */}
                   <div className="flex gap-0.5">
@@ -1583,6 +1690,11 @@ export function SpriteEditor() {
                 canvasBg={canvasBg}
                 selection={evoCompareIdx !== null ? null : selection}
                 evoOverlay={evoCompareIdx !== null ? null : evoOverlayPixels}
+                onionSkinPixels={prevFramePixels}
+                symmetryX={symmetryX}
+                showSizeGuide={showSizeGuide}
+                spriteWidth={selected?.width ?? 0}
+                spriteHeight={selected?.height ?? 0}
               />
             </div>
           ) : (
@@ -1936,7 +2048,7 @@ export function SpriteEditor() {
 }
 
 // ─── Canvas renderer (draws pixels + grid + selection highlight) ─────────────
-function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection, evoOverlay }: {
+function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection, evoOverlay, onionSkinPixels, symmetryX, showSizeGuide, spriteWidth, spriteHeight }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   pixels: Map<string, string>;
   width: number;
@@ -1947,6 +2059,11 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
   canvasBg: string;
   selection: SelectionRect | null;
   evoOverlay: { pixels: Map<string, string>; width: number; height: number } | null;
+  onionSkinPixels: Map<string, string> | null;
+  symmetryX: boolean;
+  showSizeGuide: boolean;
+  spriteWidth: number;
+  spriteHeight: number;
 }) {
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1978,6 +2095,17 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
         const { x, y } = parsePixelKey(key);
         ctx.fillStyle = color;
         ctx.fillRect((x + offsetX) * zoom, (y + offsetY) * zoom, zoom, zoom);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw onion skin (previous animation frame at 15% opacity)
+    if (onionSkinPixels) {
+      ctx.globalAlpha = 0.15;
+      for (const [key, color] of onionSkinPixels) {
+        const { x, y } = parsePixelKey(key);
+        ctx.fillStyle = color;
+        ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
       }
       ctx.globalAlpha = 1;
     }
@@ -2017,7 +2145,34 @@ function CanvasRenderer({ canvasRef, pixels, width, height, zoom, showGrid, show
         ctx.stroke();
       }
     }
-  }, [pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection, evoOverlay]);
+
+    // Symmetry center line
+    if (symmetryX && width > 0) {
+      ctx.strokeStyle = "rgba(255, 100, 100, 0.5)";
+      ctx.setLineDash([2, 2]);
+      ctx.lineWidth = 1;
+      const centerX = (width / 2) * zoom;
+      ctx.beginPath();
+      ctx.moveTo(centerX, 0);
+      ctx.lineTo(centerX, height * zoom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Evolution size guide — dashed outline of next stage size
+    if (showSizeGuide && spriteWidth && spriteHeight) {
+      const nextW = spriteWidth + 4; // EVOLUTION_SIZE_STEP
+      const nextH = spriteHeight + 4;
+      // Center the next-size box around current sprite center
+      const offsetX = -2 * zoom; // (nextW - spriteWidth) / 2
+      const offsetY = -2 * zoom;
+      ctx.strokeStyle = "rgba(100, 200, 255, 0.4)";
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(offsetX, offsetY, nextW * zoom, nextH * zoom);
+      ctx.setLineDash([]);
+    }
+  }, [pixels, width, height, zoom, showGrid, showCheckerboard, canvasBg, selection, evoOverlay, onionSkinPixels, symmetryX, showSizeGuide, spriteWidth, spriteHeight]);
 
   return null;
 }

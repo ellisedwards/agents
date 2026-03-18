@@ -489,6 +489,21 @@ Clean up this pixel art. Return ONLY a JSON array of [x,y,"#hexcolor"] tuples.`,
   }
 });
 
+// --- Save sprite patches to staging file ---
+app.post("/api/save-sprite", express.json({ limit: "10mb" }), (req, res) => {
+  const { patches } = req.body;
+  if (!Array.isArray(patches)) return res.status(400).json({ error: "patches array required" });
+
+  // Save to a staging file that Claude can pick up
+  const stagingFile = "/tmp/agent-office-sprite-patches.json";
+  try {
+    fs.writeFileSync(stagingFile, JSON.stringify(patches, null, 2));
+    res.json({ ok: true, file: stagingFile, count: patches.length });
+  } catch (err: any) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 // --- Static files (production) ---
 const clientDir = path.join(__dirname, "client");
 app.use(express.static(clientDir, {
