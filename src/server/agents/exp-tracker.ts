@@ -41,6 +41,9 @@ interface PersistedAgent {
   firstBloodAwarded: boolean;
   gameName: string;
   achievements?: string[];
+  sessionStartTime?: number;
+  critCount?: number;
+  rivalryExp?: number;
 }
 
 export class ExpTracker {
@@ -95,7 +98,9 @@ export class ExpTracker {
           firstBloodAwarded: p.firstBloodAwarded,
           gameName: p.gameName,
           leveledUp: false, // never flash on restore
-          critCount: 0, rivalryExp: 0, sessionStartTime: Date.now(),
+          critCount: p.critCount ?? 0,
+          rivalryExp: p.rivalryExp ?? 0,
+          sessionStartTime: p.sessionStartTime ?? 0, // 0 = ancient, won't trigger speed-runner
           achievements: p.achievements ?? [],
         });
       }
@@ -128,6 +133,7 @@ export class ExpTracker {
         totalExp: d.totalExp, toolCounts: d.toolCounts,
         firstBloodAwarded: d.firstBloodAwarded, gameName: d.gameName,
         achievements: d.achievements,
+        sessionStartTime: d.sessionStartTime, critCount: d.critCount, rivalryExp: d.rivalryExp,
       };
     }
     try { fs.writeFileSync(EXP_FILE, JSON.stringify(out)); } catch {}
@@ -275,21 +281,20 @@ export class ExpTracker {
 
   private checkAchievements(d: AgentExpData): string[] {
     const earned: string[] = [];
-    if (d.firstBloodAwarded) earned.push("first-blood");
-    if (d.level >= 5 && Date.now() - d.sessionStartTime < 30 * 60 * 1000) earned.push("speed-runner");
-
-    // Count tool masteries
+    // Centurion — reach level 50
+    if (d.level >= 50) earned.push("centurion");
+    // Polymath — master 5+ different tools (50+ uses each)
     let masteryCount = 0;
     for (const [tool, count] of Object.entries(d.toolCounts)) {
       if (count >= TOOL_MASTERY_THRESHOLD && TOOL_MASTERY[tool]) masteryCount++;
     }
-    if (masteryCount >= 3) earned.push("polymath");
-
-    if (d.streak && d.streakStart > 0 && Date.now() - d.streakStart >= 30 * 60 * 1000) earned.push("marathon");
-    if ((d.critCount ?? 0) >= 10) earned.push("critical-master");
-    if ((d.rivalryExp ?? 0) >= 50) earned.push("team-player");
-    if ((d.toolCounts["Bash"] ?? 0) >= 200) earned.push("shell-shocked");
-    if ((d.toolCounts["Read"] ?? 0) >= 200) earned.push("bookworm");
+    if (masteryCount >= 5) earned.push("polymath");
+    // Marathon — 2+ hour continuous streak
+    if (d.streak && d.streakStart > 0 && Date.now() - d.streakStart >= 2 * 60 * 60 * 1000) earned.push("marathon");
+    // Shell Shocked — use Bash 1000 times
+    if ((d.toolCounts["Bash"] ?? 0) >= 1000) earned.push("shell-shocked");
+    // Critical Mass — land 100 critical hits
+    if ((d.critCount ?? 0) >= 100) earned.push("critical-mass");
     return earned;
   }
 
@@ -301,25 +306,13 @@ export class ExpTracker {
     // Subagents don't get game names or display fields (they're transient)
     if (isSubagent) return null;
 
-    // Find the dominant tool (most used that has a mastery title)
-    let topTool: string | null = null;
-    let topCount = 0;
-    for (const [tool, count] of Object.entries(d.toolCounts)) {
-      if (count >= TOOL_MASTERY_THRESHOLD && TOOL_MASTERY[tool] && count > topCount) {
-        topTool = tool;
-        topCount = count;
-      }
-    }
-    const masteryTitle = topTool ? TOOL_MASTERY[topTool] : null;
-
     return {
       exp: d.exp,
       level: d.level,
       expToNext: d.expToNext,
       streak: d.streak,
-      title: masteryTitle ?? getLevelTitle(d.level, d.gameName),
+      title: getLevelTitle(d.level, d.gameName),
       gameName: d.gameName,
-      toolMasteries: masteryTitle ? [masteryTitle] : undefined,
       achievements: d.achievements.length > 0 ? d.achievements : undefined,
     };
   }
