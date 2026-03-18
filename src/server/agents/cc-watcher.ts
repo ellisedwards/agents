@@ -315,12 +315,16 @@ export class ClaudeCodeWatcher extends EventEmitter {
 
   /** Immediately remove all CC sessions. Active ones will be re-discovered on next scan. */
   clearAll() {
+    // Remove idle/lounging/stale agents — keep only agents actively doing work right now
+    const now = Date.now();
+    const activeStates = new Set(["typing", "thinking", "reading"]);
     for (const [filePath, session] of this.sessions) {
+      if (activeStates.has(session.state) && now - session.lastActivity < 60_000) continue;
       if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
       fs.unwatchFile(filePath);
       this.sessions.delete(filePath);
+      this.departedPaths.set(filePath, now);
     }
-    this.expTracker.clearAll();
     this.emitUpdate();
   }
 

@@ -63,22 +63,23 @@ export function assignDesks(
     if (!activeIds.has(id)) stickyDesks.delete(id);
   }
 
-  // First pass: assign from slot map (authoritative — always wins)
+  // Seed `taken` with all surviving sticky assignments so no desk is double-booked
   const taken = new Set<number>();
+  for (const deskIdx of stickyDesks.values()) taken.add(deskIdx);
 
-  // Reserve openclaw desk
+  // Reserve openclaw desk (always wins)
   if (activeIds.has("openclaw-main")) {
     stickyDesks.set("openclaw-main", OPENCLAW_DESK);
     taken.add(OPENCLAW_DESK);
   }
 
-  // Slot-based assignment: slot N = desk N, but skip OpenClaw's reserved desk
+  // Slot-based assignment: slot N = desk N, but skip already-taken desks
   for (const id of agentIds) {
     if (id === "openclaw-main") continue;
+    if (stickyDesks.has(id)) continue; // already has a sticky desk, keep it
     const slot = slotMap?.get(id);
     if (slot !== undefined && slot >= 0 && slot < DESK_POSITIONS.length) {
-      // If this slot collides with OpenClaw's desk, skip — will get fallback
-      if (taken.has(slot)) continue;
+      if (taken.has(slot)) continue; // collision — will get fallback
       stickyDesks.set(id, slot);
       taken.add(slot);
     }

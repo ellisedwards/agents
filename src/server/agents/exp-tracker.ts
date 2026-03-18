@@ -76,15 +76,7 @@ export class ExpTracker {
       const raw = fs.readFileSync(EXP_FILE, "utf-8");
       const saved: Record<string, PersistedAgent> = JSON.parse(raw);
       for (const [id, p] of Object.entries(saved)) {
-        // Deduplicate names — if already taken, add Roman numeral suffix
-        let name = p.gameName;
-        if (this.usedNames.has(name)) {
-          let suffix = 2;
-          while (this.usedNames.has(`${name} ${toRoman(suffix)}`)) suffix++;
-          name = `${name} ${toRoman(suffix)}`;
-          p.gameName = name;
-        }
-        this.usedNames.add(name);
+        this.usedNames.add(p.gameName);
         this.data.set(id, {
           exp: p.exp,
           level: p.level,

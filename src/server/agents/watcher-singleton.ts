@@ -51,7 +51,7 @@ class WatcherSingleton extends EventEmitter {
 
   clearAll() {
     this.ccWatcher.clearAll();
-    this.expTracker.clearAll();
+    // Don't clear exp data — CLR only removes stale agents, not stats
   }
 
   removeAgent(agentId: string) {

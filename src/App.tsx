@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, lazy, Suspense } from "react";
 import { useDemoAgents } from "@/hooks/use-demo-agents";
 import { useAgentSSE } from "@/hooks/use-agent-sse";
 import { useAgentOfficeStore } from "@/components/store";
@@ -10,11 +10,15 @@ import { SpeechBubbles } from "@/components/overlay/speech-bubble";
 import { PixelTower } from "@/components/overlay/pixel-tower";
 import { DebugPanel } from "@/components/overlay/debug-panel";
 import { PixelEditor } from "@/components/overlay/pixel-editor";
-import { SpriteEditor } from "@/components/sprite-editor/SpriteEditor";
+
+const LazySpriteEditor = lazy(() =>
+  import("@/components/sprite-editor/SpriteEditor").then(m => ({ default: m.SpriteEditor }))
+);
 
 export function App() {
-  const isSpriteEditor = new URLSearchParams(window.location.search).get("sprite-editor") === "true";
-  if (isSpriteEditor) return <SpriteEditor />;
+  if (new URLSearchParams(window.location.search).get("sprite-editor") === "true") {
+    return <Suspense fallback={<div className="w-full h-screen bg-[#1a1a2e] flex items-center justify-center text-white/50 font-mono">Loading sprite editor...</div>}><LazySpriteEditor /></Suspense>;
+  }
 
   const isDemo = new URLSearchParams(window.location.search).get("demo") === "true";
   const agents = useAgentOfficeStore((s) => s.agents);

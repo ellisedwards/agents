@@ -13,6 +13,16 @@ import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPoste
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
 
+function toRoman(n: number): string {
+  const vals = [10, 9, 5, 4, 1];
+  const syms = ["X", "IX", "V", "IV", "I"];
+  let r = "";
+  for (let i = 0; i < vals.length; i++) {
+    while (n >= vals[i]) { r += syms[i]; n -= vals[i]; }
+  }
+  return r;
+}
+
 interface AgentLabelsProps {
   transform: CanvasTransform;
 }
@@ -184,6 +194,16 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       {gameModeOn && editMode === "none" && (() => {
         const ccMains = agents.filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined));
         if (ccMains.length === 0) return null;
+        // Build "II", "III" suffixes for agents sharing the same gameName
+        const nameCount = new Map<string, number>();
+        const nameSuffix = new Map<string, string>();
+        for (const a of ccMains) {
+          const base = a.gameName ?? a.name;
+          const idx = (nameCount.get(base) ?? 0) + 1;
+          nameCount.set(base, idx);
+          if (idx > 1) nameSuffix.set(a.id, ` ${toRoman(idx)}`);
+        }
+        // If a name appeared more than once, the first instance keeps the bare name
         const record = parseInt(localStorage.getItem("game-mode-record") ?? "1", 10);
         const maxLevel = Math.max(...ccMains.map(a => a.level ?? 1), 1);
         if (maxLevel > record) localStorage.setItem("game-mode-record", String(maxLevel));
@@ -207,7 +227,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     {/* Row 1 */}
                     <div className="w-[9px] h-[9px] rounded-full" style={{ backgroundColor: teamHex }} />
                     <span className="font-semibold text-[14px] text-white truncate leading-tight">
-                      {a.gameName ?? a.name}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
+                      {(a.gameName ?? a.name) + (nameSuffix.get(a.id) ?? "")}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
                     </span>
                     <span className="font-semibold text-[14px] whitespace-nowrap">
                       <span className="text-[#787878]">LV</span>

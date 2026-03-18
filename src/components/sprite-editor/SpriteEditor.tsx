@@ -829,6 +829,12 @@ export function SpriteEditor() {
     if (selectedId) setDirtySprites(prev => new Set(prev).add(selectedId));
   }, [selectedId]);
 
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = useCallback((msg: string, ms = 3000) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), ms);
+  }, []);
+
   const saveFrame = useCallback(() => {
     if (!selected) return;
     markDirty();
@@ -850,11 +856,6 @@ export function SpriteEditor() {
   // Export patch — compact format for Claude to apply to source files
   // Includes ALL sprites edited this session
   const [exportLabel, setExportLabel] = useState("Export Patch");
-  const [toast, setToast] = useState<string | null>(null);
-  const showToast = useCallback((msg: string, ms = 3000) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), ms);
-  }, []);
   const exportPatch = useCallback(() => {
     // Save current frame first so it's included
     if (selected) markDirty();

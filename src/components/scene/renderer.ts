@@ -105,6 +105,180 @@ export function getAgentSlot(agentId: string): number | undefined {
 export function getSlotMap(): Map<string, number> {
   return stickyQuadrants;
 }
+// Pallet Town background pixel decorations (merged from sprite editor exports)
+const PALLET_TOWN_BG: { x: number; y: number; color: string }[] = [
+  // #0e1414 — dark horizontal window/shelf lines
+  { x: 191, y: 34, color: "#0e1414" }, { x: 192, y: 34, color: "#0e1414" }, { x: 193, y: 34, color: "#0e1414" },
+  { x: 194, y: 34, color: "#0e1414" }, { x: 195, y: 34, color: "#0e1414" }, { x: 196, y: 34, color: "#0e1414" },
+  { x: 197, y: 34, color: "#0e1414" }, { x: 198, y: 34, color: "#0e1414" }, { x: 199, y: 34, color: "#0e1414" },
+  { x: 200, y: 34, color: "#0e1414" }, { x: 201, y: 34, color: "#0e1414" }, { x: 202, y: 34, color: "#0e1414" },
+  { x: 203, y: 34, color: "#0e1414" }, { x: 204, y: 34, color: "#0e1414" }, { x: 205, y: 34, color: "#0e1414" },
+  { x: 206, y: 34, color: "#0e1414" }, { x: 207, y: 34, color: "#0e1414" }, { x: 208, y: 34, color: "#0e1414" },
+  { x: 209, y: 34, color: "#0e1414" }, { x: 210, y: 34, color: "#0e1414" }, { x: 211, y: 34, color: "#0e1414" },
+  { x: 212, y: 34, color: "#0e1414" }, { x: 213, y: 34, color: "#0e1414" }, { x: 214, y: 34, color: "#0e1414" },
+  { x: 215, y: 34, color: "#0e1414" }, { x: 216, y: 34, color: "#0e1414" }, { x: 217, y: 34, color: "#0e1414" },
+  { x: 218, y: 34, color: "#0e1414" }, { x: 219, y: 34, color: "#0e1414" }, { x: 220, y: 34, color: "#0e1414" },
+  { x: 221, y: 34, color: "#0e1414" }, { x: 222, y: 34, color: "#0e1414" }, { x: 223, y: 34, color: "#0e1414" },
+  { x: 224, y: 34, color: "#0e1414" }, { x: 225, y: 34, color: "#0e1414" }, { x: 226, y: 34, color: "#0e1414" },
+  { x: 227, y: 34, color: "#0e1414" }, { x: 228, y: 34, color: "#0e1414" },
+  { x: 188, y: 41, color: "#0e1414" }, { x: 189, y: 41, color: "#0e1414" }, { x: 190, y: 41, color: "#0e1414" },
+  { x: 191, y: 41, color: "#0e1414" }, { x: 192, y: 41, color: "#0e1414" }, { x: 193, y: 41, color: "#0e1414" },
+  { x: 194, y: 41, color: "#0e1414" }, { x: 195, y: 41, color: "#0e1414" }, { x: 196, y: 41, color: "#0e1414" },
+  { x: 197, y: 41, color: "#0e1414" }, { x: 198, y: 41, color: "#0e1414" }, { x: 199, y: 41, color: "#0e1414" },
+  { x: 200, y: 41, color: "#0e1414" }, { x: 201, y: 41, color: "#0e1414" },
+  { x: 205, y: 41, color: "#0e1414" }, { x: 206, y: 41, color: "#0e1414" }, { x: 207, y: 41, color: "#0e1414" },
+  { x: 208, y: 41, color: "#0e1414" }, { x: 209, y: 41, color: "#0e1414" }, { x: 210, y: 41, color: "#0e1414" },
+  { x: 211, y: 41, color: "#0e1414" }, { x: 212, y: 41, color: "#0e1414" }, { x: 213, y: 41, color: "#0e1414" },
+  { x: 214, y: 41, color: "#0e1414" },
+  { x: 218, y: 41, color: "#0e1414" }, { x: 219, y: 41, color: "#0e1414" }, { x: 220, y: 41, color: "#0e1414" },
+  { x: 221, y: 41, color: "#0e1414" }, { x: 222, y: 41, color: "#0e1414" }, { x: 223, y: 41, color: "#0e1414" },
+  { x: 224, y: 41, color: "#0e1414" }, { x: 225, y: 41, color: "#0e1414" }, { x: 226, y: 41, color: "#0e1414" },
+  { x: 227, y: 41, color: "#0e1414" }, { x: 228, y: 41, color: "#0e1414" }, { x: 229, y: 41, color: "#0e1414" },
+  { x: 230, y: 41, color: "#0e1414" }, { x: 231, y: 41, color: "#0e1414" }, { x: 232, y: 41, color: "#0e1414" },
+  { x: 188, y: 50, color: "#0e1414" }, { x: 189, y: 50, color: "#0e1414" }, { x: 190, y: 50, color: "#0e1414" },
+  { x: 191, y: 50, color: "#0e1414" }, { x: 192, y: 50, color: "#0e1414" }, { x: 193, y: 50, color: "#0e1414" },
+  { x: 194, y: 50, color: "#0e1414" }, { x: 195, y: 50, color: "#0e1414" }, { x: 196, y: 50, color: "#0e1414" },
+  { x: 197, y: 50, color: "#0e1414" }, { x: 198, y: 50, color: "#0e1414" }, { x: 199, y: 50, color: "#0e1414" },
+  { x: 200, y: 50, color: "#0e1414" }, { x: 201, y: 50, color: "#0e1414" }, { x: 202, y: 50, color: "#0e1414" },
+  { x: 203, y: 50, color: "#0e1414" }, { x: 204, y: 50, color: "#0e1414" }, { x: 205, y: 50, color: "#0e1414" },
+  { x: 206, y: 50, color: "#0e1414" }, { x: 207, y: 50, color: "#0e1414" }, { x: 208, y: 50, color: "#0e1414" },
+  { x: 209, y: 50, color: "#0e1414" }, { x: 210, y: 50, color: "#0e1414" }, { x: 211, y: 50, color: "#0e1414" },
+  { x: 212, y: 50, color: "#0e1414" }, { x: 213, y: 50, color: "#0e1414" }, { x: 214, y: 50, color: "#0e1414" },
+  { x: 215, y: 50, color: "#0e1414" }, { x: 216, y: 50, color: "#0e1414" }, { x: 217, y: 50, color: "#0e1414" },
+  { x: 218, y: 50, color: "#0e1414" }, { x: 219, y: 50, color: "#0e1414" }, { x: 220, y: 50, color: "#0e1414" },
+  { x: 221, y: 50, color: "#0e1414" }, { x: 222, y: 50, color: "#0e1414" }, { x: 223, y: 50, color: "#0e1414" },
+  { x: 224, y: 50, color: "#0e1414" }, { x: 225, y: 50, color: "#0e1414" }, { x: 226, y: 50, color: "#0e1414" },
+  { x: 227, y: 50, color: "#0e1414" }, { x: 228, y: 50, color: "#0e1414" }, { x: 229, y: 50, color: "#0e1414" },
+  { x: 230, y: 50, color: "#0e1414" }, { x: 231, y: 50, color: "#0e1414" }, { x: 232, y: 50, color: "#0e1414" },
+  { x: 205, y: 60, color: "#0e1414" }, { x: 206, y: 60, color: "#0e1414" }, { x: 207, y: 60, color: "#0e1414" },
+  { x: 208, y: 60, color: "#0e1414" }, { x: 209, y: 60, color: "#0e1414" }, { x: 210, y: 60, color: "#0e1414" },
+  { x: 211, y: 60, color: "#0e1414" }, { x: 212, y: 60, color: "#0e1414" }, { x: 213, y: 60, color: "#0e1414" },
+  { x: 214, y: 60, color: "#0e1414" }, { x: 215, y: 60, color: "#0e1414" },
+  // #182f38 — dark vertical lines (fence posts / shadows)
+  { x: 245, y: 28, color: "#182f38" }, { x: 245, y: 29, color: "#182f38" }, { x: 245, y: 30, color: "#182f38" },
+  { x: 245, y: 31, color: "#182f38" }, { x: 245, y: 32, color: "#182f38" }, { x: 245, y: 33, color: "#182f38" },
+  { x: 245, y: 34, color: "#182f38" }, { x: 245, y: 35, color: "#182f38" }, { x: 245, y: 36, color: "#182f38" },
+  { x: 245, y: 37, color: "#182f38" }, { x: 245, y: 38, color: "#182f38" }, { x: 245, y: 39, color: "#182f38" },
+  { x: 245, y: 40, color: "#182f38" }, { x: 245, y: 41, color: "#182f38" }, { x: 245, y: 42, color: "#182f38" },
+  { x: 245, y: 43, color: "#182f38" }, { x: 245, y: 44, color: "#182f38" }, { x: 245, y: 45, color: "#182f38" },
+  { x: 245, y: 46, color: "#182f38" }, { x: 245, y: 47, color: "#182f38" }, { x: 245, y: 48, color: "#182f38" },
+  { x: 245, y: 49, color: "#182f38" }, { x: 245, y: 50, color: "#182f38" }, { x: 245, y: 51, color: "#182f38" },
+  { x: 245, y: 52, color: "#182f38" },
+  { x: 190, y: 51, color: "#182f38" }, { x: 190, y: 52, color: "#182f38" }, { x: 190, y: 53, color: "#182f38" },
+  { x: 190, y: 54, color: "#182f38" }, { x: 190, y: 55, color: "#182f38" }, { x: 190, y: 56, color: "#182f38" },
+  { x: 190, y: 57, color: "#182f38" }, { x: 190, y: 58, color: "#182f38" }, { x: 190, y: 59, color: "#182f38" },
+  { x: 190, y: 60, color: "#182f38" },
+  { x: 201, y: 58, color: "#182f38" }, { x: 201, y: 59, color: "#182f38" }, { x: 201, y: 60, color: "#182f38" },
+  { x: 201, y: 61, color: "#182f38" }, { x: 201, y: 62, color: "#182f38" },
+  { x: 173, y: 61, color: "#182f38" }, { x: 174, y: 61, color: "#182f38" },
+  { x: 203, y: 61, color: "#182f38" }, { x: 204, y: 61, color: "#182f38" },
+  { x: 216, y: 61, color: "#182f38" }, { x: 217, y: 61, color: "#182f38" },
+  { x: 243, y: 61, color: "#182f38" }, { x: 244, y: 61, color: "#182f38" },
+  // #26615e — dark accents at edges
+  { x: 247, y: 61, color: "#26615e" }, { x: 172, y: 65, color: "#26615e" }, { x: 245, y: 65, color: "#26615e" },
+  // #2c625d — teal accents, bush/hedge patches
+  { x: 245, y: 55, color: "#2c625d" }, { x: 245, y: 56, color: "#2c625d" }, { x: 245, y: 57, color: "#2c625d" },
+  { x: 245, y: 58, color: "#2c625d" }, { x: 245, y: 59, color: "#2c625d" }, { x: 245, y: 60, color: "#2c625d" },
+  { x: 245, y: 61, color: "#2c625d" },
+  { x: 172, y: 61, color: "#2c625d" }, { x: 172, y: 62, color: "#2c625d" }, { x: 172, y: 63, color: "#2c625d" },
+  { x: 172, y: 64, color: "#2c625d" },
+  { x: 175, y: 61, color: "#2c625d" }, { x: 176, y: 61, color: "#2c625d" }, { x: 177, y: 61, color: "#2c625d" },
+  { x: 178, y: 61, color: "#2c625d" }, { x: 179, y: 61, color: "#2c625d" }, { x: 180, y: 61, color: "#2c625d" },
+  { x: 181, y: 61, color: "#2c625d" }, { x: 182, y: 61, color: "#2c625d" }, { x: 183, y: 61, color: "#2c625d" },
+  { x: 184, y: 61, color: "#2c625d" }, { x: 185, y: 61, color: "#2c625d" }, { x: 186, y: 61, color: "#2c625d" },
+  { x: 187, y: 61, color: "#2c625d" }, { x: 188, y: 61, color: "#2c625d" }, { x: 189, y: 61, color: "#2c625d" },
+  { x: 193, y: 61, color: "#2c625d" },
+  { x: 205, y: 61, color: "#2c625d" }, { x: 206, y: 61, color: "#2c625d" }, { x: 207, y: 61, color: "#2c625d" },
+  { x: 208, y: 61, color: "#2c625d" }, { x: 209, y: 61, color: "#2c625d" }, { x: 210, y: 61, color: "#2c625d" },
+  { x: 212, y: 61, color: "#2c625d" }, { x: 213, y: 61, color: "#2c625d" }, { x: 214, y: 61, color: "#2c625d" },
+  { x: 215, y: 61, color: "#2c625d" },
+  { x: 218, y: 61, color: "#2c625d" }, { x: 219, y: 61, color: "#2c625d" }, { x: 220, y: 61, color: "#2c625d" },
+  { x: 221, y: 61, color: "#2c625d" }, { x: 222, y: 61, color: "#2c625d" }, { x: 223, y: 61, color: "#2c625d" },
+  { x: 224, y: 61, color: "#2c625d" }, { x: 225, y: 61, color: "#2c625d" }, { x: 226, y: 61, color: "#2c625d" },
+  { x: 231, y: 61, color: "#2c625d" }, { x: 232, y: 61, color: "#2c625d" }, { x: 233, y: 61, color: "#2c625d" },
+  { x: 234, y: 61, color: "#2c625d" }, { x: 235, y: 61, color: "#2c625d" }, { x: 236, y: 61, color: "#2c625d" },
+  { x: 237, y: 61, color: "#2c625d" }, { x: 238, y: 61, color: "#2c625d" }, { x: 239, y: 61, color: "#2c625d" },
+  { x: 240, y: 61, color: "#2c625d" }, { x: 241, y: 61, color: "#2c625d" }, { x: 242, y: 61, color: "#2c625d" },
+  { x: 184, y: 62, color: "#2c625d" }, { x: 185, y: 62, color: "#2c625d" }, { x: 186, y: 62, color: "#2c625d" },
+  { x: 189, y: 62, color: "#2c625d" }, { x: 193, y: 62, color: "#2c625d" },
+  { x: 195, y: 62, color: "#2c625d" }, { x: 196, y: 62, color: "#2c625d" }, { x: 197, y: 62, color: "#2c625d" },
+  { x: 198, y: 62, color: "#2c625d" }, { x: 199, y: 62, color: "#2c625d" },
+  { x: 202, y: 62, color: "#2c625d" }, { x: 203, y: 62, color: "#2c625d" }, { x: 204, y: 62, color: "#2c625d" },
+  { x: 205, y: 62, color: "#2c625d" }, { x: 206, y: 62, color: "#2c625d" }, { x: 227, y: 62, color: "#2c625d" },
+  { x: 231, y: 62, color: "#2c625d" },
+  { x: 188, y: 63, color: "#2c625d" }, { x: 189, y: 63, color: "#2c625d" }, { x: 190, y: 63, color: "#2c625d" },
+  { x: 191, y: 63, color: "#2c625d" }, { x: 192, y: 63, color: "#2c625d" }, { x: 193, y: 63, color: "#2c625d" },
+  { x: 194, y: 63, color: "#2c625d" },
+  { x: 199, y: 63, color: "#2c625d" }, { x: 200, y: 63, color: "#2c625d" }, { x: 201, y: 63, color: "#2c625d" },
+  { x: 202, y: 63, color: "#2c625d" },
+  { x: 228, y: 63, color: "#2c625d" }, { x: 229, y: 63, color: "#2c625d" }, { x: 230, y: 63, color: "#2c625d" },
+  { x: 231, y: 63, color: "#2c625d" },
+  { x: 188, y: 64, color: "#2c625d" },
+  // #2f7c6b — corner detail
+  { x: 145, y: 52, color: "#2f7c6b" }, { x: 145, y: 53, color: "#2f7c6b" }, { x: 146, y: 53, color: "#2f7c6b" },
+  // #3d8f82 — left vertical edge
+  { x: 170, y: 39, color: "#3d8f82" }, { x: 170, y: 40, color: "#3d8f82" }, { x: 170, y: 41, color: "#3d8f82" },
+  { x: 170, y: 42, color: "#3d8f82" }, { x: 170, y: 43, color: "#3d8f82" }, { x: 170, y: 44, color: "#3d8f82" },
+  { x: 170, y: 45, color: "#3d8f82" }, { x: 170, y: 46, color: "#3d8f82" }, { x: 170, y: 47, color: "#3d8f82" },
+  { x: 170, y: 48, color: "#3d8f82" }, { x: 170, y: 49, color: "#3d8f82" }, { x: 170, y: 50, color: "#3d8f82" },
+  { x: 170, y: 51, color: "#3d8f82" }, { x: 170, y: 52, color: "#3d8f82" }, { x: 170, y: 53, color: "#3d8f82" },
+  { x: 170, y: 54, color: "#3d8f82" }, { x: 170, y: 55, color: "#3d8f82" },
+  // #3e8e80 — horizontal ground line
+  { x: 172, y: 66, color: "#3e8e80" }, { x: 173, y: 66, color: "#3e8e80" }, { x: 174, y: 66, color: "#3e8e80" },
+  { x: 175, y: 66, color: "#3e8e80" }, { x: 176, y: 66, color: "#3e8e80" }, { x: 177, y: 66, color: "#3e8e80" },
+  { x: 178, y: 66, color: "#3e8e80" }, { x: 179, y: 66, color: "#3e8e80" }, { x: 180, y: 66, color: "#3e8e80" },
+  { x: 181, y: 66, color: "#3e8e80" }, { x: 182, y: 66, color: "#3e8e80" }, { x: 183, y: 66, color: "#3e8e80" },
+  { x: 184, y: 66, color: "#3e8e80" }, { x: 185, y: 66, color: "#3e8e80" }, { x: 186, y: 66, color: "#3e8e80" },
+  { x: 187, y: 66, color: "#3e8e80" }, { x: 188, y: 66, color: "#3e8e80" }, { x: 189, y: 66, color: "#3e8e80" },
+  { x: 190, y: 66, color: "#3e8e80" }, { x: 191, y: 66, color: "#3e8e80" }, { x: 192, y: 66, color: "#3e8e80" },
+  { x: 193, y: 66, color: "#3e8e80" }, { x: 194, y: 66, color: "#3e8e80" }, { x: 195, y: 66, color: "#3e8e80" },
+  { x: 196, y: 66, color: "#3e8e80" }, { x: 197, y: 66, color: "#3e8e80" }, { x: 198, y: 66, color: "#3e8e80" },
+  { x: 199, y: 66, color: "#3e8e80" }, { x: 200, y: 66, color: "#3e8e80" }, { x: 201, y: 66, color: "#3e8e80" },
+  { x: 202, y: 66, color: "#3e8e80" }, { x: 203, y: 66, color: "#3e8e80" }, { x: 204, y: 66, color: "#3e8e80" },
+  { x: 205, y: 66, color: "#3e8e80" }, { x: 206, y: 66, color: "#3e8e80" }, { x: 207, y: 66, color: "#3e8e80" },
+  { x: 208, y: 66, color: "#3e8e80" }, { x: 209, y: 66, color: "#3e8e80" }, { x: 210, y: 66, color: "#3e8e80" },
+  { x: 211, y: 66, color: "#3e8e80" }, { x: 212, y: 66, color: "#3e8e80" }, { x: 213, y: 66, color: "#3e8e80" },
+  { x: 214, y: 66, color: "#3e8e80" }, { x: 215, y: 66, color: "#3e8e80" }, { x: 216, y: 66, color: "#3e8e80" },
+  { x: 217, y: 66, color: "#3e8e80" }, { x: 218, y: 66, color: "#3e8e80" }, { x: 219, y: 66, color: "#3e8e80" },
+  { x: 220, y: 66, color: "#3e8e80" }, { x: 221, y: 66, color: "#3e8e80" }, { x: 222, y: 66, color: "#3e8e80" },
+  { x: 223, y: 66, color: "#3e8e80" }, { x: 224, y: 66, color: "#3e8e80" }, { x: 225, y: 66, color: "#3e8e80" },
+  { x: 226, y: 66, color: "#3e8e80" }, { x: 227, y: 66, color: "#3e8e80" }, { x: 228, y: 66, color: "#3e8e80" },
+  { x: 229, y: 66, color: "#3e8e80" }, { x: 230, y: 66, color: "#3e8e80" }, { x: 231, y: 66, color: "#3e8e80" },
+  { x: 232, y: 66, color: "#3e8e80" }, { x: 233, y: 66, color: "#3e8e80" }, { x: 234, y: 66, color: "#3e8e80" },
+  { x: 235, y: 66, color: "#3e8e80" }, { x: 236, y: 66, color: "#3e8e80" }, { x: 237, y: 66, color: "#3e8e80" },
+  { x: 238, y: 66, color: "#3e8e80" }, { x: 239, y: 66, color: "#3e8e80" }, { x: 240, y: 66, color: "#3e8e80" },
+  { x: 241, y: 66, color: "#3e8e80" }, { x: 242, y: 66, color: "#3e8e80" }, { x: 243, y: 66, color: "#3e8e80" },
+  { x: 244, y: 66, color: "#3e8e80" }, { x: 245, y: 66, color: "#3e8e80" }, { x: 246, y: 66, color: "#3e8e80" },
+  { x: 247, y: 66, color: "#3e8e80" }, { x: 248, y: 66, color: "#3e8e80" },
+  { x: 217, y: 67, color: "#3e8e80" },
+  // #3f8f81 — right vertical edge lines (house border)
+  { x: 246, y: 41, color: "#3f8f81" }, { x: 246, y: 42, color: "#3f8f81" }, { x: 246, y: 43, color: "#3f8f81" },
+  { x: 246, y: 44, color: "#3f8f81" }, { x: 247, y: 44, color: "#3f8f81" },
+  { x: 246, y: 45, color: "#3f8f81" }, { x: 247, y: 45, color: "#3f8f81" },
+  { x: 246, y: 46, color: "#3f8f81" }, { x: 247, y: 46, color: "#3f8f81" },
+  { x: 246, y: 47, color: "#3f8f81" }, { x: 247, y: 47, color: "#3f8f81" },
+  { x: 246, y: 48, color: "#3f8f81" }, { x: 247, y: 48, color: "#3f8f81" },
+  { x: 246, y: 49, color: "#3f8f81" }, { x: 247, y: 49, color: "#3f8f81" },
+  { x: 246, y: 50, color: "#3f8f81" }, { x: 247, y: 50, color: "#3f8f81" },
+  { x: 246, y: 51, color: "#3f8f81" }, { x: 247, y: 51, color: "#3f8f81" },
+  { x: 246, y: 52, color: "#3f8f81" }, { x: 247, y: 52, color: "#3f8f81" },
+  { x: 246, y: 53, color: "#3f8f81" }, { x: 247, y: 53, color: "#3f8f81" },
+  { x: 246, y: 54, color: "#3f8f81" }, { x: 247, y: 54, color: "#3f8f81" },
+  { x: 246, y: 55, color: "#3f8f81" }, { x: 247, y: 55, color: "#3f8f81" },
+  { x: 246, y: 56, color: "#3f8f81" }, { x: 247, y: 56, color: "#3f8f81" },
+  { x: 246, y: 57, color: "#3f8f81" }, { x: 247, y: 57, color: "#3f8f81" },
+  { x: 246, y: 58, color: "#3f8f81" }, { x: 247, y: 58, color: "#3f8f81" },
+  { x: 246, y: 59, color: "#3f8f81" }, { x: 247, y: 59, color: "#3f8f81" },
+  { x: 246, y: 60, color: "#3f8f81" }, { x: 247, y: 60, color: "#3f8f81" },
+  { x: 246, y: 61, color: "#3f8f81" },
+  { x: 246, y: 62, color: "#3f8f81" }, { x: 247, y: 62, color: "#3f8f81" },
+  { x: 246, y: 63, color: "#3f8f81" }, { x: 247, y: 63, color: "#3f8f81" },
+  { x: 246, y: 64, color: "#3f8f81" }, { x: 247, y: 64, color: "#3f8f81" },
+  { x: 246, y: 65, color: "#3f8f81" }, { x: 247, y: 65, color: "#3f8f81" },
+  // #408c79 — corner detail
+  { x: 144, y: 53, color: "#408c79" },
+];
+
 // Sticky starter assignment — round-robin charmander/squirtle/bulbasaur, no dupes until all 3 used
 const STARTERS: CharacterType[] = ["charmander", "squirtle", "bulbasaur", "mew"];
 const stickyStarters = new Map<string, CharacterType>();
@@ -1256,70 +1430,10 @@ export function renderScene(
     }
     // Pallet Town hardcoded BG decorations
     if (theme.id === "pallet-town") {
-      // Dark vertical lines (fence posts / shadows)
-      ctx.fillStyle = "#182f38";
-      ctx.fillRect(245, 28, 1, 25);   // x=245 y=28-52
-      ctx.fillRect(190, 51, 1, 10);   // x=190 y=51-60
-      ctx.fillRect(201, 58, 1, 5);    // x=201 y=58-62
-      // Dark horizontal accents
-      ctx.fillRect(173, 61, 2, 1);
-      ctx.fillRect(203, 61, 2, 1);
-      ctx.fillRect(216, 61, 2, 1);
-      ctx.fillRect(243, 61, 2, 1);
-
-      // Left vertical edge line
-      ctx.fillStyle = "#3d8f82";
-      ctx.fillRect(170, 39, 1, 17);   // x=170 y=39-55
-
-      // Right vertical edge lines (house border)
-      ctx.fillStyle = "#3f8f81";
-      ctx.fillRect(247, 44, 1, 17);   // x=247 y=44-60
-      ctx.fillRect(247, 62, 1, 4);    // x=247 y=62-65
-      ctx.fillRect(246, 41, 1, 21);   // x=246 y=41-61
-      ctx.fillRect(246, 62, 1, 4);    // x=246 y=62-65
-
-      // Dark accents at edges
-      ctx.fillStyle = "#26615e";
-      ctx.fillRect(247, 61, 1, 1);
-      ctx.fillRect(245, 65, 1, 1);
-      ctx.fillRect(172, 65, 1, 1);
-
-      // Teal vertical accent
-      ctx.fillStyle = "#2c625d";
-      ctx.fillRect(245, 55, 1, 7);    // x=245 y=55-61
-      ctx.fillRect(172, 61, 1, 4);    // x=172 y=61-64
-
-      // Horizontal ground line
-      ctx.fillStyle = "#3e8e80";
-      ctx.fillRect(172, 66, 5, 1);    // 172-176
-      ctx.fillRect(178, 66, 71, 1);   // 178-248
-      ctx.fillRect(217, 67, 1, 1);
-
-      // Bush/hedge patches along ground (y=61-64)
-      ctx.fillStyle = "#2c625d";
-      ctx.fillRect(175, 61, 15, 1);   // 175-189
-      ctx.fillRect(184, 62, 3, 1);    // 184-186
-      ctx.fillRect(189, 62, 1, 2);    // 189 y=62-63
-      ctx.fillRect(193, 61, 1, 3);    // 193 y=61-63
-      ctx.fillRect(188, 63, 1, 2);    // 188 y=63-64
-      ctx.fillRect(190, 63, 3, 1);    // 190-192
-      ctx.fillRect(194, 63, 1, 1);
-      ctx.fillRect(195, 62, 5, 1);    // 195-199
-      ctx.fillRect(199, 63, 4, 1);    // 199-202
-      ctx.fillRect(202, 62, 5, 1);    // 202-206
-      ctx.fillRect(205, 61, 6, 1);    // 205-210
-      ctx.fillRect(212, 61, 4, 1);    // 212-215
-      ctx.fillRect(218, 61, 9, 1);    // 218-226
-      ctx.fillRect(227, 62, 1, 1);
-      ctx.fillRect(228, 63, 4, 1);    // 228-231
-      ctx.fillRect(231, 61, 12, 1);   // 231-242
-
-      // Corner detail
-      ctx.fillStyle = "#2f7c6b";
-      ctx.fillRect(145, 52, 1, 2);
-      ctx.fillRect(146, 53, 1, 1);
-      ctx.fillStyle = "#408c79";
-      ctx.fillRect(144, 53, 1, 1);
+      for (const p of PALLET_TOWN_BG) {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 1, 1);
+      }
     }
     // Draw lounge decoration pixels (guitar/fireplace area)
     const loungePixels = loadDecoPixels(theme.id, "lounge");
@@ -1710,6 +1824,32 @@ export function renderScene(
         ctx.stroke();
         ctx.setLineDash([]);
       }
+    }
+  }
+
+  // 7.6. Draw same-identity connection lines (agents sharing gameName)
+  if (useAgentOfficeStore.getState().gameModeOn) {
+    const byName = new Map<string, typeof entities>();
+    for (const entity of entities) {
+      const agent = agentById.get(entity.agentId);
+      if (!agent || agent.subagentClass !== null && agent.subagentClass !== undefined) continue;
+      const gn = agent.gameName;
+      if (!gn) continue;
+      if (!byName.has(gn)) byName.set(gn, []);
+      byName.get(gn)!.push(entity);
+    }
+    for (const [, group] of byName) {
+      if (group.length < 2) continue;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+      ctx.setLineDash([3, 4]);
+      ctx.lineWidth = 1;
+      for (let i = 0; i < group.length - 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(group[i].x, group[i].y);
+        ctx.lineTo(group[i + 1].x, group[i + 1].y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
     }
   }
 
