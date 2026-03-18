@@ -6,15 +6,17 @@ Add ellipsis context menus to sprite thumbnails in the sprite editor sidebar, wi
 
 ## Sidebar Layout Changes
 
-### Evolution Grouping
+### Evolution Carousel
 
-The sidebar currently shows all sprites in a flat 2-column grid. After this change:
+The sidebar currently shows all sprites in a flat 2-column grid (including evolutions as separate entries). After this change:
 
-- Base sprites (those without `evolutionOf`) are the main entries
-- Evolution stages appear nested underneath their base, indented, at smaller scale
-- Clicking a base sprite's row expands/collapses its evolution chain
-- Each evolution shows a small badge: `Evo 2`, `Evo 3`, etc.
-- Evolutions are still individually selectable for editing
+- Only base sprites (those without `evolutionOf`) appear as entries in the grid
+- Evolutions are hidden from the grid — they live inside their base sprite's thumbnail
+- If a sprite has evolutions, small left/right arrow buttons appear on the thumbnail
+- Clicking L/R cycles through the evolution chain in-place: the preview, name, and size label all update to show the current stage
+- A small indicator shows position (e.g., `1/3` or dots)
+- Clicking the thumbnail selects whichever stage is currently showing for editing
+- The ellipsis menu applies to whichever stage is currently displayed
 
 ### Ellipsis Menu
 
