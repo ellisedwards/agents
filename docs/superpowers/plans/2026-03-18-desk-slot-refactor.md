@@ -125,35 +125,40 @@ export function computeAssignments(
   const taken = new Set<number>();
   for (const deskIdx of stickyAssignments.values()) taken.add(deskIdx);
 
-  // 3. Trainer desk is ALWAYS taken (structural, not a reservation)
+  // 3. Trainer desk is ALWAYS taken — also evict any CC agent stuck there
   taken.add(TRAINER_DESK);
+  for (const [id, deskIdx] of stickyAssignments) {
+    if (id !== "openclaw-main" && deskIdx === TRAINER_DESK) {
+      stickyAssignments.delete(id);
+    }
+  }
 
   // 4. Match agents to desks from claw slotsDetail (authoritative)
+  //    Matches by session_id first, falls back to name if session_id is absent.
+  //    session_id is a UUID suffix embedded in agent IDs like "cc-{session_id}".
   if (slotsDetail && slotsDetail.length > 0) {
     const matchedAgentIds = new Set<string>();
     for (let s = 0; s < slotsDetail.length && s < SLOT_TO_DESK.length; s++) {
       const detail = slotsDetail[s];
-      if (!detail.session_id) continue;
+      if (!detail.session_id && !detail.name) continue;
 
-      // Match by session_id substring (session_id is a UUID suffix embedded in agent IDs like "cc-{session_id}")
-      // This is safe because session_ids are UUID-length and won't collide
       for (const id of agentIds) {
         if (matchedAgentIds.has(id)) continue;
         if (id === "openclaw-main") continue;
-        if (!id.includes(detail.session_id)) continue;
+        const matchById = detail.session_id && id.includes(detail.session_id);
+        const matchByName = !matchById && detail.name && id.includes(detail.name);
+        if (!matchById && !matchByName) continue;
 
         matchedAgentIds.add(id);
         const targetDesk = SLOT_TO_DESK[s];
 
-        // If agent already has a different desk, move it
         const currentDesk = stickyAssignments.get(id);
         if (currentDesk === targetDesk) break; // already correct
 
-        // Free the old desk if agent is moving
-        if (currentDesk !== undefined) taken.delete(currentDesk);
-
         // Only move if target is free (avoid double-booking)
+        // IMPORTANT: free old desk ONLY after confirming move succeeds
         if (!taken.has(targetDesk)) {
+          if (currentDesk !== undefined) taken.delete(currentDesk);
           stickyAssignments.set(id, targetDesk);
           taken.add(targetDesk);
         }
@@ -265,17 +270,7 @@ export function getAgentSlot(agentId: string): number | undefined { ... }
 export function getSlotMap(): Map<string, number> { ... }
 ```
 
-Replace with a getter that reads from the cached result:
-```typescript
-export function getAgentSlot(agentId: string): number | undefined {
-  return getCachedAssignments()?.getSlot(agentId);
-}
-export function getAgentDeskIndex(agentId: string): number | undefined {
-  return getCachedAssignments()?.getDeskIndex(agentId);
-}
-```
-
-Note: `getSlotMap` is no longer needed — delete it entirely.
+Delete all three exports (`getAgentSlot`, `getSlotMap`, `getAgentDeskIndex` if it existed). No pass-throughs needed — consumers read directly from `getCachedAssignments()`.
 
 - [ ] **Step 3: Update desk assignment computation (~line 1378-1386)**
 
@@ -310,7 +305,7 @@ for (const [id, asgn] of assignResult.assignments) {
 }
 ```
 
-Note: `getPixelTowerData()` is already called later (~line 2049). Move the call up so it's available here. The later usage at ~line 2049 should reuse the same `towerInfo` variable (delete the duplicate call, keep the variable).
+Note: `getPixelTowerData()` is already called at ~line 2049. Move the call up to here (~line 1382). Then at ~line 2049, DELETE the `const towerInfo = getPixelTowerData();` line — `towerInfo` is already in scope from here.
 
 IMPORTANT: `assignResult` is declared at function scope and is referenced again in Steps 5 and 6 (hundreds of lines later in the same `renderScene` function body). Do NOT declare it inside a narrower block.
 
@@ -333,15 +328,16 @@ const idx = asgn.deskIndex;
 
 Apply this pattern in both the `occupiedDeskIndices` loop (~line 1390) and the `agentLevelAtDesk` loop (~line 1400).
 
-- [ ] **Step 4: Delete the entire `stickyQuadrants` assignment block (~lines 2058-2107)**
+- [ ] **Step 4: Delete the `stickyQuadrants` assignment block (~lines 2062-2107)**
 
 Delete the section labeled "--- Authoritative slot assignment from claw's slots_detail ---" which includes:
-- The `mainCCs` filter for quadrant assignment
-- The `activeMainIds` cleanup
-- The claw slotsDetail matching loop
-- The fallback sequential fill loop
+- The `activeMainIds` cleanup (lines 2066-2070)
+- The claw slotsDetail matching loop (lines 2072-2093)
+- The fallback sequential fill loop (lines 2096-2107)
 
 All of this is now handled by `computeAssignments` in step 3.
+
+**KEEP the `mainCCs` definition** (lines 2058-2060) — it is still used by the pokeball glow code in Step 5.
 
 - [ ] **Step 5: Update pokeball glow code (~lines 2108-2160)**
 
@@ -442,6 +438,8 @@ if (cached) {
 
 Note: The `deskEligible` filter is no longer needed here — the renderer already computed assignments for the correct set of agents.
 
+**First-frame safety:** `getCachedAssignments()` returns `null` before the renderer's first frame runs. The `if (cached)` guard handles this — agents simply have no labels for that frame. This matches existing behavior (labels don't render until desk positions are known). The canvas `requestAnimationFrame` runs before React's commit phase, so in practice the cache is populated before labels render.
+
 - [ ] **Step 3: Update debug label to show desk index and claw slot separately**
 
 Replace:
@@ -459,12 +457,12 @@ With:
   const slot = cached?.getSlot(agent.id);
   if (deskIdx === undefined) return null;
   return <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)" }}>
-    d{slot !== undefined ? slot : "?"} s{deskIdx}
+    d{deskIdx}{slot !== undefined ? ` q${slot}` : ""}
   </span>;
 })()}
 ```
 
-This shows `d{clawSlot} s{deskIndex}` — diverging correctly when desk 2 is skipped (e.g., `d2 s3` for the 3rd CC agent at desk 3).
+This shows `d{deskIndex}` always, plus `q{quadrant}` when the agent has a claw quadrant (e.g., `d3 q2` for the agent at desk 3 with claw quadrant 2). Desk 5 agents show just `d5` (no quadrant).
 
 - [ ] **Step 4: Commit**
 
@@ -552,7 +550,7 @@ Expected: Builds successfully.
 Open `localhost:4747` and verify:
 - [ ] CC agents sit at desks 0, 1, 3, 4, 5 (never desk 2)
 - [ ] Trainer is always at desk 2
-- [ ] Debug labels show correct `d{slot} s{desk}` (e.g., `d2 s3` for agent at desk 3 with claw slot 2)
+- [ ] Debug labels show `d{desk} q{quadrant}` (e.g., `d3 q2` for agent at desk 3 with claw quadrant 2)
 - [ ] Pokeball glow matches the correct claw quadrant
 - [ ] Labels, speech bubbles, and character positions all agree
 - [ ] Refresh preserves correct assignments (no swapping)
