@@ -112,13 +112,15 @@ let cachedResult: AssignmentResult | null = null;
 
 export function computeAssignments(
   agentIds: string[],          // desk-eligible agent IDs (no subagents, no lounging/departing)
+  allCCMainIds: string[],      // ALL CC main agent IDs (including lounging/departing) — for sticky preservation
   slotsDetail?: SlotDetail[],  // raw claw data — NOT a pre-processed map
 ): AssignmentResult {
-  const activeIds = new Set(agentIds);
+  const retainIds = new Set(allCCMainIds); // broad set: keep sticky assignments for lounging agents
+  retainIds.add("openclaw-main");
 
-  // 1. Clean up departed agents
+  // 1. Clean up only truly departed agents (not lounging — they keep their desk)
   for (const id of stickyAssignments.keys()) {
-    if (!activeIds.has(id)) stickyAssignments.delete(id);
+    if (!retainIds.has(id)) stickyAssignments.delete(id);
   }
 
   // 2. Build taken set from surviving assignments
@@ -134,9 +136,12 @@ export function computeAssignments(
   }
 
   // 4. Match agents to desks from claw slotsDetail (authoritative)
-  //    Matches by session_id first, falls back to name if session_id is absent.
-  //    session_id is a UUID suffix embedded in agent IDs like "cc-{session_id}".
+  //    Two-phase approach to handle swaps:
+  //    Phase A: determine desired moves (agentId → targetDesk)
+  //    Phase B: execute moves, freeing old desks first for agents that are moving
   if (slotsDetail && slotsDetail.length > 0) {
+    // Phase A: match claw slots to agents, build desired moves
+    const desiredMoves = new Map<string, number>(); // agentId → targetDesk
     const matchedAgentIds = new Set<string>();
     for (let s = 0; s < slotsDetail.length && s < SLOT_TO_DESK.length; s++) {
       const detail = slotsDetail[s];
@@ -151,18 +156,26 @@ export function computeAssignments(
 
         matchedAgentIds.add(id);
         const targetDesk = SLOT_TO_DESK[s];
-
         const currentDesk = stickyAssignments.get(id);
-        if (currentDesk === targetDesk) break; // already correct
-
-        // Only move if target is free (avoid double-booking)
-        // IMPORTANT: free old desk ONLY after confirming move succeeds
-        if (!taken.has(targetDesk)) {
-          if (currentDesk !== undefined) taken.delete(currentDesk);
-          stickyAssignments.set(id, targetDesk);
-          taken.add(targetDesk);
+        if (currentDesk !== targetDesk) {
+          desiredMoves.set(id, targetDesk);
         }
         break;
+      }
+    }
+
+    // Phase B: free old desks for ALL moving agents first, then assign new desks
+    for (const [id] of desiredMoves) {
+      const oldDesk = stickyAssignments.get(id);
+      if (oldDesk !== undefined) {
+        taken.delete(oldDesk);
+        stickyAssignments.delete(id);
+      }
+    }
+    for (const [id, targetDesk] of desiredMoves) {
+      if (!taken.has(targetDesk)) {
+        stickyAssignments.set(id, targetDesk);
+        taken.add(targetDesk);
       }
     }
   }
@@ -289,13 +302,16 @@ for (const [id, pos] of rawDeskMap) {
 
 With:
 ```typescript
-const deskEligible = agents.filter((a) =>
-  a.state !== "lounging" && a.state !== "departing" &&
-  (a.subagentClass === null || a.subagentClass === undefined)
+const allCCMains = agents.filter((a) =>
+  a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
+);
+const deskEligible = allCCMains.filter((a) =>
+  a.state !== "lounging" && a.state !== "departing"
 );
 const towerInfo = getPixelTowerData();
 const assignResult = computeAssignments(
   deskEligible.map((a) => a.id),
+  allCCMains.map((a) => a.id),
   towerInfo.data.slotsDetail,
 );
 const deskMap = new Map<string, { x: number; y: number; characterX: number; characterY: number }>();
