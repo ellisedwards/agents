@@ -170,13 +170,20 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setAgents: (incoming) => {
     const now = Date.now();
     const prev = get().agents;
-    // Build map of incoming agents
-    const incomingMap = new Map(incoming.map((a) => [a.id, a]));
+    // Build version map from previous agents to reject out-of-order SSE updates
+    const prevVersions = new Map(prev.map(a => [a.id, a.stateVersion ?? 0]));
+    // Filter incoming to only include agents with equal or higher version
+    const filtered: AgentState[] = incoming.filter(a => {
+      const prevV = prevVersions.get(a.id) ?? 0;
+      return (a.stateVersion ?? 0) >= prevV;
+    });
+    // Build map of filtered incoming agents
+    const incomingMap = new Map(filtered.map((a) => [a.id, a]));
     // Merge: use incoming data, but keep recently-seen agents that
     // briefly disappeared (grace period prevents flicker from transient poll gaps)
     const graceMs = 15000;
     // Trust the server's state — it handles idle/lounging/thinking correctly
-    const merged: AgentState[] = [...incoming];
+    const merged: AgentState[] = [...filtered];
     for (const old of prev) {
       if (!incomingMap.has(old.id) && now - old.lastActivity < graceMs) {
         merged.push(old);

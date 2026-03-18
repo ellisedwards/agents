@@ -49,6 +49,36 @@ function clawPost(claw: string, urlPath: string, body: object, timeoutSec = 3): 
   });
 }
 
+// Circuit breaker for claw communication
+let clawCircuitOpen = false;
+let clawFailCount = 0;
+let clawLastFailTime = 0;
+const CLAW_FAIL_THRESHOLD = 3;
+const CLAW_RECOVERY_MS = 30_000;
+
+async function clawGetSafe(urlPath: string, timeoutSec = 2): Promise<any> {
+  if (clawCircuitOpen) {
+    if (Date.now() - clawLastFailTime < CLAW_RECOVERY_MS) {
+      throw new Error("claw circuit open");
+    }
+    clawCircuitOpen = false;
+    clawFailCount = 0;
+  }
+  try {
+    const result = await clawGet(claw, urlPath, timeoutSec);
+    clawFailCount = 0;
+    return result;
+  } catch (err) {
+    clawFailCount++;
+    clawLastFailTime = Date.now();
+    if (clawFailCount >= CLAW_FAIL_THRESHOLD) {
+      clawCircuitOpen = true;
+      console.log("[claw] circuit breaker OPEN — pausing requests for 30s");
+    }
+    throw err;
+  }
+}
+
 // Yeelight level-up sparkle — fire-and-forget
 const lastSparkleTime = new Map<number, number>();
 function triggerLevelUpSparkle(slotIndex: number) {
@@ -153,6 +183,15 @@ app.post("/api/kill-agent", express.json(), (req, res) => {
   res.json({ ok: true });
 });
 
+// Rename an agent's game name
+app.post("/api/rename-agent", express.json(), (req, res) => {
+  const { agentId, name } = req.body;
+  if (!agentId || !name) return res.status(400).json({ error: "agentId and name required" });
+  const expId = agentId.includes("/subagents/") ? agentId : path.dirname(agentId);
+  const ok = watcher.expTracker.renameAgent(expId, name);
+  res.json({ ok });
+});
+
 // Client-triggered sparkle — perfectly timed with visual level-up
 app.post("/api/sparkle", express.json(), (req, res) => {
   const { slot } = req.body;
@@ -211,7 +250,7 @@ app.post("/api/game-mode", express.json(), (req, res) => {
 // --- Light brightness ---
 app.get("/api/brightness", async (_req, res) => {
   try {
-    const data = await clawGet(claw, "/status");
+    const data = await clawGetSafe("/status");
     res.json({ brightness: data.brightness ?? null });
   } catch {
     res.status(502).json({ error: "claw unreachable" });
@@ -224,7 +263,7 @@ app.get("/api/brightness/:level", async (req, res) => {
     return res.status(400).json({ error: "brightness must be 0-100" });
   }
   try {
-    const data = await clawGet(claw, `/brightness/${level}`);
+    const data = await clawGetSafe(`/brightness/${level}`);
     res.json(data);
   } catch {
     res.status(502).json({ error: "claw unreachable" });
@@ -235,8 +274,8 @@ app.get("/api/brightness/:level", async (req, res) => {
 app.get("/api/claw-health", async (_req, res) => {
   try {
     const [statusData, pixelsData] = await Promise.all([
-      clawGet(claw, "/status"),
-      clawGet(claw, "/pixels").catch(() => null),
+      clawGetSafe("/status"),
+      clawGetSafe("/pixels").catch(() => null),
     ]);
     // Derive slot status from actual pixel data (source of truth)
     const quadrantIndices = [[15,16,20,21],[18,19,23,24],[0,1,5,6],[3,4,8,9]];
@@ -265,8 +304,8 @@ app.get("/api/claw-health", async (_req, res) => {
 app.get("/api/relay", async (_req, res) => {
   try {
     const [outData, inData] = await Promise.all([
-      clawGet(claw, "/relay").catch(() => ({ messages: [] })),
-      clawGet(claw, "/relay/reply").catch(() => ({ replies: [] })),
+      clawGetSafe("/relay").catch(() => ({ messages: [] })),
+      clawGetSafe("/relay/reply").catch(() => ({ replies: [] })),
     ]);
     // Normalize into unified format
     const messages = [
@@ -296,9 +335,9 @@ app.post("/api/tower-reset", (_req, res) => {
 app.get("/api/pixels", async (_req, res) => {
   try {
     const [pixelsData, statusData, slotsData] = await Promise.all([
-      clawGet(claw, "/pixels"),
-      clawGet(claw, "/status").catch(() => null),
-      clawGet(claw, "/hook/agent-slots").catch(() => null),
+      clawGetSafe("/pixels"),
+      clawGetSafe("/status").catch(() => null),
+      clawGetSafe("/hook/agent-slots").catch(() => null),
     ]);
     if (!pixelsData?.panels) return res.status(502).json({ error: "claw unreachable" });
     const data = pixelsData;
@@ -317,7 +356,7 @@ app.get("/api/pixels", async (_req, res) => {
 
 app.get("/api/uptime-kuma", async (_req, res) => {
   try {
-    const data = await clawGet(claw, "/hook/uptime-kuma");
+    const data = await clawGetSafe("/hook/uptime-kuma");
     res.json(data);
   } catch (e) {
     console.error("[proxy] /api/uptime-kuma error:", e);

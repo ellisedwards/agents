@@ -42,4 +42,5 @@ export interface AgentState {
   title?: string;
   gameName?: string;
   toolMasteries?: string[];
+  stateVersion?: number;
 }

@@ -21,8 +21,10 @@ export const EXP_AWARDS: Record<string, number> = {
 export const BONUS_FIRST_BLOOD = 3;
 export const BONUS_STREAK = 5;
 export const BONUS_SPEED_COMBO = 2;
-export const BONUS_RIVALRY = 1;
+export const BONUS_RIVALRY = 3;
 export const CRITICAL_HIT_CHANCE = 0.1;
+export const LUCKY_BREAK_CHANCE = 0.02;
+export const LUCKY_BREAK_MULTIPLIER = 3;
 export const SUBAGENT_EXP_SHARE = 0.5;
 export const STREAK_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 export const STREAK_GAP_MS = 30 * 1000; // 30 seconds max gap
@@ -30,22 +32,32 @@ export const SPEED_COMBO_WINDOW_MS = 10 * 1000;
 export const SPEED_COMBO_COUNT = 3;
 export const TOOL_MASTERY_THRESHOLD = 50;
 
-// --- Level Titles ---
-export const LEVEL_TITLES: [number, string][] = [
-  [90, "Legendary"],
-  [70, "Ascended"],
-  [50, "Grand Master"],
-  [40, "Archmage"],
-  [30, "Expert"],
-  [20, "Veteran"],
-  [12, "Journeyman"],
-  [5, "Apprentice"],
-  [1, "Fresh Spawn"],
+// --- Level Title Pools (randomly assigned per agent, stable by name hash) ---
+const TITLE_POOLS: [number, string[]][] = [
+  [90, ["Legendary", "Mythic", "Eternal", "Transcendent", "Apex"]],
+  [70, ["Ascended", "Exalted", "Sovereign", "Celestial", "Paragon"]],
+  [50, ["Grand Master", "Archmage", "Overlord", "Champion", "Warden"]],
+  [40, ["Commander", "Sage", "Vanguard", "Harbinger", "Tactician"]],
+  [30, ["Expert", "Adept", "Sentinel", "Ranger", "Artisan"]],
+  [20, ["Veteran", "Knight", "Invoker", "Corsair", "Warden"]],
+  [12, ["Journeyman", "Scout", "Striker", "Mystic", "Drifter"]],
+  [5, ["Apprentice", "Initiate", "Cadet", "Acolyte", "Fledgling"]],
+  [1, ["Fresh Spawn", "Rookie", "Hatchling", "Newcomer", "Sprout"]],
 ];
 
-export function getLevelTitle(level: number): string {
-  for (const [lv, title] of LEVEL_TITLES) {
-    if (level >= lv) return title;
+/** Deterministic hash from agent name → stable title pick */
+function nameHash(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+export function getLevelTitle(level: number, agentName?: string): string {
+  for (const [lv, pool] of TITLE_POOLS) {
+    if (level >= lv) {
+      const idx = agentName ? nameHash(agentName) % pool.length : 0;
+      return pool[idx];
+    }
   }
   return "Fresh Spawn";
 }
@@ -71,6 +83,9 @@ export const AGENT_NAMES = [
   "Cosmo", "Fable", "Jinx", "Mochi", "Pip", "Quill",
 ];
 
-// --- Golden Pokeball Thresholds ---
-export const GOLD_POKEBALL_LEVEL = 10;
-export const FULL_GOLD_POKEBALL_LEVEL = 20;
+// --- Pokeball Tier Thresholds ---
+// Standard (red) → Great (blue, Lv20) → Ultra (black/yellow, Lv30) → Gold top (Lv50) → Full gold (Lv75)
+export const GREAT_BALL_LEVEL = 20;
+export const ULTRA_BALL_LEVEL = 30;
+export const GOLD_BALL_LEVEL = 50;
+export const MASTER_BALL_LEVEL = 75;

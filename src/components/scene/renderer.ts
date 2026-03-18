@@ -356,7 +356,6 @@ interface LevelUpEffect {
   particles: Array<{ angle: number; speed: number; color: string }>;
 }
 const activeLevelUps: LevelUpEffect[] = [];
-let screenFlashAlpha = 0;
 const previousLevels = new Map<string, number>();
 const previousExp = new Map<string, number>(); // agentId → total exp (exp + level*expToNext approx)
 
@@ -374,8 +373,6 @@ export function getCurrentFrame(): number {
 }
 
 export function triggerLevelUp(x: number, y: number, teamColor: string) {
-  // screenFlashAlpha disabled — was causing full-scene redraw flash
-  // screenFlashAlpha = 0.06;
   const particles: LevelUpEffect["particles"] = [];
   const colors = [teamColor, "#ffcc44", "#ffffff"];
   for (let i = 0; i < 15; i++) {
@@ -2345,15 +2342,6 @@ export function renderScene(
     ctx.globalAlpha = 1;
   }
 
-  // Screen flash
-  if (screenFlashAlpha > 0) {
-    ctx.globalAlpha = screenFlashAlpha;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    ctx.globalAlpha = 1;
-    screenFlashAlpha = Math.max(0, screenFlashAlpha - 0.02);
-  }
-
   // Clean up agents that no longer exist — poof any that vanished without departing
   const activeIds = new Set(agents.map((a) => a.id));
   for (const id of knownAgentIds) {
@@ -2387,6 +2375,9 @@ export function renderScene(
   }
   for (const id of pokeballFlashes.keys()) {
     if (!activeIds.has(id)) pokeballFlashes.delete(id);
+  }
+  for (const id of stickyQuadrants.keys()) {
+    if (!activeIds.has(id)) stickyQuadrants.delete(id);
   }
   // agentLevelAtDesk is cleared and rebuilt each frame, no per-agent cleanup needed
 

@@ -36,6 +36,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
   private departedPaths = new Map<string, number>(); // path → departure timestamp
   private scanInterval: ReturnType<typeof setInterval> | null = null;
   private ccCounter = 0;
+  private emitVersion = 0;
   private expTracker: ExpTracker;
 
   constructor(expTracker: ExpTracker) {
@@ -370,6 +371,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
   }
 
   private emitUpdate() {
+    this.emitVersion++;
     const now = Date.now();
     const agents: AgentState[] = [];
     for (const [filePath, session] of this.sessions) {
@@ -383,6 +385,15 @@ export class ClaudeCodeWatcher extends EventEmitter {
         session.state === "idle" &&
         !hasActiveSubagents &&
         now - session.lastActivity > LOUNGE_MS;
+      // Re-link orphaned subagents to parent if parent now exists
+      if (session.subagentClass !== null && session.parentId) {
+        const parentSession = this.sessions.get(session.parentId);
+        if (parentSession && session.teamColor !== parentSession.teamColor) {
+          session.teamColor = parentSession.teamColor;
+          session.subagentClass = parentSession.teamColor;
+        }
+      }
+
       // Show as "thinking" while subagents work (main session idles during background tasks)
       const effectiveState = (session.state === "idle" && hasActiveSubagents) ? "thinking" : session.state;
 
@@ -396,6 +407,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
         subagentClass: session.subagentClass,
         teamColor: session.teamColor,
         lastActivity: session.lastActivity,
+        stateVersion: this.emitVersion,
         ...this.expTracker.getExpFields(session.subagentClass !== null ? filePath : path.dirname(filePath), session.subagentClass !== null),
       });
     }

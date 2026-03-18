@@ -250,7 +250,17 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                       {hudMenuId === a.id && (
                         <div className="absolute right-0 top-5 z-50 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[90px] shadow-lg">
                           <button
-                            onClick={() => { const name = prompt("Rename:", a.gameName ?? a.name); if (name) { /* TODO */ } setHudMenuId(null); }}
+                            onClick={() => {
+                              const name = prompt("Rename:", a.gameName ?? a.name);
+                              if (name) {
+                                fetch("/api/rename-agent", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ agentId: a.id, name }),
+                                }).catch(() => {});
+                              }
+                              setHudMenuId(null);
+                            }}
                             className="block w-full text-left text-[9px] px-3 py-1 text-white/50 hover:bg-white/10 hover:text-white/80"
                           >Rename</button>
                           <button

@@ -1,7 +1,7 @@
 // src/server/agents/exp-tracker.ts
 import {
   EXP_AWARDS, BONUS_FIRST_BLOOD, BONUS_STREAK, BONUS_SPEED_COMBO,
-  BONUS_RIVALRY, CRITICAL_HIT_CHANCE, SUBAGENT_EXP_SHARE,
+  BONUS_RIVALRY, CRITICAL_HIT_CHANCE, LUCKY_BREAK_CHANCE, LUCKY_BREAK_MULTIPLIER, SUBAGENT_EXP_SHARE,
   STREAK_GAP_MS, SPEED_COMBO_WINDOW_MS, SPEED_COMBO_COUNT,
   TOOL_MASTERY_THRESHOLD, TOOL_MASTERY, AGENT_NAMES,
   expForLevel, getLevelTitle,
@@ -176,6 +176,10 @@ export class ExpTracker {
     const isCrit = Math.random() < CRITICAL_HIT_CHANCE;
     if (isCrit) baseExp *= 2;
 
+    // Lucky Break (2% chance, 3x exp — stacks with crit)
+    const isLucky = Math.random() < LUCKY_BREAK_CHANCE;
+    if (isLucky) baseExp *= LUCKY_BREAK_MULTIPLIER;
+
     // First blood (bonus, not doubled by crit)
     if (!d.firstBloodAwarded) {
       baseExp += BONUS_FIRST_BLOOD;
@@ -278,7 +282,7 @@ export class ExpTracker {
       level: d.level,
       expToNext: d.expToNext,
       streak: d.streak,
-      title: masteryTitle ?? getLevelTitle(d.level),
+      title: masteryTitle ?? getLevelTitle(d.level, d.gameName),
       gameName: d.gameName,
       toolMasteries: masteryTitle ? [masteryTitle] : undefined,
     };
@@ -297,10 +301,21 @@ export class ExpTracker {
     return this.data.get(agentId)?.level ?? 1;
   }
 
+  renameAgent(agentId: string, newName: string): boolean {
+    const d = this.data.get(agentId);
+    if (!d) return false;
+    this.usedNames.delete(d.gameName);
+    d.gameName = newName;
+    this.usedNames.add(newName);
+    this.saveToDisk();
+    return true;
+  }
+
   clearAgent(agentId: string): void {
     const d = this.data.get(agentId);
     if (d) this.usedNames.delete(d.gameName);
     this.data.delete(agentId);
+    this.lastThinkingExp.delete(agentId);
     this.scheduleSave();
   }
 
