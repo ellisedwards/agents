@@ -11,6 +11,8 @@ import {
   Play, Square, MoreVertical, ArrowUpDown,
 } from "lucide-react";
 
+const DELETABLE_BUILTINS = new Set(["mew", "pikachu", "jigglypuff"]);
+
 // ─── Expected states per category ───────────────────────────────────────────
 const EXPECTED_STATES: Record<SpriteCategory, string[]> = {
   agent: ["idle", "typing", "reading", "thinking", "waiting", "walk1", "walk2", "blink"],
@@ -214,27 +216,98 @@ function SpritePreview({ pixels, width, height, scale = 1, className = "" }: {
 }
 
 // ─── Library thumbnail ──────────────────────────────────────────────────────
-function SpriteThumbnail({ sprite, selected, onClick }: {
+function SpriteThumbnail({ sprite, chain, carouselIdx, selected, onClick, onCarouselChange, onMenuAction }: {
   sprite: SpriteDefinition;
+  chain: SpriteDefinition[];   // full evolution chain [base, evo1, evo2, ...]
+  carouselIdx: number;         // which stage is showing
   selected: boolean;
-  onClick: () => void;
+  onClick: (sprite: SpriteDefinition) => void;
+  onCarouselChange: (spriteId: string, idx: number) => void;
+  onMenuAction: (action: "duplicate" | "duplicate-all" | "evolve" | "delete", sprite: SpriteDefinition) => void;
 }) {
-  const idleFrame = sprite.frames[0];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const displaySprite = chain[carouselIdx] ?? sprite;
+  const hasChain = chain.length > 1;
+  const idleFrame = displaySprite.frames[0];
   const pixels = useMemo(() => pixelRectsToMap(idleFrame?.pixels ?? []), [idleFrame]);
+  const canDelete = !displaySprite.builtIn || DELETABLE_BUILTINS.has(displaySprite.id);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   return (
-    <button
-      onClick={onClick}
-      className={`flex flex-col items-center gap-1 p-2 rounded transition-colors ${
+    <div
+      className={`relative group flex flex-col items-center gap-1 p-2 rounded transition-colors cursor-pointer ${
         selected ? "bg-white/15 ring-1 ring-white/30" : "hover:bg-white/8"
       }`}
+      onClick={() => onClick(displaySprite)}
     >
-      <div className="bg-[#1a1a2e] rounded p-1 flex items-center justify-center" style={{ minWidth: 40, minHeight: 40 }}>
-        <SpritePreview pixels={pixels} width={sprite.width} height={sprite.height} scale={2} />
+      {/* Ellipsis menu button */}
+      <div ref={menuRef} className="absolute top-1 right-1 z-10">
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+          className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-white/30 hover:text-white/60 transition-opacity"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="2" r="1" fill="currentColor"/><circle cx="5" cy="5" r="1" fill="currentColor"/><circle cx="5" cy="8" r="1" fill="currentColor"/></svg>
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-5 bg-[#1e1e2e]/95 border border-white/10 rounded-md py-1 min-w-[100px] shadow-lg">
+            <button
+              onClick={(e) => { e.stopPropagation(); onMenuAction("duplicate", displaySprite); setMenuOpen(false); }}
+              className="block w-full text-left text-[9px] px-3 py-1 text-white/50 hover:bg-white/10 hover:text-white/80"
+            >Duplicate</button>
+            {hasChain && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onMenuAction("duplicate-all", displaySprite); setMenuOpen(false); }}
+                className="block w-full text-left text-[9px] px-3 py-1 text-white/50 hover:bg-white/10 hover:text-white/80"
+              >Duplicate All</button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onMenuAction("evolve", displaySprite); setMenuOpen(false); }}
+              className="block w-full text-left text-[9px] px-3 py-1 text-white/50 hover:bg-white/10 hover:text-white/80"
+            >Add Evolution</button>
+            {canDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onMenuAction("delete", displaySprite); setMenuOpen(false); }}
+                className="block w-full text-left text-[9px] px-3 py-1 text-red-400/60 hover:bg-red-400/10 hover:text-red-400"
+              >Delete</button>
+            )}
+          </div>
+        )}
       </div>
-      <span className="font-mono text-[9px] text-white/50 truncate max-w-[60px]">{sprite.name}</span>
-      <span className="font-mono text-[7px] text-white/20">{sprite.width}x{sprite.height}</span>
-    </button>
+
+      {/* Sprite preview with carousel arrows */}
+      <div className="bg-[#1a1a2e] rounded p-1 flex items-center justify-center relative" style={{ minWidth: 40, minHeight: 40 }}>
+        {hasChain && carouselIdx > 0 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onCarouselChange(sprite.id, carouselIdx - 1); }}
+            className="absolute left-0 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-[10px] px-0.5"
+          >◀</button>
+        )}
+        <SpritePreview pixels={pixels} width={displaySprite.width} height={displaySprite.height} scale={2} />
+        {hasChain && carouselIdx < chain.length - 1 && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onCarouselChange(sprite.id, carouselIdx + 1); }}
+            className="absolute right-0 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 text-[10px] px-0.5"
+          >▶</button>
+        )}
+      </div>
+      <span className="font-mono text-[9px] text-white/50 truncate max-w-[60px]">{displaySprite.name}</span>
+      <div className="flex items-center gap-1">
+        <span className="font-mono text-[7px] text-white/20">{displaySprite.width}x{displaySprite.height}</span>
+        {hasChain && (
+          <span className="font-mono text-[7px] text-white/30">{carouselIdx + 1}/{chain.length}</span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1171,14 +1244,86 @@ export function SpriteEditor() {
     return () => document.removeEventListener("mousedown", handler);
   }, [frameMenuIdx]);
 
-  // Delete custom sprite
-  const deleteSprite = useCallback(() => {
-    if (!selected || selected.builtIn) return;
-    const updated = allSprites.filter(s => s.id !== selected.id);
+  // Duplicate a single sprite (standalone copy, no evolution link)
+  const duplicateSprite = useCallback((sprite: SpriteDefinition) => {
+    const id = `custom-${Date.now()}`;
+    const copy: SpriteDefinition = {
+      ...sprite,
+      id,
+      name: `${sprite.name}_copy`,
+      builtIn: false,
+      evolutionOf: undefined,
+      evolutionStage: 0,
+      frames: sprite.frames.map(f => ({ name: f.name, pixels: [...f.pixels] })),
+    };
+    const updated = [...allSprites, copy];
     setAllSprites(updated);
     saveCustomSprites(updated.filter(s => !s.builtIn));
-    setSelectedId(null);
-  }, [selected, allSprites]);
+    setSelectedId(id);
+    setFrameIndex(0);
+    showToast(`Duplicated as ${copy.name}`);
+  }, [allSprites, showToast]);
+
+  // Duplicate entire evolution chain
+  const duplicateChain = useCallback((sprite: SpriteDefinition) => {
+    const rootId = sprite.evolutionOf ?? sprite.id;
+    const chain = allSprites
+      .filter(s => s.id === rootId || s.evolutionOf === rootId)
+      .sort((a, b) => (a.evolutionStage ?? 0) - (b.evolutionStage ?? 0));
+
+    const baseId = `custom-${Date.now()}`;
+    const copies: SpriteDefinition[] = chain.map((s, i) => ({
+      ...s,
+      id: i === 0 ? baseId : `${baseId}-evo${i}`,
+      name: `${s.name}_copy`,
+      builtIn: false,
+      evolutionOf: i === 0 ? undefined : baseId,
+      evolutionStage: s.evolutionStage,
+      frames: s.frames.map(f => ({ name: f.name, pixels: [...f.pixels] })),
+    }));
+
+    const updated = [...allSprites, ...copies];
+    setAllSprites(updated);
+    saveCustomSprites(updated.filter(s => !s.builtIn));
+    setSelectedId(baseId);
+    setFrameIndex(0);
+    showToast(`Duplicated ${chain.length} sprites`);
+  }, [allSprites, showToast]);
+
+  // Delete sprite + its evolutions
+  const deleteSprite = useCallback((sprite: SpriteDefinition) => {
+    const canDelete = !sprite.builtIn || DELETABLE_BUILTINS.has(sprite.id);
+    if (!canDelete) return;
+
+    // Find evolutions of this sprite
+    const evolutions = allSprites.filter(s => s.evolutionOf === sprite.id);
+    if (evolutions.length > 0) {
+      if (!confirm(`Delete ${sprite.name} and its ${evolutions.length} evolution(s)?`)) return;
+    }
+
+    // Delete sprite + its evolutions (but not siblings or parent)
+    const deleteIds = new Set([sprite.id, ...evolutions.map(s => s.id)]);
+    const updated = allSprites.filter(s => !deleteIds.has(s.id));
+    setAllSprites(updated);
+    saveCustomSprites(updated.filter(s => !s.builtIn));
+    if (selectedId && deleteIds.has(selectedId)) {
+      setSelectedId(null);
+    }
+    showToast(`Deleted ${sprite.name}${evolutions.length > 0 ? ` and ${evolutions.length} evolution(s)` : ""}`);
+  }, [allSprites, selectedId, showToast]);
+
+  // Menu action dispatcher for sprite thumbnails
+  const handleMenuAction = useCallback((action: "duplicate" | "duplicate-all" | "evolve" | "delete", sprite: SpriteDefinition) => {
+    switch (action) {
+      case "duplicate": duplicateSprite(sprite); break;
+      case "duplicate-all": duplicateChain(sprite); break;
+      case "evolve":
+        setSelectedId(sprite.id);
+        setTimeout(() => addEvolution(), 0);
+        break;
+      case "delete": deleteSprite(sprite); break;
+    }
+  }, [duplicateSprite, duplicateChain, deleteSprite, addEvolution]);
 
   // Resize sprite
   const resizeSprite = useCallback(() => {
@@ -1195,9 +1340,26 @@ export function SpriteEditor() {
     if (!selected.builtIn) saveCustomSprites(updated.filter(s => !s.builtIn));
   }, [selected, allSprites]);
 
-  const filteredSprites = categoryFilter === "all"
+  const filteredSprites = (categoryFilter === "all"
     ? allSprites
-    : allSprites.filter(s => s.category === categoryFilter);
+    : allSprites.filter(s => s.category === categoryFilter)
+  ).filter(s => !s.evolutionOf); // only show base sprites in grid
+
+  // Build evolution chains: baseId → [base, evo1, evo2, ...] sorted by stage
+  const evoChains = useMemo(() => {
+    const chains = new Map<string, SpriteDefinition[]>();
+    for (const s of allSprites) {
+      const rootId = s.evolutionOf ?? s.id;
+      if (!chains.has(rootId)) chains.set(rootId, []);
+      chains.get(rootId)!.push(s);
+    }
+    for (const chain of chains.values()) {
+      chain.sort((a, b) => (a.evolutionStage ?? 0) - (b.evolutionStage ?? 0));
+    }
+    return chains;
+  }, [allSprites]);
+
+  const [carouselIndex, setCarouselIndex] = useState<Map<string, number>>(new Map());
 
   // When comparing evolutions, use the compare sprite's dimensions
   const displayWidth = evoComparePixels ? evoComparePixels.width : (selected?.width ?? 16);
@@ -1254,14 +1416,25 @@ export function SpriteEditor() {
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           <div className="grid grid-cols-2 gap-1">
-            {filteredSprites.map(sprite => (
-              <SpriteThumbnail
-                key={sprite.id}
-                sprite={sprite}
-                selected={selectedId === sprite.id}
-                onClick={() => { setSelectedId(sprite.id); setFrameIndex(0); }}
-              />
-            ))}
+            {filteredSprites.map(sprite => {
+              const chain = evoChains.get(sprite.id) ?? [sprite];
+              const idx = carouselIndex.get(sprite.id) ?? 0;
+              const displaySprite = chain[idx] ?? sprite;
+              return (
+                <SpriteThumbnail
+                  key={sprite.id}
+                  sprite={sprite}
+                  chain={chain}
+                  carouselIdx={idx}
+                  selected={selectedId === displaySprite.id}
+                  onClick={(s) => { setSelectedId(s.id); setFrameIndex(0); }}
+                  onCarouselChange={(id, newIdx) => {
+                    setCarouselIndex(prev => new Map(prev).set(id, newIdx));
+                  }}
+                  onMenuAction={handleMenuAction}
+                />
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1953,7 +2126,7 @@ export function SpriteEditor() {
               {!selected.builtIn && (
                 <>
                   <button onClick={resizeSprite} className="text-[8px] text-white/30 hover:text-white/60 bg-white/5 px-1.5 py-0.5 rounded">Resize</button>
-                  <button onClick={deleteSprite} className="text-[8px] text-red-400/50 hover:text-red-400 bg-white/5 px-1.5 py-0.5 rounded">Delete</button>
+                  <button onClick={() => deleteSprite(selected)} className="text-[8px] text-red-400/50 hover:text-red-400 bg-white/5 px-1.5 py-0.5 rounded">Delete</button>
                 </>
               )}
             </div>
