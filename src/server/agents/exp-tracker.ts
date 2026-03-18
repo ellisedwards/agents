@@ -25,6 +25,10 @@ interface AgentExpData {
   firstBloodAwarded: boolean;
   gameName: string;
   leveledUp: boolean; // flag for current tick, cleared after read
+  critCount: number;
+  rivalryExp: number;
+  sessionStartTime: number;
+  achievements: string[];
 }
 
 /** Serializable subset of AgentExpData for persistence */
@@ -36,6 +40,7 @@ interface PersistedAgent {
   toolCounts: Record<string, number>;
   firstBloodAwarded: boolean;
   gameName: string;
+  achievements?: string[];
 }
 
 export class ExpTracker {
@@ -90,6 +95,8 @@ export class ExpTracker {
           firstBloodAwarded: p.firstBloodAwarded,
           gameName: p.gameName,
           leveledUp: false, // never flash on restore
+          critCount: 0, rivalryExp: 0, sessionStartTime: Date.now(),
+          achievements: p.achievements ?? [],
         });
       }
       console.log(`[exp-tracker] restored ${this.data.size} agents from disk`);
@@ -120,6 +127,7 @@ export class ExpTracker {
         exp: d.exp, level: d.level, expToNext: d.expToNext,
         totalExp: d.totalExp, toolCounts: d.toolCounts,
         firstBloodAwarded: d.firstBloodAwarded, gameName: d.gameName,
+        achievements: d.achievements,
       };
     }
     try { fs.writeFileSync(EXP_FILE, JSON.stringify(out)); } catch {}
@@ -155,6 +163,7 @@ export class ExpTracker {
         streak: false, streakStart: 0, lastToolTime: 0,
         recentTools: [], toolCounts: {}, firstBloodAwarded: false,
         gameName: this.assignName(), leveledUp: false,
+        critCount: 0, rivalryExp: 0, sessionStartTime: Date.now(), achievements: [],
       };
       this.data.set(agentId, d);
     }
@@ -174,7 +183,7 @@ export class ExpTracker {
 
     // Critical hit (10% chance, doubles base EXP only — applied before bonuses)
     const isCrit = Math.random() < CRITICAL_HIT_CHANCE;
-    if (isCrit) baseExp *= 2;
+    if (isCrit) { baseExp *= 2; d.critCount = (d.critCount ?? 0) + 1; }
 
     // Lucky Break (2% chance, 3x exp — stacks with crit)
     const isLucky = Math.random() < LUCKY_BREAK_CHANCE;
@@ -209,7 +218,7 @@ export class ExpTracker {
     const typingCount = allAgents.filter(a =>
       a.source === "cc" && a.state === "typing" && a.id !== agentId
     ).length;
-    if (typingCount > 0) baseExp += BONUS_RIVALRY;
+    if (typingCount > 0) { baseExp += BONUS_RIVALRY; d.rivalryExp = (d.rivalryExp ?? 0) + BONUS_RIVALRY; }
 
     // Tool mastery tracking
     d.toolCounts[toolName] = (d.toolCounts[toolName] || 0) + 1;
@@ -217,6 +226,12 @@ export class ExpTracker {
     // Award EXP
     this.awardExp(d, baseExp);
     d.lastToolTime = now;
+
+    // Check achievements
+    const newAchievements = this.checkAchievements(d);
+    if (newAchievements.length > d.achievements.length) {
+      d.achievements = newAchievements;
+    }
 
     // Subagent EXP share — find parent and give them 50%
     if (agent?.parentId) {
@@ -258,6 +273,26 @@ export class ExpTracker {
     else this.scheduleSave();
   }
 
+  private checkAchievements(d: AgentExpData): string[] {
+    const earned: string[] = [];
+    if (d.firstBloodAwarded) earned.push("first-blood");
+    if (d.level >= 5 && Date.now() - d.sessionStartTime < 30 * 60 * 1000) earned.push("speed-runner");
+
+    // Count tool masteries
+    let masteryCount = 0;
+    for (const [tool, count] of Object.entries(d.toolCounts)) {
+      if (count >= TOOL_MASTERY_THRESHOLD && TOOL_MASTERY[tool]) masteryCount++;
+    }
+    if (masteryCount >= 3) earned.push("polymath");
+
+    if (d.streak && d.streakStart > 0 && Date.now() - d.streakStart >= 30 * 60 * 1000) earned.push("marathon");
+    if ((d.critCount ?? 0) >= 10) earned.push("critical-master");
+    if ((d.rivalryExp ?? 0) >= 50) earned.push("team-player");
+    if ((d.toolCounts["Bash"] ?? 0) >= 200) earned.push("shell-shocked");
+    if ((d.toolCounts["Read"] ?? 0) >= 200) earned.push("bookworm");
+    return earned;
+  }
+
   /** Get EXP fields to merge into AgentState. Returns null if no data or subagent. */
   getExpFields(agentId: string, isSubagent: boolean): Partial<AgentState> | null {
     if (!this.enabled) return null;
@@ -285,6 +320,7 @@ export class ExpTracker {
       title: masteryTitle ?? getLevelTitle(d.level, d.gameName),
       gameName: d.gameName,
       toolMasteries: masteryTitle ? [masteryTitle] : undefined,
+      achievements: d.achievements.length > 0 ? d.achievements : undefined,
     };
   }
 

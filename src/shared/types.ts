@@ -42,5 +42,6 @@ export interface AgentState {
   title?: string;
   gameName?: string;
   toolMasteries?: string[];
+  achievements?: string[];
   stateVersion?: number;
 }

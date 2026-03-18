@@ -13,6 +13,11 @@ import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPoste
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
 
+const ACHIEVEMENT_ICONS: Record<string, string> = {
+  "first-blood": "\u{1FA78}", "speed-runner": "\u26A1", "polymath": "\u{1F9E0}", "marathon": "\u{1F3C3}",
+  "critical-master": "\u{1F4A5}", "team-player": "\u{1F91D}", "shell-shocked": "\u{1F41A}", "bookworm": "\u{1F4DA}",
+};
+
 function toRoman(n: number): string {
   const vals = [10, 9, 5, 4, 1];
   const syms = ["X", "IX", "V", "IV", "I"];
@@ -281,6 +286,20 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                       {a.exp ?? 0}/{a.expToNext ?? 100}
                     </span>
                     <div />
+
+                    {/* Row 3: achievement badges */}
+                    {(a.achievements?.length ?? 0) > 0 && <>
+                      <div />
+                      <span className="text-[11px] leading-tight" title={a.achievements!.join(", ")}>
+                        {a.achievements!.map(id => {
+                          const ach = ACHIEVEMENT_ICONS[id];
+                          return ach ? <span key={id} className="mr-0.5" title={id}>{ach}</span> : null;
+                        })}
+                      </span>
+                      <div />
+                      <div />
+                      <div />
+                    </>}
                   </div>
                 );
               })}
