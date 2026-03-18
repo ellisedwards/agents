@@ -43,5 +43,6 @@ export interface AgentState {
   gameName?: string;
   toolMasteries?: string[];
   achievements?: string[];
+  luckyMultiplier?: { multiplier: number; usesLeft: number };
   stateVersion?: number;
 }

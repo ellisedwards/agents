@@ -126,6 +126,10 @@ interface AgentOfficeStore {
   setGameModeOn: (on: boolean) => void;
   setHudPosition: (pos: HudPosition) => void;
   killAgent: (agentId: string) => void;
+  luckyPokeballAgent: string | null;
+  setLuckyPokeballAgent: (id: string | null) => void;
+  luckyWheelAgent: string | null;
+  setLuckyWheelAgent: (id: string | null) => void;
   storageWarning: boolean;
   dismissStorageWarning: () => void;
 }
@@ -154,6 +158,10 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   towerOpacity: initialTower.opacity,
   editMode: "none",
   gameModeOn: loadGameMode(),
+  luckyPokeballAgent: null,
+  setLuckyPokeballAgent: (id) => set({ luckyPokeballAgent: id }),
+  luckyWheelAgent: null,
+  setLuckyWheelAgent: (id) => set({ luckyWheelAgent: id }),
   storageWarning: false,
   dismissStorageWarning: () => set({ storageWarning: false }),
   hudPosition: (localStorage.getItem("agent-office-hud-pos") as HudPosition) || "top-left",

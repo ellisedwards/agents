@@ -29,6 +29,8 @@ interface AgentExpData {
   rivalryExp: number;
   sessionStartTime: number;
   achievements: string[];
+  luckyMultiplier?: number;
+  luckyUsesLeft?: number;
 }
 
 /** Serializable subset of AgentExpData for persistence */
@@ -195,6 +197,16 @@ export class ExpTracker {
     const isLucky = Math.random() < LUCKY_BREAK_CHANCE;
     if (isLucky) baseExp *= LUCKY_BREAK_MULTIPLIER;
 
+    // Lucky Pokeball multiplier (stacks with crit and lucky break)
+    if (d.luckyUsesLeft && d.luckyUsesLeft > 0 && d.luckyMultiplier) {
+      baseExp *= d.luckyMultiplier;
+      d.luckyUsesLeft--;
+      if (d.luckyUsesLeft <= 0) {
+        d.luckyMultiplier = undefined;
+        d.luckyUsesLeft = undefined;
+      }
+    }
+
     // First blood (bonus, not doubled by crit)
     if (!d.firstBloodAwarded) {
       baseExp += BONUS_FIRST_BLOOD;
@@ -298,6 +310,13 @@ export class ExpTracker {
     return earned;
   }
 
+  setLuckyMultiplier(agentId: string, multiplier: number, uses: number): void {
+    const d = this.getOrCreate(agentId);
+    d.luckyMultiplier = multiplier;
+    d.luckyUsesLeft = uses;
+    this.scheduleSave();
+  }
+
   /** Get EXP fields to merge into AgentState. Returns null if no data or subagent. */
   getExpFields(agentId: string, isSubagent: boolean): Partial<AgentState> | null {
     if (!this.enabled) return null;
@@ -314,6 +333,7 @@ export class ExpTracker {
       title: getLevelTitle(d.level, d.gameName),
       gameName: d.gameName,
       achievements: d.achievements.length > 0 ? d.achievements : undefined,
+      luckyMultiplier: d.luckyMultiplier && d.luckyUsesLeft ? { multiplier: d.luckyMultiplier, usesLeft: d.luckyUsesLeft } : undefined,
     };
   }
 

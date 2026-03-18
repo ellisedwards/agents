@@ -1389,11 +1389,8 @@ export function renderScene(
 
   // 3. Determine which desk indices have laptops
   const occupiedDeskIndices = new Set<number>();
-  for (const agent of deskEligible) {
-    const asgn = assignResult.assignments.get(agent.id);
-    if (!asgn) continue;
-    const idx = asgn.deskIndex;
-    if (idx >= 0) occupiedDeskIndices.add(idx);
+  for (const [, asgn] of assignResult.assignments) {
+    if (asgn.deskIndex >= 0) occupiedDeskIndices.add(asgn.deskIndex);
   }
 
   // 3a. Populate agent levels at desks for golden pokeball
@@ -2082,6 +2079,26 @@ export function renderScene(
         ctx.fillRect(dx + 1, dy - 1, 7, 7); // Cover pokeball area
         ctx.globalAlpha = 1;
         if (flashFrames <= 1) pokeballFlashes.delete(agent.id);
+      }
+
+      // Lucky pokeball wobble/sparkle/pulse
+      const luckyAgent = useAgentOfficeStore.getState().luckyPokeballAgent;
+      if (luckyAgent === agent.id) {
+        const wobbleX = Math.sin(frame * 0.3) * 2;
+        // Gold pulse overlay
+        ctx.globalAlpha = 0.2 + Math.sin(frame * 0.15) * 0.15;
+        ctx.fillStyle = "#ffcc44";
+        ctx.fillRect(dx + 1 + wobbleX, dy - 1, 7, 7);
+        ctx.globalAlpha = 1;
+        // Sparkle particles — every 8 frames, gold/white pixel at random offset
+        if (frame % 8 === 0) {
+          const sx = dx + 4 + (Math.random() - 0.5) * 12;
+          const sy = dy + 3 + (Math.random() - 0.5) * 12;
+          ctx.fillStyle = Math.random() > 0.5 ? "#ffcc44" : "#ffffff";
+          ctx.globalAlpha = 0.8;
+          ctx.fillRect(sx, sy, 1, 1);
+          ctx.globalAlpha = 1;
+        }
       }
 
       const isTool = agent.state === "reading" || agent.state === "typing" || agent.state === "waiting";

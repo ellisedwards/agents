@@ -267,6 +267,14 @@ app.post("/api/light-test", express.json(), async (req, res) => {
   }
 });
 
+// --- Lucky Pokeball multiplier ---
+app.post("/api/lucky-multiplier", express.json(), (req, res) => {
+  const { agentId, multiplier, uses } = req.body;
+  if (!agentId || !multiplier) return res.status(400).json({ error: "agentId and multiplier required" });
+  watcher.expTracker.setLuckyMultiplier(agentId, multiplier, uses ?? 10);
+  res.json({ ok: true });
+});
+
 // --- Game mode toggle ---
 app.get("/api/game-mode", (_req, res) => {
   const tracker = watcher.expTracker;

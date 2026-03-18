@@ -12,6 +12,7 @@ import { getCachedAssignments } from "../scene/desk-layout";
 import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, setAgentCharacter, getAgentCharacter, STARTERS, getLastDeskPos } from "../scene/renderer";
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
+import LuckyWheel from "./lucky-wheel";
 
 const ACHIEVEMENT_DATA: Record<string, { icon: string; name: string }> = {
   "centurion": { icon: "\u{1F451}", name: "Centurion — Reach level 50" },
@@ -58,6 +59,107 @@ function ServerInfo() {
   );
 }
 
+function GameGuide() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="font-mono text-[10px] px-1.5 py-0.5 rounded text-white/20 hover:text-white/50 transition-colors"
+      >
+        ?
+      </button>
+      {open && (
+        <div
+          className="absolute top-6 right-0 rounded-[7px] px-[14px] py-[12px] min-w-[260px] max-h-[400px] overflow-y-auto space-y-3"
+          style={{ backgroundColor: "rgba(31, 31, 36, 0.94)", animation: "panelReveal 0.15s ease-out" }}
+        >
+          <div className="font-mono text-[11px] text-white/80 font-bold">Game Guide</div>
+
+          <div className="space-y-1">
+            <div className="font-mono text-[9px] text-yellow-300/70 font-bold">EXP Awards</div>
+            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+              <div>Write / Edit: 8 exp</div>
+              <div>Bash: 5 exp</div>
+              <div>Read / Grep / Glob: 3 exp</div>
+              <div>Agent (subagent): 10 exp</div>
+              <div>Thinking: 1 exp (30s cooldown)</div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="font-mono text-[9px] text-green-300/70 font-bold">Bonuses</div>
+            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+              <div>First Blood: +3 exp (first tool use)</div>
+              <div>Streak: +5 exp (active 5+ min)</div>
+              <div>Speed Combo: +2 exp (3 tools in 10s)</div>
+              <div>Rivalry: +3 exp (2+ agents typing)</div>
+              <div>Subagent Share: parent gets 50%</div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="font-mono text-[9px] text-amber-300/70 font-bold">Critical Hits</div>
+            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+              <div>10% chance: 2x base exp</div>
+              <div>Lucky Break (2%): 3x exp</div>
+              <div>Both can stack</div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="font-mono text-[9px] text-red-300/70 font-bold">Pokeball Tiers</div>
+            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Standard (Lv 1)</div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Great Ball (Lv 20)</div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-800 inline-block border border-yellow-500/50" /> Ultra Ball (Lv 30)</div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" /> Gold Top (Lv 50)</div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" style={{ boxShadow: "0 0 3px #ffcc44" }} /> Full Gold + Shimmer (Lv 75)</div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="font-mono text-[9px] text-purple-300/70 font-bold">Titles</div>
+            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+              <div>Lv 1: Fresh Spawn / Rookie</div>
+              <div>Lv 5: Apprentice / Initiate</div>
+              <div>Lv 12: Journeyman / Scout</div>
+              <div>Lv 20: Veteran / Knight</div>
+              <div>Lv 30: Expert / Adept</div>
+              <div>Lv 40: Commander / Sage</div>
+              <div>Lv 50: Grand Master / Champion</div>
+              <div>Lv 70: Ascended / Exalted</div>
+              <div>Lv 90: Legendary / Mythic</div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="font-mono text-[9px] text-cyan-300/70 font-bold">Achievements</div>
+            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+              <div>👑 Centurion — Reach Lv 50</div>
+              <div>🧠 Polymath — Master 5+ tools (50 uses each)</div>
+              <div>🏃 Marathon — 2-hour streak</div>
+              <div>🐚 Shell Shocked — 1000 Bash uses</div>
+              <div>💥 Critical Mass — 100 critical hits</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TIME_OPTIONS: { value: TimeMode; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "day", label: "Day" },
@@ -97,6 +199,10 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const levelUpEvents = useAgentOfficeStore((s) => s.levelUpEvents);
   const expGainEvents = useAgentOfficeStore((s) => s.expGainEvents);
   const achievementEvents = useAgentOfficeStore((s) => s.achievementEvents);
+  const luckyPokeballAgent = useAgentOfficeStore((s) => s.luckyPokeballAgent);
+  const setLuckyPokeballAgent = useAgentOfficeStore((s) => s.setLuckyPokeballAgent);
+  const luckyWheelAgent = useAgentOfficeStore((s) => s.luckyWheelAgent);
+  const setLuckyWheelAgent = useAgentOfficeStore((s) => s.setLuckyWheelAgent);
   const cached = getCachedAssignments();
   const deskMap = new Map<string, { x: number; y: number; characterX: number; characterY: number }>();
   if (cached) {
@@ -133,6 +239,39 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [hudMenuId]);
+
+  // Lucky pokeball: pick a random desk-bound CC agent
+  const triggerLuckyPokeball = useCallback(() => {
+    const ccDesked = agents.filter(a =>
+      a.source === "cc" &&
+      (a.subagentClass === null || a.subagentClass === undefined) &&
+      a.state !== "lounging" && a.state !== "departing" &&
+      deskMap.has(a.id)
+    );
+    if (ccDesked.length === 0) return;
+    const pick = ccDesked[Math.floor(Math.random() * ccDesked.length)];
+    setLuckyPokeballAgent(pick.id);
+    // Auto-clear after 30 seconds if not clicked
+    setTimeout(() => {
+      if (useAgentOfficeStore.getState().luckyPokeballAgent === pick.id) {
+        setLuckyPokeballAgent(null);
+      }
+    }, 30000);
+  }, [agents, deskMap, setLuckyPokeballAgent]);
+
+  // Lucky pokeball timer: every 10-15 minutes
+  useEffect(() => {
+    if (!gameModeOn) return;
+    const schedule = (): ReturnType<typeof setTimeout> => {
+      const delay = (10 + Math.random() * 5) * 60 * 1000;
+      return setTimeout(() => {
+        triggerLuckyPokeball();
+        timerId = schedule();
+      }, delay);
+    };
+    let timerId = schedule();
+    return () => clearTimeout(timerId);
+  }, [gameModeOn, triggerLuckyPokeball]);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -175,6 +314,24 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         e.clientX - rect.left,
         e.clientY - rect.top
       );
+      // Lucky pokeball click — check if click is near the glowing pokeball
+      const luckyId = useAgentOfficeStore.getState().luckyPokeballAgent;
+      if (luckyId) {
+        const pokePos = deskMap.get(luckyId);
+        if (pokePos) {
+          // Pokeball is drawn at (pos.x + 1, pos.y - 1), size 7x7 — check within ~10px
+          const pbCx = pokePos.x + 4.5;
+          const pbCy = pokePos.y + 2.5;
+          const pdx = canvasPos.x - pbCx;
+          const pdy = canvasPos.y - pbCy;
+          if (Math.sqrt(pdx * pdx + pdy * pdy) < 10) {
+            setLuckyWheelAgent(luckyId);
+            setLuckyPokeballAgent(null);
+            return;
+          }
+        }
+      }
+
       // Health poster click
       const hpb = getHealthPosterBounds();
       if (hpb && canvasPos.x >= hpb.x && canvasPos.x <= hpb.x + hpb.w &&
@@ -253,6 +410,11 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     <span className="font-semibold text-[14px] whitespace-nowrap" style={{ opacity: isDupe ? 0.25 : 1 }}>
                       <span className="text-[#787878]">LV</span>
                       <span className="text-white">{a.level ?? 1}</span>
+                      {a.luckyMultiplier && (
+                        <span className="text-[10px] text-yellow-300/70 ml-1">
+                          {a.luckyMultiplier.multiplier}x ({a.luckyMultiplier.usesLeft})
+                        </span>
+                      )}
                     </span>
                     <div className="relative" style={{ height: "14px", opacity: isDupe ? 0.25 : 1 }}>
                       <div className="absolute inset-0 rounded-[3.5px]" style={{ backgroundColor: teamHex, opacity: 0.33 }} />
@@ -334,6 +496,9 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
             {gameModeOn ? "end game" : "play"}
           </button>
         </div>
+
+        {/* Game guide — only visible during game mode */}
+        {gameModeOn && <GameGuide />}
 
         {/* Edit button + dropdown */}
         <div ref={editPanelRef} className="relative">
@@ -592,6 +757,12 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 >
                   ufo
                 </button>
+                <button
+                  onClick={() => triggerLuckyPokeball()}
+                  className="font-mono text-[9px] text-white/50 bg-white/10 hover:bg-white/20 rounded px-1.5 py-0.5 transition-colors"
+                >
+                  lucky
+                </button>
               </div>
             </div>
 
@@ -689,14 +860,14 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 className="absolute font-mono font-bold px-2 py-1 bg-[#181825]/90 rounded whitespace-nowrap pointer-events-none"
                 style={{
                   left: domPos.x,
-                  top: domPos.y - 32 * transform.scale,
+                  top: domPos.y - 18 * transform.scale,
                   transform: "translateX(-50%)",
                   fontSize: "15px",
                   color: teamHex,
                   opacity: isHovered ? 1 : 0.8,
                   textShadow: "0 1px 3px rgba(0,0,0,0.6)",
                   letterSpacing: "0.02em",
-                  animation: "labelReveal 0.2s ease-out",
+                  animation: "toolReveal 0.2s ease-out",
                 }}
               >
                 {agent.currentTool}
@@ -729,7 +900,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 className="absolute font-mono font-bold whitespace-nowrap pointer-events-none flex flex-col items-center"
                 style={{
                   left: domPos.x,
-                  top: domPos.y + 16 * transform.scale,
+                  top: domPos.y + 12 * transform.scale,
                   transform: "translateX(-50%)",
                   opacity: isHovered ? 1 : (labelsOn || debugOn) ? 0.7 : 0,
                   animation: "labelReveal 0.2s ease-out",
@@ -839,6 +1010,47 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         );
       })}
 
+      {/* Lucky Wheel overlay */}
+      {luckyWheelAgent && (() => {
+        const wheelAgent = agents.find(a => a.id === luckyWheelAgent);
+        if (!wheelAgent) return null;
+        const teamHex = TEAM_COLORS[wheelAgent.teamColor] ?? "#88cc88";
+        const displayName = wheelAgent.gameName ?? wheelAgent.name;
+        return (
+          <LuckyWheel
+            agentName={displayName}
+            teamColor={teamHex}
+            onResult={(multiplier) => {
+              // POST to server
+              fetch("/api/lucky-multiplier", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ agentId: luckyWheelAgent, multiplier, uses: 10 }),
+              }).catch(() => {});
+              // Show a toast via level-up events system (reuse the mechanism)
+              useAgentOfficeStore.getState().addLevelUp(
+                luckyWheelAgent,
+                `${displayName} ${multiplier}x LUCKY!`,
+                wheelAgent.level ?? 1,
+                String(wheelAgent.teamColor)
+              );
+              // Jackpot: trigger claw sparkle
+              if (multiplier === 50) {
+                const slot = cached?.getSlot(luckyWheelAgent);
+                if (slot !== undefined) {
+                  fetch("/api/sparkle", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ slot }),
+                  }).catch(() => {});
+                }
+              }
+            }}
+            onClose={() => setLuckyWheelAgent(null)}
+          />
+        );
+      })()}
+
       <style>{`
         @keyframes achievementFloat {
           0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.5); }
@@ -860,6 +1072,10 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         }
         @keyframes labelReveal {
           0% { opacity: 0; transform: translateX(-50%) translateY(3px); }
+          100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes toolReveal {
+          0% { opacity: 0; transform: translateX(-50%) translateY(4px); }
           100% { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
         @keyframes panelReveal {
