@@ -291,20 +291,22 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                       )}
                     </div>
 
-                    {/* Row 2: title under name, achievements under LV, exp under bar */}
+                    {/* Row 2: title under name, badges + exp spanning under LV and bar */}
                     {!isDupe && <>
                     <div />
                     <span className="text-[11px] text-[#636363] truncate leading-tight">
                       {a.title ?? ""}
                     </span>
-                    <span className="text-[10px] leading-tight">
-                      {(a.achievements ?? []).map(id => {
-                        const ach = ACHIEVEMENT_DATA[id];
-                        return ach ? <span key={id} className="mr-px cursor-default" title={ach.name}>{ach.icon}</span> : null;
-                      })}
-                    </span>
-                    <span className="text-[10px] text-[#636363] text-right leading-tight">
-                      {`${a.exp ?? 0}/${a.expToNext ?? 100}`}
+                    <span className="text-[10px] leading-tight flex items-center" style={{ gridColumn: "3 / 5" }}>
+                      <span className="flex-1">
+                        {(a.achievements ?? []).map(id => {
+                          const ach = ACHIEVEMENT_DATA[id];
+                          return ach ? <span key={id} className="mr-1 cursor-default" title={ach.name}>{ach.icon}</span> : null;
+                        })}
+                      </span>
+                      <span className="text-[10px] text-[#636363]">
+                        {`${a.exp ?? 0}/${a.expToNext ?? 100}`}
+                      </span>
                     </span>
                     <div />
                     </>}
