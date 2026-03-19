@@ -337,7 +337,10 @@ export class ClaudeCodeWatcher extends EventEmitter {
       if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
       fs.unwatchFile(filePath);
       this.sessions.delete(filePath);
-      this.departedPaths.set(filePath, now);
+      // Only block re-discovery for subagents — main agents should be re-discovered
+      if (session.subagentClass !== null) {
+        this.departedPaths.set(filePath, now);
+      }
     }
     this.emitUpdate();
   }

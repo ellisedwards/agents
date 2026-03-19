@@ -389,8 +389,7 @@ app.get("/api/pixels", async (_req, res) => {
       data.slotsDetail = slotsData.slots_detail;
     }
     res.json(data);
-  } catch (e) {
-    console.error("[proxy] /api/pixels error:", e);
+  } catch {
     res.status(502).json({ error: "claw unreachable" });
   }
 });
@@ -399,8 +398,7 @@ app.get("/api/uptime-kuma", async (_req, res) => {
   try {
     const data = await clawGetSafe("/hook/uptime-kuma");
     res.json(data);
-  } catch (e) {
-    console.error("[proxy] /api/uptime-kuma error:", e);
+  } catch {
     res.status(502).json({ error: "claw unreachable" });
   }
 });
