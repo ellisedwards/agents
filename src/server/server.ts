@@ -514,19 +514,21 @@ app.post("/api/save-sprite", express.json({ limit: "10mb" }), (req, res) => {
 
 // --- Static files (production) ---
 const clientDir = path.join(__dirname, "client");
-app.use(express.static(clientDir, {
-  etag: false,
-  maxAge: 0,
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith(".html")) {
-      res.setHeader("Cache-Control", "no-store");
-    }
-  },
-}));
-app.get("*", (_req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  res.sendFile(path.join(clientDir, "index.html"));
-});
+if (fs.existsSync(clientDir)) {
+  app.use(express.static(clientDir, {
+    etag: false,
+    maxAge: 0,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html")) {
+        res.setHeader("Cache-Control", "no-store");
+      }
+    },
+  }));
+  app.get("*", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(path.join(clientDir, "index.html"));
+  });
+}
 
 // --- Start ---
 watcher.start();

@@ -8,7 +8,7 @@ import type { AgentState, AgentActivityState, MageColorIndex } from "../../share
 
 const CLAUDE_DIR = path.join(os.homedir(), ".claude", "projects");
 const STALE_MS = 30 * 60 * 1000; // 30 minutes
-const SUBAGENT_STALE_MS = 30 * 60 * 1000; // 30 minutes — MCP tool calls don't update JSONL mtime
+const SUBAGENT_STALE_MS = 5 * 60 * 1000; // 5 min — subagents are short-lived
 const LOUNGE_MS = 5 * 60 * 1000; // 5 minutes idle → lounging
 const SCAN_INTERVAL_MS = 3_000;
 const WATCH_INTERVAL_MS = 500;
@@ -81,10 +81,11 @@ export class ClaudeCodeWatcher extends EventEmitter {
         }
       }
     }
-    // Allow departed paths to be re-discovered after 2 minutes
-    const DEPART_COOLDOWN_MS = 2 * 60 * 1000;
+    // Allow departed paths to be re-discovered after staleness window
+    // Use the appropriate staleness limit so completed files don't get re-discovered
     for (const [dp, departedAt] of this.departedPaths) {
-      if (now - departedAt > DEPART_COOLDOWN_MS) {
+      const limit = dp.includes("/subagents/") ? SUBAGENT_STALE_MS : STALE_MS;
+      if (now - departedAt > limit) {
         this.departedPaths.delete(dp);
       }
     }
@@ -99,10 +100,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
       totalFound += jsonlFiles.length;
       for (const filePath of jsonlFiles) {
         if (this.sessions.has(filePath)) continue;
-        if (this.departedPaths.has(filePath)) {
-          console.log(`[cc-watcher] skipping departed: ${path.basename(filePath)}`);
-          continue;
-        }
+        if (this.departedPaths.has(filePath)) continue;
         if (this.sessions.size >= MAX_WATCHED) break;
         console.log(`[cc-watcher] new session: ${path.basename(filePath)} (from ${path.basename(dir)})`);
         this.startWatching(filePath, now);
@@ -167,6 +165,21 @@ export class ClaudeCodeWatcher extends EventEmitter {
     // of a known parent session's UUID folder
     const isInSubagentsDir = filePath.includes("/subagents/");
     if (isInSubagentsDir) {
+      // Quick check: if the last line has stop_reason "end_turn", it already completed
+      try {
+        const fd = fs.openSync(filePath, "r");
+        const stat = fs.fstatSync(fd);
+        const tailSize = Math.min(4096, stat.size);
+        const buf = Buffer.alloc(tailSize);
+        fs.readSync(fd, buf, 0, tailSize, stat.size - tailSize);
+        fs.closeSync(fd);
+        const tail = buf.toString("utf-8");
+        if (tail.includes('"stop_reason":"end_turn"') || tail.includes('"stop_reason": "end_turn"') || tail.includes('"turn_duration"')) {
+          this.departedPaths.set(filePath, Date.now());
+          return;
+        }
+      } catch {}
+
       // Try to match to a parent by path: .../projects/<proj>/<uuid>/subagents/<file>.jsonl
       // Parent would be: .../projects/<proj>/<uuid>.jsonl
       const subagentsDir = path.dirname(filePath);        // .../subagents

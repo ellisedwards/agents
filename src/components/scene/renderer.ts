@@ -2081,26 +2081,6 @@ export function renderScene(
         if (flashFrames <= 1) pokeballFlashes.delete(agent.id);
       }
 
-      // Lucky pokeball wobble/sparkle/pulse
-      const luckyAgent = useAgentOfficeStore.getState().luckyPokeballAgent;
-      if (luckyAgent === agent.id) {
-        const wobbleX = Math.sin(frame * 0.3) * 2;
-        // Gold pulse overlay
-        ctx.globalAlpha = 0.2 + Math.sin(frame * 0.15) * 0.15;
-        ctx.fillStyle = "#ffcc44";
-        ctx.fillRect(dx + 1 + wobbleX, dy - 1, 7, 7);
-        ctx.globalAlpha = 1;
-        // Sparkle particles — every 8 frames, gold/white pixel at random offset
-        if (frame % 8 === 0) {
-          const sx = dx + 4 + (Math.random() - 0.5) * 12;
-          const sy = dy + 3 + (Math.random() - 0.5) * 12;
-          ctx.fillStyle = Math.random() > 0.5 ? "#ffcc44" : "#ffffff";
-          ctx.globalAlpha = 0.8;
-          ctx.fillRect(sx, sy, 1, 1);
-          ctx.globalAlpha = 1;
-        }
-      }
-
       const isTool = agent.state === "reading" || agent.state === "typing" || agent.state === "waiting";
       if (isTool) {
         const HIRST = [
@@ -2148,6 +2128,41 @@ export function renderScene(
         ctx.fillStyle = "#ffcc44";
         ctx.fillRect(dx + 3, dy + 2, 2, 2);
         ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  // Lucky pokeball — multicolor sparkles (independent of claw connection)
+  const luckyAgentId = useAgentOfficeStore.getState().luckyPokeballAgent;
+  if (luckyAgentId) {
+    const luckyPos = deskMap.get(luckyAgentId);
+    if (luckyPos) {
+      const dx = luckyPos.x;
+      const dy = luckyPos.y;
+      const pbCx = dx + 4.5;
+      const pbCy = dy + 3;
+
+      // Multicolor glow — cycles through rainbow
+      const LUCKY_COLORS = ["#ff4466", "#ffaa22", "#ffee44", "#44dd88", "#44aaff", "#aa66ff", "#ff66aa"];
+      const colorIdx = Math.floor(frame / 6) % LUCKY_COLORS.length;
+      ctx.globalAlpha = 0.2 + Math.sin(frame * 0.2) * 0.1;
+      ctx.fillStyle = LUCKY_COLORS[colorIdx];
+      ctx.fillRect(dx, dy - 1, 8, 7);
+      ctx.globalAlpha = 1;
+
+      // Multicolor sparkle particles
+      const SPARKLE_COLORS = ["#ff4466", "#ffcc44", "#44ff88", "#44aaff", "#ff66ff", "#ffffff"];
+      for (let i = 0; i < 2; i++) {
+        if ((frame + i) % 3 === 0) {
+          const sparkAngle = Math.random() * Math.PI * 2;
+          const dist = 5 + Math.random() * 6;
+          const sx = pbCx + Math.cos(sparkAngle) * dist;
+          const sy = pbCy + Math.sin(sparkAngle) * dist;
+          ctx.fillStyle = SPARKLE_COLORS[Math.floor(Math.random() * SPARKLE_COLORS.length)];
+          ctx.globalAlpha = 0.6 + Math.random() * 0.4;
+          ctx.fillRect(Math.round(sx), Math.round(sy), 1, 1);
+          ctx.globalAlpha = 1;
+        }
       }
     }
   }

@@ -314,17 +314,18 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         e.clientX - rect.left,
         e.clientY - rect.top
       );
-      // Lucky pokeball click — check if click is near the glowing pokeball
+      // Lucky pokeball click — click anywhere near the agent or pokeball to activate
       const luckyId = useAgentOfficeStore.getState().luckyPokeballAgent;
       if (luckyId) {
         const pokePos = deskMap.get(luckyId);
         if (pokePos) {
-          // Pokeball is drawn at (pos.x + 1, pos.y - 1), size 7x7 — check within ~10px
-          const pbCx = pokePos.x + 4.5;
-          const pbCy = pokePos.y + 2.5;
-          const pdx = canvasPos.x - pbCx;
-          const pdy = canvasPos.y - pbCy;
-          if (Math.sqrt(pdx * pdx + pdy * pdy) < 10) {
+          const oY = getThemeById(themeId).floorOffsetY ?? 0;
+          // Check near the character (generous 20px radius) or the pokeball
+          const charX = pokePos.characterX;
+          const charY = pokePos.characterY + oY;
+          const cdx = canvasPos.x - charX;
+          const cdy = canvasPos.y - charY;
+          if (Math.sqrt(cdx * cdx + cdy * cdy) < 20) {
             setLuckyWheelAgent(luckyId);
             setLuckyPokeballAgent(null);
             return;
@@ -349,7 +350,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         }
       }
     },
-    [transform]
+    [transform, deskMap, themeId, setLuckyWheelAgent, setLuckyPokeballAgent]
   );
 
   return (
