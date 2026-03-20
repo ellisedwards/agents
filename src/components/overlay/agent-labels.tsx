@@ -12,7 +12,8 @@ import { getCachedAssignments } from "../scene/desk-layout";
 import { getAgentPosition, getCatPosition, pokeCat, triggerFloat, getHealthPosterBounds, setAgentCharacter, getAgentCharacter, STARTERS, getLastDeskPos } from "../scene/renderer";
 import { triggerUfo } from "../scene/environment";
 import { TEAM_COLORS } from "@/shared/types";
-import LuckyWheel from "./lucky-wheel";
+import SlotMachine from "./lucky-wheel";
+import type { Win } from "./lucky-wheel";
 
 const ACHIEVEMENT_DATA: Record<string, { icon: string; name: string }> = {
   "centurion": { icon: "\u{1F451}", name: "Centurion — Reach level 50" },
@@ -214,12 +215,14 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const [hudMenuId, setHudMenuId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [endGameOpen, setEndGameOpen] = useState(false);
+  const [killConfirm, setKillConfirm] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const editPanelRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
   useEffect(() => {
-    if (!settingsOpen && !editOpen) return;
+    if (!settingsOpen && !editOpen && !endGameOpen) return;
     function handleClick(e: MouseEvent) {
       if (settingsOpen && panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setSettingsOpen(false);
@@ -227,10 +230,17 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
       if (editOpen && editPanelRef.current && !editPanelRef.current.contains(e.target as Node)) {
         setEditOpen(false);
       }
+      if (endGameOpen) {
+        const target = e.target as HTMLElement;
+        if (!target.closest("[data-end-game-menu]")) {
+          setEndGameOpen(false);
+          setKillConfirm(false);
+        }
+      }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [settingsOpen, editOpen]);
+  }, [settingsOpen, editOpen, endGameOpen]);
 
   // Close HUD agent menu on outside click
   useEffect(() => {
@@ -487,7 +497,14 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         {/* Play/Stop game button */}
         <div className="relative">
           <button
-            onClick={() => setGameModeOn(!gameModeOn)}
+            onClick={() => {
+              if (gameModeOn) {
+                setEndGameOpen(!endGameOpen);
+                setKillConfirm(false);
+              } else {
+                setGameModeOn(true);
+              }
+            }}
             className={`font-mono text-[10px] px-1.5 py-0.5 rounded transition-colors ${
               gameModeOn
                 ? "text-yellow-300/70 hover:text-yellow-300"
@@ -496,6 +513,60 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
           >
             {gameModeOn ? "end game" : "play"}
           </button>
+          {endGameOpen && gameModeOn && (
+            <div
+              data-end-game-menu
+              className="absolute right-0 top-full mt-1 rounded-md overflow-hidden"
+              style={{
+                backgroundColor: "rgba(22, 22, 28, 0.95)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                minWidth: killConfirm ? 180 : 100,
+                zIndex: 50,
+              }}
+            >
+              {!killConfirm ? (
+                <>
+                  <button
+                    onClick={() => { setGameModeOn(false); setEndGameOpen(false); }}
+                    className="block w-full text-left font-mono text-[10px] px-3 py-1.5 text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    pause
+                  </button>
+                  <button
+                    onClick={() => setKillConfirm(true)}
+                    className="block w-full text-left font-mono text-[10px] px-3 py-1.5 text-red-400/70 hover:text-red-400 hover:bg-red-400/5 transition-colors"
+                  >
+                    kill
+                  </button>
+                </>
+              ) : (
+                <div className="px-3 py-2">
+                  <div className="font-mono text-[9px] text-white/40 mb-2">
+                    Wipe all EXP, levels, and names?
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        fetch("/api/game-kill", { method: "POST" }).catch(() => {});
+                        setGameModeOn(false);
+                        setEndGameOpen(false);
+                        setKillConfirm(false);
+                      }}
+                      className="font-mono text-[10px] px-2 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                    >
+                      kill
+                    </button>
+                    <button
+                      onClick={() => setKillConfirm(false)}
+                      className="font-mono text-[10px] px-2 py-0.5 rounded text-white/40 hover:text-white/60 transition-colors"
+                    >
+                      cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Game guide — only visible during game mode */}
@@ -1011,32 +1082,33 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
         );
       })}
 
-      {/* Lucky Wheel overlay */}
+      {/* Slot Machine overlay */}
       {luckyWheelAgent && (() => {
-        const wheelAgent = agents.find(a => a.id === luckyWheelAgent);
-        if (!wheelAgent) return null;
-        const teamHex = TEAM_COLORS[wheelAgent.teamColor] ?? "#88cc88";
-        const displayName = wheelAgent.gameName ?? wheelAgent.name;
+        const slotAgent = agents.find(a => a.id === luckyWheelAgent);
+        if (!slotAgent) return null;
+        const teamHex = TEAM_COLORS[slotAgent.teamColor] ?? "#88cc88";
+        const displayName = slotAgent.gameName ?? slotAgent.name;
         return (
-          <LuckyWheel
+          <SlotMachine
             agentName={displayName}
             teamColor={teamHex}
-            onResult={(multiplier) => {
-              // POST to server
+            onResult={(wins: Win[]) => {
+              if (wins.length === 0) return;
+              // Apply best multiplier with combined uses
+              const best = wins.reduce((a, b) => a.multiplier >= b.multiplier ? a : b);
+              const totalUses = wins.reduce((sum, w) => sum + w.uses, 0);
               fetch("/api/lucky-multiplier", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ agentId: luckyWheelAgent, multiplier, uses: 10 }),
+                body: JSON.stringify({ agentId: luckyWheelAgent, multiplier: best.multiplier, uses: totalUses }),
               }).catch(() => {});
-              // Show a toast via level-up events system (reuse the mechanism)
               useAgentOfficeStore.getState().addLevelUp(
                 luckyWheelAgent,
-                `${displayName} ${multiplier}x LUCKY!`,
-                wheelAgent.level ?? 1,
-                String(wheelAgent.teamColor)
+                `${displayName} ${best.multiplier}x LUCKY!`,
+                slotAgent.level ?? 1,
+                String(slotAgent.teamColor)
               );
-              // Jackpot: trigger claw sparkle
-              if (multiplier === 50) {
+              if (best.multiplier >= 50) {
                 const slot = cached?.getSlot(luckyWheelAgent);
                 if (slot !== undefined) {
                   fetch("/api/sparkle", {

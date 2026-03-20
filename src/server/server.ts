@@ -234,6 +234,7 @@ app.post("/api/sparkle", express.json(), (req, res) => {
 });
 
 // Light test panel — simulate claw hooks for any slot
+// Note: claw hook endpoints are GET, not POST (except sparkle)
 app.post("/api/light-test", express.json(), async (req, res) => {
   const { slot, action } = req.body;
   if (slot === undefined || slot < 0 || slot > 3) return res.status(400).json({ error: "slot 0-3 required" });
@@ -243,20 +244,20 @@ app.post("/api/light-test", express.json(), async (req, res) => {
         await clawPost(claw, "/hook/agent-slots/sparkle", { slot, duration: 2.0 });
         break;
       case "thinking":
-        await clawPost(claw, `/hook/thinking-start?slot=${slot}`, {});
+        await clawGet(claw, `/hook/thinking-start?slot=${slot}`);
         break;
       case "thinking-stop":
-        await clawPost(claw, `/hook/thinking-end?slot=${slot}`, {});
+        await clawGet(claw, `/hook/thinking-end?slot=${slot}`);
         break;
       case "active":
-        await clawPost(claw, `/hook/prompt-start?slot=${slot}`, {});
+        await clawGet(claw, `/hook/prompt-start?slot=${slot}`);
         break;
       case "active-stop":
-        await clawPost(claw, `/hook/prompt-end?slot=${slot}`, {});
+        await clawGet(claw, `/hook/prompt-end?slot=${slot}`);
         break;
       case "off":
-        await clawPost(claw, `/hook/thinking-end?slot=${slot}`, {});
-        await clawPost(claw, `/hook/prompt-end?slot=${slot}`, {});
+        await clawGet(claw, `/hook/thinking-end?slot=${slot}`);
+        await clawGet(claw, `/hook/prompt-end?slot=${slot}`);
         break;
       default:
         return res.status(400).json({ error: "unknown action" });
@@ -285,6 +286,12 @@ app.get("/api/game-mode", (_req, res) => {
 app.post("/api/game-mode", express.json(), (req, res) => {
   const { enabled } = req.body;
   watcher.expTracker.setEnabled(!!enabled);
+  res.json({ ok: true });
+});
+
+app.post("/api/game-kill", (_req, res) => {
+  watcher.expTracker.clearAll();
+  watcher.expTracker.setEnabled(false);
   res.json({ ok: true });
 });
 

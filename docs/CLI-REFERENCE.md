@@ -28,6 +28,7 @@
 | `GET /api/game-mode` | Check if game mode is enabled |
 | `POST /api/game-mode` `{enabled: bool}` | Toggle game mode |
 | `POST /api/lucky-multiplier` `{agentId, multiplier, uses}` | Set lucky EXP multiplier |
+| `POST /api/game-kill` | Kill game — wipe all EXP, levels, names, achievements |
 
 ### Claw / hardware
 
