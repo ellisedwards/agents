@@ -11,6 +11,7 @@
     "install-app": "cp -r app-bundle/Agent\\ Office.app /Applications/"
   },
   "dependencies": {
+    "@stoprocent/bleno": "^0.12.4",
     "express": "^4.21.0",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",

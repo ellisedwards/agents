@@ -4,6 +4,7 @@ import * as os from "os";
 
 export interface AppConfig {
   clawHost: string;
+  clawHostFallback: string;
   clawPort: number;
   port: number;
 }
@@ -13,6 +14,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 
 const DEFAULTS: AppConfig = {
   clawHost: "192.168.50.40",
+  clawHostFallback: "100.93.11.10",
   clawPort: 9999,
   port: 4747,
 };

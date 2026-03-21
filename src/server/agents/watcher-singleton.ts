@@ -12,11 +12,11 @@ class WatcherSingleton extends EventEmitter {
   private started = false;
   public expTracker: ExpTracker;
 
-  constructor(clawBaseUrl: string) {
+  constructor(clawBaseUrl: string, fallbackBaseUrl?: string) {
     super();
     this.expTracker = new ExpTracker();
     this.ccWatcher = new ClaudeCodeWatcher(this.expTracker);
-    this.ocWatcher = new OpenClawWatcher(clawBaseUrl);
+    this.ocWatcher = new OpenClawWatcher(clawBaseUrl, fallbackBaseUrl);
   }
 
   start() {
@@ -61,6 +61,6 @@ class WatcherSingleton extends EventEmitter {
   }
 }
 
-export function createWatcher(clawBaseUrl: string): WatcherSingleton {
-  return new WatcherSingleton(clawBaseUrl);
+export function createWatcher(clawBaseUrl: string, fallbackBaseUrl?: string): WatcherSingleton {
+  return new WatcherSingleton(clawBaseUrl, fallbackBaseUrl);
 }

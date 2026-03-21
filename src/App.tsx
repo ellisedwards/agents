@@ -107,10 +107,66 @@ export function App() {
                 ))}
               </span>
             </div>
+            {/* Slot detail — who owns each slot */}
+            {clawHealth.slotsDetail && clawHealth.slotsDetail.some(s => s.name) && (
+              <div className="space-y-0.5 pt-1 border-t border-white/5">
+                {clawHealth.slotsDetail.map((sd, i) => (
+                  sd.name ? (
+                    <div key={i} className="flex justify-between">
+                      <span className="text-neutral-500">S{i}: {sd.name}</span>
+                      <span className="text-neutral-400">
+                        {sd.ttl_remaining != null && sd.ttl_remaining > 0 ? `${sd.ttl_remaining}s` : sd.state}
+                      </span>
+                    </div>
+                  ) : null
+                ))}
+                {(clawHealth.waitingCount ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-neutral-500">Waiting</span>
+                    <span className="text-yellow-400">{clawHealth.waitingCount}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Zones */}
+            {clawHealth.zones && (
+              <div className="pt-1 border-t border-white/5">
+                <div className="flex justify-between">
+                  <span className="text-neutral-400">Zones</span>
+                  <span className="text-neutral-500 text-[8px]">
+                    {[
+                      clawHealth.zones.thinking !== "off" && `think:${clawHealth.zones.thinking}`,
+                      clawHealth.zones.display !== "clear" && `disp:${clawHealth.zones.display}`,
+                      `ctx:${clawHealth.zones.context}`,
+                    ].filter(Boolean).join(" ")}
+                  </span>
+                </div>
+              </div>
+            )}
             {clawHealth.animationRunning && (
               <div className="flex justify-between">
                 <span className="text-neutral-400">Animation</span>
                 <span className="text-yellow-400">running</span>
+              </div>
+            )}
+            {clawHealth.transitionInProgress && (
+              <div className="flex justify-between">
+                <span className="text-neutral-400">Transition</span>
+                <span className="text-cyan-400">in progress</span>
+              </div>
+            )}
+            {/* Uptime monitors */}
+            {clawHealth.uptimeMonitors && clawHealth.uptimeMonitors.length > 0 && (
+              <div className="pt-1 border-t border-white/5 space-y-0.5">
+                <span className="text-neutral-500 text-[8px]">Network</span>
+                {clawHealth.uptimeMonitors.map((m, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span className="text-neutral-400">{m.name}</span>
+                    <span className={m.up ? "text-green-400/70" : "text-red-400"}>
+                      {m.up ? `${m.ping}ms` : "down"}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
             <div className="text-neutral-500 text-[8px] pt-1 border-t border-white/10">

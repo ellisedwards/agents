@@ -5,5 +5,8 @@
 - Add subtle reveal animations to HTML overlay elements (labels, HUD, settings panel) — slight 2-3px rise-in on appear, fade transitions
 - Update settings panel styling to closer match the HUD design (rounded corners, semi-transparent dark bg, consistent font sizing)
 
+## Sprite Editor
+- Export as SVG — add an "Export SVG" button to the sprite editor that converts the current frame's PixelRect array to an SVG file (each rect becomes a `<rect>` element with `shape-rendering="crispEdges"`). Should trigger a download with the sprite name as filename.
+
 ## Architecture
 - Manifest-driven asset system — PNG/JSON furniture definitions instead of TypeScript sprite arrays. Each asset is a folder with PNGs + manifest.json declaring sprites, rotations, animation frames. Needed for the background/furniture editor with object stamps, vegetation, etc. Reference: pixel-agents project uses this pattern successfully.

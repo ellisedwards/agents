@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="112" viewBox="0 0 16 14" shape-rendering="crispEdges">
+  <!-- Blue Mage (CC Agent) -->
+  <rect x="5" y="0" width="6" height="3" fill="#8B6914"/>
+  <rect x="4" y="3" width="8" height="2" fill="#8B6914"/>
+  <rect x="6" y="0" width="4" height="2" fill="#9a7a24"/>
+  <rect x="5" y="5" width="6" height="3" fill="#1a1a2e"/>
+  <rect x="6" y="5" width="1" height="1" fill="#88ccff"/>
+  <rect x="9" y="5" width="1" height="1" fill="#88ccff"/>
+  <rect x="5" y="8" width="6" height="4" fill="#3355cc"/>
+  <rect x="3" y="9" width="2" height="3" fill="#3355cc"/>
+  <rect x="11" y="9" width="2" height="3" fill="#3355cc"/>
+  <rect x="6" y="8" width="4" height="3" fill="#4466dd"/>
+  <rect x="5" y="12" width="2" height="2" fill="#8B4513"/>
+  <rect x="9" y="12" width="2" height="2" fill="#8B4513"/>
+</svg>

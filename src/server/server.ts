@@ -6,6 +6,7 @@ import { execFile } from "child_process";
 import { loadConfig, clawBaseUrl } from "./config";
 import { createWatcher } from "./agents/watcher-singleton";
 import type { AgentState } from "../shared/types";
+import { startBleBridge, updateBleState, isBleConnected } from "./ble-bridge";
 
 // --- Claw API response types ---
 interface ClawStatus {
@@ -45,8 +46,33 @@ interface RelayMessage {
 // temporarily unreachable (macOS per-process routing cache). Both fetch()
 // and http.get fail with EHOSTUNREACH even after the host comes back.
 // curl is immune because each invocation is a fresh process.
-function clawGet(claw: string, urlPath: string, timeoutSec = 2): Promise<unknown> {
-  const url = `${claw}${urlPath}`;
+
+// Host failover: try primary (WiFi), fall back to Tailscale
+let activeClaw: "primary" | "fallback" = "primary";
+let primaryCheckTimer: ReturnType<typeof setTimeout> | null = null;
+
+function getClawUrl(): string {
+  return activeClaw === "primary" ? claw : clawFallback;
+}
+
+function switchToFallback() {
+  if (activeClaw === "fallback") return;
+  activeClaw = "fallback";
+  console.log(`[claw] switched to fallback (${clawFallback})`);
+  // Periodically try primary again
+  if (!primaryCheckTimer) {
+    primaryCheckTimer = setInterval(() => {
+      curlRaw(claw, "/status", 1).then(() => {
+        activeClaw = "primary";
+        console.log(`[claw] switched back to primary (${claw})`);
+        if (primaryCheckTimer) { clearInterval(primaryCheckTimer); primaryCheckTimer = null; }
+      }).catch(() => {}); // still down, stay on fallback
+    }, 60_000);
+  }
+}
+
+function curlRaw(baseUrl: string, urlPath: string, timeoutSec = 2): Promise<unknown> {
+  const url = `${baseUrl}${urlPath}`;
   return new Promise((resolve, reject) => {
     execFile("curl", [
       "-s",
@@ -63,22 +89,49 @@ function clawGet(claw: string, urlPath: string, timeoutSec = 2): Promise<unknown
   });
 }
 
-// POST to claw via curl (for sparkle endpoint etc.)
-function clawPost(claw: string, urlPath: string, body: object, timeoutSec = 3): Promise<unknown> {
-  const url = `${claw}${urlPath}`;
-  return new Promise((resolve, reject) => {
-    execFile("curl", [
-      "-s", "-X", "POST",
-      "-H", "Content-Type: application/json",
-      "-d", JSON.stringify(body),
-      "--connect-timeout", String(timeoutSec),
-      "--max-time", String(timeoutSec),
-      url,
-    ], { timeout: (timeoutSec * 1000) + 1000 }, (err, stdout) => {
-      if (err) return reject(new Error(`claw unreachable: ${urlPath}`));
-      try { resolve(JSON.parse(stdout || "{}")); }
-      catch { resolve({}); }
+async function clawGet(_claw: string, urlPath: string, timeoutSec = 2): Promise<unknown> {
+  try {
+    return await curlRaw(getClawUrl(), urlPath, timeoutSec);
+  } catch (err) {
+    // If primary failed, try fallback
+    if (activeClaw === "primary" && clawFallback) {
+      try {
+        const result = await curlRaw(clawFallback, urlPath, timeoutSec);
+        switchToFallback();
+        return result;
+      } catch { /* fallback also failed */ }
+    }
+    throw err;
+  }
+}
+
+function clawPost(_claw: string, urlPath: string, body: object, timeoutSec = 3): Promise<unknown> {
+  const doPost = (baseUrl: string) => {
+    const url = `${baseUrl}${urlPath}`;
+    return new Promise<unknown>((resolve, reject) => {
+      execFile("curl", [
+        "-s", "-X", "POST",
+        "-H", "Content-Type: application/json",
+        "-d", JSON.stringify(body),
+        "--connect-timeout", String(timeoutSec),
+        "--max-time", String(timeoutSec),
+        url,
+      ], { timeout: (timeoutSec * 1000) + 1000 }, (err, stdout) => {
+        if (err) return reject(new Error(`claw unreachable: ${urlPath}`));
+        try { resolve(JSON.parse(stdout || "{}")); }
+        catch { resolve({}); }
+      });
     });
+  };
+
+  return doPost(getClawUrl()).catch((err) => {
+    if (activeClaw === "primary" && clawFallback) {
+      return doPost(clawFallback).then((result) => {
+        switchToFallback();
+        return result;
+      });
+    }
+    throw err;
   });
 }
 
@@ -96,6 +149,7 @@ async function clawGetSafe(urlPath: string, timeoutSec = 2): Promise<unknown> {
     }
     clawCircuitOpen = false;
     clawFailCount = 0;
+    console.log("[claw] circuit breaker CLOSED — retrying");
   }
   try {
     const result = await clawGet(claw, urlPath, timeoutSec);
@@ -104,7 +158,7 @@ async function clawGetSafe(urlPath: string, timeoutSec = 2): Promise<unknown> {
   } catch (err) {
     clawFailCount++;
     clawLastFailTime = Date.now();
-    if (clawFailCount >= CLAW_FAIL_THRESHOLD) {
+    if (clawFailCount >= CLAW_FAIL_THRESHOLD && !clawCircuitOpen) {
       clawCircuitOpen = true;
       console.log("[claw] circuit breaker OPEN — pausing requests for 30s");
     }
@@ -129,6 +183,11 @@ function triggerLevelUpSparkle(slotIndex: number) {
 let lastMatrixConnected = true;
 let autoRecoveryInProgress = false;
 
+function getActiveClawHost(): string {
+  return activeClaw === "fallback" && config.clawHostFallback
+    ? config.clawHostFallback : config.clawHost;
+}
+
 function checkAndAutoRecover(claw: string) {
   setInterval(async () => {
     if (autoRecoveryInProgress) return;
@@ -138,13 +197,16 @@ function checkAndAutoRecover(claw: string) {
       if (!connected && lastMatrixConnected) {
         console.log("[auto-recovery] Yeelight disconnected, running tower-reset...");
         autoRecoveryInProgress = true;
-        execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "ellis@192.168.50.40",
+        execFile("ssh", ["-T", "-o", "ConnectTimeout=5", `ellis@${getActiveClawHost()}`,
           "~/clawd/scripts/tower-reset"], { timeout: 15000 },
           (err, stdout) => {
             autoRecoveryInProgress = false;
             if (err) console.error("[auto-recovery] Failed:", err.message);
             else console.log("[auto-recovery] Reset result:", stdout.trim());
           });
+      }
+      if (connected && !lastMatrixConnected) {
+        console.log("[auto-recovery] Yeelight reconnected");
       }
       lastMatrixConnected = connected;
     } catch {
@@ -156,13 +218,20 @@ function checkAndAutoRecover(claw: string) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const config = loadConfig();
 const claw = clawBaseUrl(config);
-const watcher = createWatcher(claw);
+const clawFallback = config.clawHostFallback
+  ? `http://${config.clawHostFallback}:${config.clawPort}`
+  : "";
+const watcher = createWatcher(claw, clawFallback || undefined);
 
 const app = express();
 
 // --- Build ID (for stale-build detection) ---
 // Read from disk so rebuilds are detected without restarting the server
-const buildIdFile = path.join(__dirname, ".build-id");
+// Vite writes to <root>/dist/.build-id
+// In dev (__dirname=src/server) → ../../dist, in prod (__dirname=dist) → ./
+const buildIdFile = __dirname.includes("src" + path.sep + "server")
+  ? path.join(__dirname, "..", "..", "dist", ".build-id")
+  : path.join(__dirname, ".build-id");
 const serverStartedAt = new Date().toISOString();
 app.get("/api/build-id", (_req, res) => {
   try {
@@ -185,20 +254,26 @@ app.get("/api/agents", (req, res) => {
     res.write(":keepalive\n\n");
   }, 15000);
 
+  console.log("[sse] client connected");
   const current = watcher.getAgents();
   res.write(`data: ${JSON.stringify(current)}\n\n`);
+
+  const cleanup = () => {
+    console.log("[sse] client disconnected");
+    clearInterval(heartbeat);
+    watcher.off("agents", onAgents);
+  };
 
   const onAgents = (agents: AgentState[]) => {
     try {
       res.write(`data: ${JSON.stringify(agents)}\n\n`);
-    } catch {}
+    } catch {
+      cleanup();
+    }
   };
 
   watcher.on("agents", onAgents);
-  req.on("close", () => {
-    clearInterval(heartbeat);
-    watcher.off("agents", onAgents);
-  });
+  req.on("close", cleanup);
 });
 
 // --- Agent management ---
@@ -321,9 +396,11 @@ app.get("/api/brightness/:level", async (req, res) => {
 // --- Claw health ---
 app.get("/api/claw-health", async (_req, res) => {
   try {
-    const [statusData, pixelsData] = await Promise.all([
+    const [statusData, pixelsData, slotsData, uptimeData] = await Promise.all([
       clawGetSafe("/status") as Promise<ClawStatus>,
       clawGetSafe("/pixels").catch(() => null) as Promise<ClawPixels | null>,
+      clawGetSafe("/hook/agent-slots").catch(() => null) as Promise<ClawSlots | null>,
+      clawGetSafe("/hook/uptime-kuma").catch(() => null) as Promise<any>,
     ]);
     // Derive slot status from actual pixel data (source of truth)
     const quadrantIndices = [[15,16,20,21],[18,19,23,24],[0,1,5,6],[3,4,8,9]];
@@ -342,6 +419,20 @@ app.get("/api/claw-health", async (_req, res) => {
       matrixMode: statusData.claw_activity || null,
       brightness: statusData.brightness ?? null,
       animationRunning: statusData.animation_running ?? false,
+      slotsDetail: slotsData?.slots_detail ?? undefined,
+      waitingCount: slotsData?.waiting_count ?? 0,
+      transitionInProgress: slotsData?.transition_in_progress ?? false,
+      zones: statusData.zones ? {
+        thinking: statusData.zones.thinking,
+        display: statusData.zones.display,
+        context: statusData.zones.context,
+      } : undefined,
+      uptimeMonitors: uptimeData?.monitors?.map((m: any) => ({
+        name: m.name,
+        status: m.status,
+        ping: m.ping,
+        up: m.up,
+      })) ?? undefined,
     });
   } catch {
     res.json({ reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
@@ -369,7 +460,7 @@ app.get("/api/relay", async (_req, res) => {
 
 // --- Tower reset ---
 app.post("/api/tower-reset", (_req, res) => {
-  execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "ellis@192.168.50.40", "~/clawd/scripts/tower-reset"], { timeout: 15000 }, (err, stdout, stderr) => {
+  execFile("ssh", ["-T", "-o", "ConnectTimeout=5", `ellis@${getActiveClawHost()}`, "~/clawd/scripts/tower-reset"], { timeout: 15000 }, (err, stdout, stderr) => {
     if (err) {
       console.error("[tower-reset] error:", err.message, stderr);
       return res.status(500).json({ ok: false, error: err.message });
@@ -542,8 +633,46 @@ watcher.start();
 // (client triggers at the exact visual moment, not on a server poll)
 
 checkAndAutoRecover(claw);
+
+startBleBridge();
+
+// Push data to BLE subscribers at ~4Hz (matches ESP32 poll rate)
+setInterval(async () => {
+  if (!isBleConnected()) return;
+  try {
+    const [pixelsData, statusData] = await Promise.all([
+      clawGet(claw, "/pixels", 2).catch(() => null) as Promise<any>,
+      clawGet(claw, "/status", 2).catch(() => null) as Promise<any>,
+    ]);
+    if (!pixelsData?.panels) return;
+
+    const middle = pixelsData.panels.middle || [];
+    const bottom = pixelsData.panels.bottom || [];
+    const bodyColors: number[] = [];
+    for (let i = 0; i < 25; i++) {
+      bodyColors.push(parseInt((middle[i] || "#000000").slice(1), 16));
+    }
+    for (let i = 0; i < 25; i++) {
+      bodyColors.push(parseInt((bottom[i] || "#000000").slice(1), 16));
+    }
+
+    const agentSlots = statusData?.agent_slots?.slots || [];
+    const slotStates = [0, 0, 0, 0];
+    for (let i = 0; i < 4 && i < agentSlots.length; i++) {
+      if (agentSlots[i] === "active") slotStates[i] = 2;
+      else if (agentSlots[i] === "waiting") slotStates[i] = 1;
+      else slotStates[i] = 0;
+    }
+
+    const activity = statusData?.claw_activity || "idle";
+    const hirstState = activity === "typing" ? 2 : activity === "thinking" ? 1 : 0;
+
+    updateBleState({ bodyColors, slotStates, hirstState });
+  } catch {}
+}, 250);
+
 const server = app.listen(config.port, () => {
-  console.log(`Agent Office running at http://localhost:${config.port}`);
+  console.log(`Agent Office running at http://localhost:${config.port}  claw=${claw}  fallback=${clawFallback || "none"}`);
 });
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {

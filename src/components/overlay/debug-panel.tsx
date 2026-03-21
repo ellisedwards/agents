@@ -4,7 +4,7 @@ import { usePixelTower } from "@/hooks/use-pixel-tower";
 
 interface LogEntry {
   time: number;
-  source: "pixels" | "agents" | "claw";
+  source: "pixels" | "agents" | "claw" | "network" | "slots";
   text: string;
 }
 
@@ -32,10 +32,75 @@ function fmt(ts: number): string {
 }
 
 const SRC_COLORS: Record<string, string> = {
-  pixels: "text-cyan-400",
-  agents: "text-green-400",
-  claw: "text-yellow-400",
+  pixels: "text-fuchsia-400",
+  agents: "text-lime-400",
+  claw: "text-rose-400",
+  network: "text-violet-400",
+  slots: "text-amber-400",
 };
+
+// Syntax-highlight debug text like code
+function colorizeText(text: string): (string | JSX.Element)[] {
+  const parts: (string | JSX.Element)[] = [];
+  let key = 0;
+  // Split on tokens we want to colorize
+  const regex = /(\w+)=([\w.?]+|\[[^\]]*\])|(\b(?:idle|thinking|typing|reading|waiting|active|off|connected|disconnected|on|OFF|DOWN|TRANSITION|none|clear)\b)|(\b\d+(?:\.\d+)?(?:ms|s|%)?)\b|(\([^)]*\))|(\b(?:S\d):\w+)/g;
+  let lastIdx = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    // Text before match
+    if (match.index > lastIdx) {
+      parts.push(text.slice(lastIdx, match.index));
+    }
+
+    if (match[1] && match[2]) {
+      // key=value pair
+      parts.push(<span key={key++} className="text-blue-400/70">{match[1]}</span>);
+      parts.push(<span key={key++} className="text-neutral-500">=</span>);
+      const val = match[2];
+      // Color the value based on content
+      const valClass = /active|connected|on|up/i.test(val) ? "text-green-400/80"
+        : /off|idle|none|clear|disconnected|OFF|DOWN/i.test(val) ? "text-neutral-500"
+        : /thinking/i.test(val) ? "text-amber-400/80"
+        : /typing|reading|waiting/i.test(val) ? "text-sky-400/80"
+        : val.startsWith("[") ? "text-neutral-400"
+        : "text-orange-300/80";
+      parts.push(<span key={key++} className={valClass}>{val}</span>);
+    } else if (match[3]) {
+      // State keyword
+      const word = match[3];
+      const cls = /active|connected|on/i.test(word) ? "text-green-400/80"
+        : /off|idle|none|clear|disconnected/i.test(word) ? "text-neutral-500"
+        : /thinking/i.test(word) ? "text-amber-400/80"
+        : /typing|reading|waiting/i.test(word) ? "text-sky-400/80"
+        : /DOWN|TRANSITION|OFF/i.test(word) ? "text-red-400"
+        : "text-neutral-300";
+      parts.push(<span key={key++} className={cls}>{word}</span>);
+    } else if (match[4]) {
+      // Number with unit
+      parts.push(<span key={key++} className="text-emerald-400/70">{match[4]}</span>);
+    } else if (match[5]) {
+      // Parenthesized content like (Bash) or (active 12s)
+      parts.push(<span key={key++} className="text-neutral-500">{match[5]}</span>);
+    } else if (match[6]) {
+      // Slot reference like S0:vacuum
+      const [slot, name] = match[6].split(":");
+      parts.push(<span key={key++} className="text-orange-400/70">{slot}</span>);
+      parts.push(<span key={key++} className="text-neutral-500">:</span>);
+      parts.push(<span key={key++} className="text-teal-400/70">{name}</span>);
+    }
+
+    lastIdx = match.index + match[0].length;
+  }
+
+  // Remaining text
+  if (lastIdx < text.length) {
+    parts.push(<span key={key++} className="text-neutral-300">{text.slice(lastIdx)}</span>);
+  }
+
+  return parts.length > 0 ? parts : [<span key={0} className="text-neutral-300">{text}</span>];
+}
 
 export function DebugPanel() {
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -61,40 +126,88 @@ export function DebugPanel() {
     const entry: LogEntry = {
       time: Date.now(),
       source: "pixels",
-      text: `activity=${activity}  quads=[${quads}]`,
+      text: `${"act=" + activity.padEnd(10)}quads=[${quads}]`,
     };
     setLog((prev) => [...prev.slice(-MAX_LINES), entry]);
   }, [pixelData, pixelConnected]);
 
-  // Agent state changes
+  // Agent state changes — log only agents that changed
+  const prevAgentStates = useRef(new Map<string, string>());
   useEffect(() => {
     if (!agents.length) return;
-    const summary = agents
-      .map((a) => `${a.name}:${a.state}${a.currentTool ? `(${a.currentTool})` : ""}`)
-      .join("  ");
-    if (summary === prevAgents.current) return;
-    prevAgents.current = summary;
-    const entry: LogEntry = {
-      time: Date.now(),
-      source: "agents",
-      text: summary,
-    };
-    setLog((prev) => [...prev.slice(-MAX_LINES), entry]);
+    const now = Date.now();
+    const entries: LogEntry[] = [];
+    const currentStates = new Map<string, string>();
+
+    for (const a of agents) {
+      const stateStr = `${a.state}${a.currentTool ? `(${a.currentTool})` : ""}`;
+      currentStates.set(a.name, stateStr);
+      const prev = prevAgentStates.current.get(a.name);
+      if (prev !== stateStr) {
+        entries.push({
+          time: now,
+          source: "agents",
+          text: `${a.name.padEnd(14)}${stateStr}`,
+        });
+      }
+    }
+
+    // Detect departures
+    for (const [name] of prevAgentStates.current) {
+      if (!currentStates.has(name)) {
+        entries.push({ time: now, source: "agents", text: `${name.padEnd(14)}departed` });
+      }
+    }
+
+    prevAgentStates.current = currentStates;
+    if (entries.length > 0) {
+      setLog((prev) => [...prev.slice(-MAX_LINES), ...entries]);
+    }
   }, [agents]);
 
-  // Claw health changes
+  // Track additional previous values
+  const prevSlots = useRef("");
+  const prevNetwork = useRef("");
+
+  // Claw health changes — core status
   useEffect(() => {
     if (!clawHealth) return;
-    const key = `${clawHealth.matrixMode}|${clawHealth.slots.join(",")}`;
+    const yee = clawHealth.yeelightConnected ? "on" : "OFF";
+    const waiting = (clawHealth.waitingCount ?? 0) > 0 ? `  wait=${clawHealth.waitingCount}` : "";
+    const transition = clawHealth.transitionInProgress ? "  TRANSITION" : "";
+    const key = `${clawHealth.matrixMode}|${clawHealth.slots.join(",")}|${yee}${waiting}${transition}`;
     if (key === prevClaw.current) return;
     prevClaw.current = key;
     const entry: LogEntry = {
       time: Date.now(),
       source: "claw",
-      text: `mode=${clawHealth.matrixMode}  slots=[${clawHealth.slots.join(",")}]`,
+      text: `${"yee=" + yee.padEnd(4)}${"mode=" + (clawHealth.matrixMode ?? "?").padEnd(10)}${"slots=[" + clawHealth.slots.join(",") + "]"}${waiting}${transition}`,
     };
     setLog((prev) => [...prev.slice(-MAX_LINES), entry]);
   }, [clawHealth]);
+
+  // Slot detail changes — who owns which slot
+  useEffect(() => {
+    if (!clawHealth?.slotsDetail) return;
+    const detail = clawHealth.slotsDetail
+      .map((sd, i) => sd.name ? `${"S" + i + ":" + sd.name}`.padEnd(18) + `${sd.ttl_remaining != null && sd.ttl_remaining > 0 ? `${sd.ttl_remaining}s` : sd.state}` : null)
+      .filter(Boolean)
+      .join("  ") || "empty";
+    if (detail === prevSlots.current) return;
+    prevSlots.current = detail;
+    setLog((prev) => [...prev.slice(-MAX_LINES), { time: Date.now(), source: "slots" as const, text: detail }]);
+  }, [clawHealth?.slotsDetail]);
+
+  // Network monitor changes
+  useEffect(() => {
+    if (!clawHealth?.uptimeMonitors) return;
+    const summary = clawHealth.uptimeMonitors
+      .map(m => `${m.name.padEnd(12)}${(m.up ? `${m.ping}ms` : "DOWN").padEnd(8)}`)
+      .join("");
+    if (summary === prevNetwork.current) return;
+    prevNetwork.current = summary;
+    setLog((prev) => [...prev.slice(-MAX_LINES), { time: Date.now(), source: "network" as const, text: summary }]);
+  }, [clawHealth?.uptimeMonitors]);
 
   // Auto-scroll
   useEffect(() => {
@@ -104,24 +217,26 @@ export function DebugPanel() {
   }, [log]);
 
   return (
-    <div className="absolute top-2 left-2 z-50 bg-black/85 border border-white/10 rounded font-mono text-[9px] leading-[13px] w-[420px] max-h-[300px] flex flex-col select-none">
-      <div className="flex justify-between items-center px-2 py-1 border-b border-white/10">
-        <span className="text-white/50 text-[8px] uppercase tracking-wider">Signal Debug</span>
+    <div className="absolute top-2 left-2 z-50 bg-black/90 border border-white/10 rounded font-mono text-[10px] leading-[16px] w-[560px] max-h-[320px] flex flex-col select-none">
+      <div className="flex justify-between items-center px-3 py-1.5 border-b border-white/10">
+        <span className="text-white/40 text-[9px] uppercase tracking-widest">Signal Debug</span>
         <span className="flex gap-2 text-[8px]">
-          <span className="text-cyan-400">pixels</span>
-          <span className="text-green-400">agents</span>
-          <span className="text-yellow-400">claw</span>
+          <span className="text-fuchsia-400">pixels</span>
+          <span className="text-lime-400">agents</span>
+          <span className="text-rose-400">claw</span>
+          <span className="text-amber-400">slots</span>
+          <span className="text-violet-400">net</span>
         </span>
       </div>
-      <div ref={scrollRef} className="overflow-y-auto px-2 py-1 flex-1">
+      <div ref={scrollRef} className="overflow-y-auto px-3 py-1.5 flex-1">
         {log.length === 0 && (
           <div className="text-neutral-500 py-2">Waiting for signals...</div>
         )}
         {log.map((entry, i) => (
-          <div key={i} className="flex gap-2 whitespace-nowrap">
-            <span className="text-neutral-500 shrink-0">{fmt(entry.time)}</span>
-            <span className={`shrink-0 w-[42px] ${SRC_COLORS[entry.source]}`}>{entry.source}</span>
-            <span className="text-neutral-300 overflow-hidden text-ellipsis">{entry.text}</span>
+          <div key={i} className="grid grid-cols-[80px_56px_1fr] hover:bg-white/[0.03] px-1 -mx-1 rounded">
+            <span className="text-neutral-600">{fmt(entry.time)}</span>
+            <span className={SRC_COLORS[entry.source]}>{entry.source}</span>
+            <span className="whitespace-pre overflow-hidden text-ellipsis">{colorizeText(entry.text)}</span>
           </div>
         ))}
       </div>

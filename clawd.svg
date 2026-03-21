@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="112" height="104" viewBox="0 0 14 13" shape-rendering="crispEdges">
+  <!-- Clawd (idle) -->
+  <rect x="3" y="0" width="2" height="2" fill="#c4856c"/>
+  <rect x="9" y="0" width="2" height="2" fill="#c4856c"/>
+  <rect x="2" y="2" width="10" height="6" fill="#c4856c"/>
+  <rect x="0" y="4" width="2" height="2" fill="#c4856c"/>
+  <rect x="12" y="4" width="2" height="2" fill="#c4856c"/>
+  <rect x="4" y="3" width="1" height="3" fill="#2d1a0f"/>
+  <rect x="9" y="3" width="1" height="3" fill="#2d1a0f"/>
+  <rect x="3" y="8" width="8" height="2" fill="#b07a60"/>
+  <rect x="3" y="10" width="2" height="2" fill="#b07a60"/>
+  <rect x="6" y="10" width="1" height="2" fill="#b07a60"/>
+  <rect x="7" y="10" width="1" height="2" fill="#b07a60"/>
+  <rect x="9" y="10" width="2" height="2" fill="#b07a60"/>
+</svg>

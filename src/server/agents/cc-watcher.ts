@@ -38,6 +38,7 @@ export class ClaudeCodeWatcher extends EventEmitter {
   private ccCounter = 0;
   private emitVersion = 0;
   private expTracker: ExpTracker;
+  private rescanPending = false;
 
   constructor(expTracker: ExpTracker) {
     super();
@@ -166,19 +167,22 @@ export class ClaudeCodeWatcher extends EventEmitter {
     const isInSubagentsDir = filePath.includes("/subagents/");
     if (isInSubagentsDir) {
       // Quick check: if the last line has stop_reason "end_turn", it already completed
+      let fd: number | undefined;
       try {
-        const fd = fs.openSync(filePath, "r");
+        fd = fs.openSync(filePath, "r");
         const stat = fs.fstatSync(fd);
         const tailSize = Math.min(4096, stat.size);
         const buf = Buffer.alloc(tailSize);
         fs.readSync(fd, buf, 0, tailSize, stat.size - tailSize);
-        fs.closeSync(fd);
         const tail = buf.toString("utf-8");
         if (tail.includes('"stop_reason":"end_turn"') || tail.includes('"stop_reason": "end_turn"') || tail.includes('"turn_duration"')) {
           this.departedPaths.set(filePath, Date.now());
           return;
         }
-      } catch {}
+      } catch {
+      } finally {
+        if (fd !== undefined) try { fs.closeSync(fd); } catch {}
+      }
 
       // Try to match to a parent by path: .../projects/<proj>/<uuid>/subagents/<file>.jsonl
       // Parent would be: .../projects/<proj>/<uuid>.jsonl
@@ -246,15 +250,17 @@ export class ClaudeCodeWatcher extends EventEmitter {
     // Use synchronous read to avoid race condition where emitUpdate()
     // fires before async stream finishes processing new lines
     let buffer: string;
+    let fd: number | undefined;
     try {
-      const fd = fs.openSync(session.filePath, "r");
+      fd = fs.openSync(session.filePath, "r");
       const length = stat.size - session.byteOffset;
       const buf = Buffer.alloc(length);
       fs.readSync(fd, buf, 0, length, session.byteOffset);
-      fs.closeSync(fd);
       buffer = buf.toString("utf-8");
     } catch {
       return;
+    } finally {
+      if (fd !== undefined) try { fs.closeSync(fd); } catch {}
     }
 
     session.byteOffset = stat.size;
@@ -281,9 +287,12 @@ export class ClaudeCodeWatcher extends EventEmitter {
       } else if (event.type === "sub_agent_spawn") {
         session.pendingSubAgents++;
         session.expectingSubAgentSince = Date.now();
-        // Quickly rescan to pick up the subagent's JSONL file
-        setTimeout(() => this.scan(), 500);
-        setTimeout(() => this.scan(), 2000);
+        // Quickly rescan to pick up the subagent's JSONL file (deduped)
+        if (!this.rescanPending) {
+          this.rescanPending = true;
+          setTimeout(() => { this.rescanPending = false; this.scan(); }, 500);
+          setTimeout(() => this.scan(), 2000);
+        }
       } else if (event.type === "turn_end") {
         if (session.subagentClass !== null) {
           this.departSubagent(session);

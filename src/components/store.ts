@@ -14,6 +14,21 @@ export interface RelayMessage {
   time: string;
 }
 
+export interface SlotDetail {
+  state: string;
+  age_sec?: number;
+  ttl_remaining?: number;
+  session_id?: string;
+  name?: string;
+}
+
+export interface UptimeMonitor {
+  name: string;
+  status: number;
+  ping: number;
+  up: boolean;
+}
+
 export interface ClawHealth {
   reachable: boolean;
   yeelightConnected: boolean;
@@ -22,6 +37,11 @@ export interface ClawHealth {
   matrixMode: string | null;
   brightness?: number | null;
   animationRunning?: boolean;
+  slotsDetail?: SlotDetail[];
+  uptimeMonitors?: UptimeMonitor[];
+  zones?: { thinking: string; display: string; context: string };
+  waitingCount?: number;
+  transitionInProgress?: boolean;
 }
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";
