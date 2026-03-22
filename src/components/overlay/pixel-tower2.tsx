@@ -112,7 +112,7 @@ export function PixelTower2() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div className="flex flex-col" style={{ gap: panelGap }}>
+      <div className="flex flex-col" style={{ gap: 4 }}>
         <div className="rounded-md bg-black/80 backdrop-blur-sm p-2">
           <Panel pixels={topPixels} px={px} gap={gap} />
         </div>
