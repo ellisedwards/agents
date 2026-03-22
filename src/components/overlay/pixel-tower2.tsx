@@ -3,10 +3,13 @@ import { useTower2 } from "@/hooks/use-tower2";
 import { useAgentOfficeStore } from "../store";
 import type { TowerSize } from "../store";
 
-const SIZES: Partial<Record<TowerSize, { px: number; gap: number }>> = {
-  small: { px: 12, gap: 6 },
-  medium: { px: 24, gap: 12 },
-  large: { px: 36, gap: 18 },
+const COLS = 5;
+const ROWS = 5;
+
+const SIZES: Partial<Record<TowerSize, { px: number; gap: number; panelGap: number }>> = {
+  small: { px: 12, gap: 6, panelGap: 8 },
+  medium: { px: 24, gap: 12, panelGap: 16 },
+  large: { px: 36, gap: 18, panelGap: 24 },
 };
 
 function brighten(hex: string, factor: number): string {
@@ -15,6 +18,41 @@ function brighten(hex: string, factor: number): string {
   const g = Math.min(255, Math.round(parseInt(hex.slice(3, 5), 16) * factor));
   const b = Math.min(255, Math.round(parseInt(hex.slice(5, 7), 16) * factor));
   return `rgb(${r},${g},${b})`;
+}
+
+function Panel({ pixels, px, gap }: { pixels: string[]; px: number; gap: number }) {
+  const w = COLS * (px + gap) - gap;
+  const h = ROWS * (px + gap) - gap;
+  const anyLit = pixels.some(c => c !== "#000000");
+
+  return (
+    <div className="relative" style={{ width: w, height: h }}>
+      {pixels.map((color, i) => {
+        const col = i % COLS;
+        const row = (ROWS - 1) - Math.floor(i / COLS);
+        const isLit = color !== "#000000";
+        const displayColor = isLit ? brighten(color, 2) : color;
+
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: col * (px + gap),
+              top: row * (px + gap),
+              width: px,
+              height: px,
+              backgroundColor: isLit ? displayColor : anyLit ? "rgba(255,255,255,0.06)" : "#000000",
+              borderRadius: px / 2,
+              boxShadow: isLit
+                ? `0 0 ${px}px ${displayColor}aa, 0 0 ${px * 2}px ${displayColor}44`
+                : undefined,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 const T2_POS_KEY = "agent-office-tower2-pos";
@@ -59,13 +97,12 @@ export function PixelTower2() {
   const sizeConfig = SIZES[tower2Size];
   if (!sizeConfig) return null;
 
-  const { px, gap } = sizeConfig;
-  const cols = data.width || 5;
-  const rows = data.height || 10;
+  const { px, gap, panelGap } = sizeConfig;
   const pixels = data.pixels || [];
 
-  const w = cols * (px + gap) - gap;
-  const h = rows * (px + gap) - gap;
+  // Split 50 pixels into two 5x5 panels: bottom (0-24), top (25-49)
+  const bottomPixels = pixels.slice(0, 25);
+  const topPixels = pixels.slice(25, 50);
 
   return (
     <div
@@ -75,33 +112,12 @@ export function PixelTower2() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div className="flex flex-col rounded-md bg-black/80 backdrop-blur-sm p-2">
-        <div className="relative" style={{ width: w, height: h }}>
-          {pixels.map((color, i) => {
-            const col = i % cols;
-            const row = (rows - 1) - Math.floor(i / cols);
-            const isLit = color !== "#000000";
-            const displayColor = isLit ? brighten(color, 2) : color;
-
-            return (
-              <div
-                key={i}
-                style={{
-                  position: "absolute",
-                  left: col * (px + gap),
-                  top: row * (px + gap),
-                  width: px,
-                  height: px,
-                  backgroundColor: isLit ? displayColor : "rgba(255,255,255,0.06)",
-                  borderRadius: px / 2,
-                  boxShadow: isLit
-                    ? `0 0 ${px}px ${displayColor}aa, 0 0 ${px * 2}px ${displayColor}44`
-                    : undefined,
-                }}
-              />
-            );
-          })}
-        </div>
+      <div
+        className="flex flex-col rounded-md bg-black/80 backdrop-blur-sm p-2"
+        style={{ gap: panelGap }}
+      >
+        <Panel pixels={topPixels} px={px} gap={gap} />
+        <Panel pixels={bottomPixels} px={px} gap={gap} />
       </div>
     </div>
   );

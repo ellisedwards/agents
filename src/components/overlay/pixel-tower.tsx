@@ -36,6 +36,7 @@ function Panel({
 }) {
   const w = COLS * (px + gap) - gap;
   const h = ROWS * (px + gap) - gap;
+  const anyLit = pixels.some(c => c !== "#000000");
   return (
     <div className="relative" style={{ width: w, height: h }}>
       {pixels.map((color, i) => {
@@ -53,7 +54,7 @@ function Panel({
               top: row * (px + gap),
               width: px,
               height: px,
-              backgroundColor: isLit ? displayColor : "rgba(255,255,255,0.06)",
+              backgroundColor: isLit ? displayColor : anyLit ? "rgba(255,255,255,0.06)" : "#000000",
               borderRadius: px / 2,
               boxShadow: isLit
                 ? `0 0 ${px}px ${displayColor}aa, 0 0 ${px * 2}px ${displayColor}44`
@@ -63,7 +64,7 @@ function Panel({
           />
         );
       })}
-      {diffuse && (
+      {diffuse && pixels.some(c => c !== "#000000") && (
         <>
           <div
             className="absolute inset-0 rounded-sm pointer-events-none"
