@@ -11,7 +11,7 @@ import { PixelTower } from "@/components/overlay/pixel-tower";
 import { DebugPanel } from "@/components/overlay/debug-panel";
 import { PixelEditor } from "@/components/overlay/pixel-editor";
 import { Toasts } from "@/components/overlay/toasts";
-// HelpGuide is now inside agent-labels.tsx (unified ? panel in top bar)
+import { PixelTower2 } from "@/components/overlay/pixel-tower2";
 
 const LazySpriteEditor = lazy(() =>
   import("@/components/sprite-editor/SpriteEditor").then(m => ({ default: m.SpriteEditor }))
@@ -76,6 +76,7 @@ export function App() {
       <PixelEditor canvasRef={canvasRef} />
       <SpeechBubbles transform={transform} />
       <PixelTower />
+      <PixelTower2 />
       <StatusBar />
       <Toasts />
       {debugOn && <DebugPanel />}

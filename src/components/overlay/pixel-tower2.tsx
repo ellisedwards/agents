@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useTower2 } from "@/hooks/use-tower2";
 import { useAgentOfficeStore } from "../store";
 import type { TowerSize } from "../store";
@@ -30,7 +30,6 @@ const SIZES: Partial<Record<TowerSize, { px: number; gap: number }>> = {
   large: { px: 36, gap: 18 },
 };
 
-// Status dot colors
 function dotColor(status: string): string {
   if (status === "green") return "#00cc44";
   if (status === "red" || status === "down") return "#cc3333";
@@ -38,10 +37,44 @@ function dotColor(status: string): string {
   return "#333";
 }
 
+const T2_POS_KEY = "agent-office-tower2-pos";
+
+function loadT2Pos(): { x: number; y: number } {
+  try {
+    const raw = localStorage.getItem(T2_POS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { x: 12, y: 180 };
+}
+
 export function PixelTower2() {
   const { data, connected } = useTower2();
   const towerSize = useAgentOfficeStore((s) => s.towerSize);
   const towerVisible = useAgentOfficeStore((s) => s.towerVisible);
+
+  const [pos, setPos] = useState(loadT2Pos);
+  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y };
+  }, [pos]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const newPos = {
+      x: Math.max(0, dragRef.current.origX + (e.clientX - dragRef.current.startX)),
+      y: Math.max(0, dragRef.current.origY + (e.clientY - dragRef.current.startY)),
+    };
+    setPos(newPos);
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    if (dragRef.current) {
+      try { localStorage.setItem(T2_POS_KEY, JSON.stringify(pos)); } catch {}
+    }
+    dragRef.current = null;
+  }, [pos]);
 
   // Animation state
   const [headIdx, setHeadIdx] = useState(0);
@@ -49,7 +82,6 @@ export function PixelTower2() {
   const [doneFlash, setDoneFlash] = useState(false);
   const prevMode = useRef(data.mode);
 
-  // Animate perimeter chase when thinking/typing
   useEffect(() => {
     const isAnimating = data.mode === "thinking" || data.mode === "typing";
     if (isAnimating) {
@@ -64,12 +96,9 @@ export function PixelTower2() {
         animRef.current = null;
       }
     }
-    return () => {
-      if (animRef.current) clearInterval(animRef.current);
-    };
+    return () => { if (animRef.current) clearInterval(animRef.current); };
   }, [data.mode]);
 
-  // Done flash
   useEffect(() => {
     if (prevMode.current === "thinking" && data.mode === "done") {
       setDoneFlash(true);
@@ -91,12 +120,10 @@ export function PixelTower2() {
   );
 
   if (doneFlash) {
-    // Green flash across entire block
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS; c++)
         grid[r][c] = "#003300";
   } else if (isChasing) {
-    // Golden perimeter chase
     for (let t = 0; t < TRAIL_LENGTH; t++) {
       const idx = (headIdx - t + PERIMETER.length) % PERIMETER.length;
       const [col, row] = PERIMETER[idx];
@@ -104,9 +131,11 @@ export function PixelTower2() {
       grid[row][col] = t === 0 ? GOLD_HEAD : goldTrail(brightness);
     }
   } else if (data.mode === "dots" && data.dots.length > 0) {
-    // Show status dots in a row along the middle
-    for (let i = 0; i < Math.min(data.dots.length, COLS); i++) {
-      grid[1][i] = dotColor(data.dots[i].status);
+    // Spread dots across the grid, filling row by row
+    for (let i = 0; i < Math.min(data.dots.length, COLS * ROWS); i++) {
+      const r = Math.floor(i / COLS);
+      const c = i % COLS;
+      grid[r][c] = dotColor(data.dots[i].status);
     }
   }
 
@@ -115,33 +144,38 @@ export function PixelTower2() {
 
   return (
     <div
-      className="flex flex-col rounded-md bg-black/80 backdrop-blur-sm p-2"
-      style={{ marginTop: 8 }}
+      className="absolute z-20 cursor-grab active:cursor-grabbing select-none"
+      style={{ left: pos.x, top: pos.y }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
     >
-      <div className="relative" style={{ width: w, height: h }}>
-        {grid.flatMap((row, r) =>
-          row.map((color, c) => {
-            const isLit = color !== "rgba(255,255,255,0.06)";
-            return (
-              <div
-                key={`${r}-${c}`}
-                style={{
-                  position: "absolute",
-                  left: c * (px + gap),
-                  top: r * (px + gap),
-                  width: px,
-                  height: px,
-                  backgroundColor: color,
-                  borderRadius: px / 2,
-                  boxShadow: isLit
-                    ? `0 0 ${px}px ${color}aa, 0 0 ${px * 2}px ${color}44`
-                    : undefined,
-                  transition: isChasing ? "background-color 0.08s" : "background-color 0.3s",
-                }}
-              />
-            );
-          })
-        )}
+      <div className="flex flex-col rounded-md bg-black/80 backdrop-blur-sm p-2">
+        <div className="relative" style={{ width: w, height: h }}>
+          {grid.flatMap((row, r) =>
+            row.map((color, c) => {
+              const isLit = color !== "rgba(255,255,255,0.06)";
+              return (
+                <div
+                  key={`${r}-${c}`}
+                  style={{
+                    position: "absolute",
+                    left: c * (px + gap),
+                    top: r * (px + gap),
+                    width: px,
+                    height: px,
+                    backgroundColor: color,
+                    borderRadius: px / 2,
+                    boxShadow: isLit
+                      ? `0 0 ${px}px ${color}aa, 0 0 ${px * 2}px ${color}44`
+                      : undefined,
+                    transition: isChasing ? "background-color 0.08s" : "background-color 0.3s",
+                  }}
+                />
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );

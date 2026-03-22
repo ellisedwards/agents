@@ -3,7 +3,7 @@ import { useCallback, useRef } from "react";
 import { usePixelTower } from "@/hooks/use-pixel-tower";
 import { useAgentOfficeStore } from "../store";
 import type { TowerSize } from "../store";
-import { PixelTower2 } from "./pixel-tower2";
+// Tower 2 is rendered separately in App.tsx
 
 const COLS = 5;
 const ROWS = 5;
@@ -152,7 +152,6 @@ export function PixelTower() {
         <Panel pixels={data.panels.middle} px={px} gap={gap} />
         <Panel pixels={data.panels.bottom} px={px} gap={gap} />
       </div>
-      <PixelTower2 />
     </div>
   );
 }
