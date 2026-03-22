@@ -29,7 +29,7 @@ function loadT2Pos(): { x: number; y: number } {
 
 export function PixelTower2() {
   const { data, connected } = useTower2();
-  const towerSize = useAgentOfficeStore((s) => s.towerSize);
+  const tower2Size = useAgentOfficeStore((s) => s.tower2Size);
   const tower2Visible = useAgentOfficeStore((s) => s.tower2Visible);
 
   const [pos, setPos] = useState(loadT2Pos);
@@ -55,8 +55,8 @@ export function PixelTower2() {
     dragRef.current = null;
   }, [pos]);
 
-  if (!connected || !tower2Visible || towerSize === "monolith") return null;
-  const sizeConfig = SIZES[towerSize];
+  if (!connected || !tower2Visible) return null;
+  const sizeConfig = SIZES[tower2Size];
   if (!sizeConfig) return null;
 
   const { px, gap } = sizeConfig;

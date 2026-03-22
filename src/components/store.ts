@@ -146,6 +146,8 @@ interface AgentOfficeStore {
   setTowerVisible: (visible: boolean) => void;
   tower2Visible: boolean;
   setTower2Visible: (visible: boolean) => void;
+  tower2Size: TowerSize;
+  setTower2Size: (size: TowerSize) => void;
   setTowerPos: (pos: { x: number; y: number }) => void;
   setTowerOpacity: (opacity: number) => void;
   setEditMode: (mode: EditMode) => void;
@@ -183,6 +185,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   towerSize: initialTower.size,
   towerVisible: initialTower.visible,
   tower2Visible: (() => { try { return localStorage.getItem("agent-office-tower2-visible") !== "false"; } catch { return true; } })(),
+  tower2Size: ((() => { try { return localStorage.getItem("agent-office-tower2-size") as TowerSize || "medium"; } catch { return "medium"; } })()) as TowerSize,
   towerPos: { x: initialTower.x, y: initialTower.y },
   towerOpacity: initialTower.opacity,
   editMode: "none",
@@ -353,6 +356,10 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setTower2Visible: (visible) => {
     set({ tower2Visible: visible });
     try { localStorage.setItem("agent-office-tower2-visible", String(visible)); } catch {}
+  },
+  setTower2Size: (size) => {
+    set({ tower2Size: size });
+    try { localStorage.setItem("agent-office-tower2-size", size); } catch {}
   },
   setTowerPos: (pos) => {
     set({ towerPos: pos });

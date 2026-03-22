@@ -258,6 +258,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const towerVisible = useAgentOfficeStore((s) => s.towerVisible);
   const tower2Visible = useAgentOfficeStore((s) => s.tower2Visible);
   const setTower2Visible = useAgentOfficeStore((s) => s.setTower2Visible);
+  const tower2Size = useAgentOfficeStore((s) => s.tower2Size);
+  const setTower2Size = useAgentOfficeStore((s) => s.setTower2Size);
   const setTowerVisible = useAgentOfficeStore((s) => s.setTowerVisible);
   const statusPosterOn = useAgentOfficeStore((s) => s.statusPosterOn);
   const setStatusPosterOn = useAgentOfficeStore((s) => s.setStatusPosterOn);
@@ -869,9 +871,9 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
               </div>
             )}
 
-            {/* Tower size */}
+            {/* Tower 1 size */}
             <div className="space-y-1">
-              <span className="font-mono text-[10px] text-white/50 block">Tower Size</span>
+              <span className="font-mono text-[10px] text-white/50 block">Tower 1 Size</span>
               <select
                 value={towerSize}
                 onChange={(e) => setTowerSize(e.target.value as TowerSize)}
@@ -881,6 +883,20 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 <option value="medium" className="bg-[#1e1e2e]">Medium</option>
                 <option value="large" className="bg-[#1e1e2e]">Large</option>
                 <option value="monolith" className="bg-[#1e1e2e]">Monolith</option>
+              </select>
+            </div>
+
+            {/* Tower 2 size */}
+            <div className="space-y-1">
+              <span className="font-mono text-[10px] text-white/50 block">Tower 2 Size</span>
+              <select
+                value={tower2Size}
+                onChange={(e) => setTower2Size(e.target.value as TowerSize)}
+                className="w-full bg-white/10 text-white/70 font-mono text-[10px] rounded px-1.5 py-1 border border-white/10 outline-none"
+              >
+                <option value="small" className="bg-[#1e1e2e]">Small</option>
+                <option value="medium" className="bg-[#1e1e2e]">Medium</option>
+                <option value="large" className="bg-[#1e1e2e]">Large</option>
               </select>
             </div>
 
