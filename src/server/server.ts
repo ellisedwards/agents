@@ -300,6 +300,38 @@ app.post("/api/rename-agent", express.json(), (req, res) => {
   res.json({ ok });
 });
 
+// --- ESP32 compact agent data ---
+// Lightweight endpoint for the ESP32 Buddy to get rich agent info
+// that only Agent Office knows (names, levels, states, tools)
+app.get("/api/esp-agents", (_req, res) => {
+  const agents = watcher.getAgents();
+  const compact = agents
+    .filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined))
+    .map(a => ({
+      n: a.gameName || a.name,       // display name
+      s: a.state,                     // idle/thinking/typing/reading/lounging
+      t: a.currentTool || undefined,  // current tool (Bash, Read, etc.)
+      l: a.level ?? 0,               // level
+      e: a.exp ?? 0,                  // current exp
+      en: a.expToNext ?? 0,           // exp needed for next level
+      ti: a.title ?? undefined,       // title (Rookie, Veteran, etc.)
+      tc: a.teamColor,               // team color index
+    }));
+  // Also include claw-main if present
+  const oc = agents.find(a => a.source === "openclaw");
+  if (oc) {
+    compact.push({
+      n: oc.name,
+      s: oc.state,
+      t: oc.currentTool || undefined,
+      l: 0, e: 0, en: 0,
+      ti: undefined,
+      tc: oc.teamColor,
+    });
+  }
+  res.json({ agents: compact, count: compact.length });
+});
+
 // Client-triggered sparkle — perfectly timed with visual level-up
 app.post("/api/sparkle", express.json(), (req, res) => {
   const { slot } = req.body;
