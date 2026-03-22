@@ -256,6 +256,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
   const towerSize = useAgentOfficeStore((s) => s.towerSize);
   const setTowerSize = useAgentOfficeStore((s) => s.setTowerSize);
   const towerVisible = useAgentOfficeStore((s) => s.towerVisible);
+  const tower2Visible = useAgentOfficeStore((s) => s.tower2Visible);
+  const setTower2Visible = useAgentOfficeStore((s) => s.setTower2Visible);
   const setTowerVisible = useAgentOfficeStore((s) => s.setTowerVisible);
   const statusPosterOn = useAgentOfficeStore((s) => s.statusPosterOn);
   const setStatusPosterOn = useAgentOfficeStore((s) => s.setStatusPosterOn);
@@ -766,9 +768,9 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
               </select>
             </div>
 
-            {/* Tower toggle */}
+            {/* Tower 1 toggle */}
             <label className="flex items-center justify-between gap-3 cursor-pointer">
-              <span className="font-mono text-[10px] text-white/50">Tower</span>
+              <span className="font-mono text-[10px] text-white/50">Tower 1</span>
               <button
                 onClick={() => setTowerVisible(!towerVisible)}
                 className={`w-7 h-4 rounded-full transition-colors relative ${
@@ -778,6 +780,23 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 <span
                   className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
                     towerVisible ? "left-[13px]" : "left-[3px]"
+                  }`}
+                />
+              </button>
+            </label>
+
+            {/* Tower 2 toggle */}
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <span className="font-mono text-[10px] text-white/50">Tower 2</span>
+              <button
+                onClick={() => setTower2Visible(!tower2Visible)}
+                className={`w-7 h-4 rounded-full transition-colors relative ${
+                  tower2Visible ? "bg-green-500/70" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-[3px] w-2.5 h-2.5 rounded-full bg-white transition-all ${
+                    tower2Visible ? "left-[13px]" : "left-[3px]"
                   }`}
                 />
               </button>

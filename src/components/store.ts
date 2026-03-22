@@ -144,6 +144,8 @@ interface AgentOfficeStore {
   setThemeId: (id: ThemeId) => void;
   setTowerSize: (size: TowerSize) => void;
   setTowerVisible: (visible: boolean) => void;
+  tower2Visible: boolean;
+  setTower2Visible: (visible: boolean) => void;
   setTowerPos: (pos: { x: number; y: number }) => void;
   setTowerOpacity: (opacity: number) => void;
   setEditMode: (mode: EditMode) => void;
@@ -180,6 +182,7 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   themeId: loadThemeId(),
   towerSize: initialTower.size,
   towerVisible: initialTower.visible,
+  tower2Visible: (() => { try { return localStorage.getItem("agent-office-tower2-visible") !== "false"; } catch { return true; } })(),
   towerPos: { x: initialTower.x, y: initialTower.y },
   towerOpacity: initialTower.opacity,
   editMode: "none",
@@ -346,6 +349,10 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
     set({ towerVisible: visible });
     const s = get();
     saveTowerPrefs({ visible, size: s.towerSize, x: s.towerPos.x, y: s.towerPos.y, opacity: s.towerOpacity });
+  },
+  setTower2Visible: (visible) => {
+    set({ tower2Visible: visible });
+    try { localStorage.setItem("agent-office-tower2-visible", String(visible)); } catch {}
   },
   setTowerPos: (pos) => {
     set({ towerPos: pos });
