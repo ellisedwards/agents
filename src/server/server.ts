@@ -327,7 +327,10 @@ setInterval(async () => {
   } catch {}
 }, 1000);
 
+let espLastPoll = 0;
+
 app.get("/api/esp32-status", (_req, res) => {
+  espLastPoll = Date.now();
   const allAgents = watcher.getAgents();
   const ccMain = allAgents
     .filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined))
@@ -485,6 +488,7 @@ app.get("/api/claw-health", async (_req, res) => {
       clawMode: activeClaw,
       circuitBreakerOpen: clawCircuitOpen,
       bleConnected: isBleConnected(),
+      espConnected: (Date.now() - espLastPoll) < 5000,
       yeelightConnected: statusData.connected === true,
       slots,
       activeSlots: slots.filter((s: string) => s !== "off").length,
@@ -507,7 +511,8 @@ app.get("/api/claw-health", async (_req, res) => {
       })) ?? undefined,
     });
   } catch {
-    res.json({ reachable: false, clawMode: activeClaw, circuitBreakerOpen: clawCircuitOpen, bleConnected: isBleConnected(), yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
+    res.json({ reachable: false, clawMode: activeClaw, circuitBreakerOpen: clawCircuitOpen, bleConnected: isBleConnected(),
+      espConnected: (Date.now() - espLastPoll) < 5000, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
   }
 });
 

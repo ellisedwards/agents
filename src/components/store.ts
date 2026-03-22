@@ -34,6 +34,7 @@ export interface ClawHealth {
   clawMode?: "primary" | "fallback";
   circuitBreakerOpen?: boolean;
   bleConnected?: boolean;
+  espConnected?: boolean;
   yeelightConnected: boolean;
   slots: string[];
   activeSlots: number;

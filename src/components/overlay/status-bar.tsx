@@ -159,6 +159,20 @@ export function StatusBar() {
            clawHealth.clawMode === "fallback" ? "tailscale" : "wifi"}
         </span>
       )}
+      {/* Yeelight disconnected warning — only when claw is up but bulb isn't */}
+      {clawHealth && clawHealth.reachable && !clawHealth.yeelightConnected && (
+        <span className="text-yellow-400/80 flex items-center gap-1" title="Yeelight bulb disconnected — may need power cycle">
+          <span className="w-1.5 h-1.5 rounded-full bg-yellow-400/80 inline-block" />
+          bulb offline
+        </span>
+      )}
+      {/* ESP32 polling indicator */}
+      {clawHealth?.espConnected && (
+        <span className="text-teal-400/70 flex items-center gap-1" title="ESP32 Buddy polling /api/esp32-status">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-400/70 inline-block" />
+          esp
+        </span>
+      )}
 
       {status === "connected" && agents.length > 0 && (
         <button
