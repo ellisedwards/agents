@@ -372,6 +372,17 @@ app.get("/api/esp32-status", (_req, res) => {
   });
 });
 
+// --- Tower 2 proxy (same host as claw, port 9998) ---
+app.get("/api/tower2-status", async (_req, res) => {
+  try {
+    const tower2Url = `http://${getActiveClawHost()}:9998`;
+    const data = await curlRaw(tower2Url, "/status", 2);
+    res.json(data);
+  } catch {
+    res.json({ ok: false, mode: "offline", animating: false, dots: [] });
+  }
+});
+
 // Client-triggered sparkle — perfectly timed with visual level-up
 app.post("/api/sparkle", express.json(), (req, res) => {
   const { slot } = req.body;
