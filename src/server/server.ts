@@ -300,36 +300,73 @@ app.post("/api/rename-agent", express.json(), (req, res) => {
   res.json({ ok });
 });
 
-// --- ESP32 compact agent data ---
-// Lightweight endpoint for the ESP32 Buddy to get rich agent info
-// that only Agent Office knows (names, levels, states, tools)
-app.get("/api/esp-agents", (_req, res) => {
-  const agents = watcher.getAgents();
-  const compact = agents
+// --- ESP32 combined status endpoint ---
+// Single endpoint for ESP32 Buddy — agents, body colors, and state in one call.
+// Agents are mapped to slot states (active/waiting/off) to match the 4-slot model.
+const MAGE_SPRITE_NAMES = ["mage-blue", "mage-red", "mage-purple", "mage-orange", "mage-gold", "mage-teal"];
+let lastBodyColors: string[] = [];
+let lastHirstState = "off";
+
+// Keep body colors and hirst state updated from claw polling
+// (piggyback on the BLE interval or add a dedicated one)
+setInterval(async () => {
+  try {
+    const [pixelsData, statusData] = await Promise.all([
+      clawGet(claw, "/pixels", 2).catch(() => null) as Promise<any>,
+      clawGet(claw, "/status", 2).catch(() => null) as Promise<any>,
+    ]);
+    if (pixelsData?.panels) {
+      const middle = pixelsData.panels.middle || [];
+      const bottom = pixelsData.panels.bottom || [];
+      lastBodyColors = [...middle.slice(0, 25), ...bottom.slice(0, 25)];
+    }
+    if (statusData?.claw_activity) {
+      const a = statusData.claw_activity;
+      lastHirstState = a === "typing" ? "running" : a === "thinking" ? "in" : "off";
+    }
+  } catch {}
+}, 1000);
+
+app.get("/api/esp32-status", (_req, res) => {
+  const allAgents = watcher.getAgents();
+  const ccMain = allAgents
     .filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined))
-    .map(a => ({
-      n: a.gameName || a.name,       // display name
-      s: a.state,                     // idle/thinking/typing/reading/lounging
-      t: a.currentTool || undefined,  // current tool (Bash, Read, etc.)
-      l: a.level ?? 0,               // level
-      e: a.exp ?? 0,                  // current exp
-      en: a.expToNext ?? 0,           // exp needed for next level
-      ti: a.title ?? undefined,       // title (Rookie, Veteran, etc.)
-      tc: a.teamColor,               // team color index
-    }));
-  // Also include claw-main if present
-  const oc = agents.find(a => a.source === "openclaw");
-  if (oc) {
-    compact.push({
-      n: oc.name,
-      s: oc.state,
-      t: oc.currentTool || undefined,
-      l: 0, e: 0, en: 0,
-      ti: undefined,
-      tc: oc.teamColor,
-    });
+    .slice(0, 4); // max 4 slots
+
+  const agents = ccMain.map(a => {
+    const state = (a.state === "typing" || a.state === "reading" || a.state === "thinking") ? "active"
+      : a.state === "idle" || a.state === "lounging" ? "waiting"
+      : "off";
+    const entry: Record<string, any> = {
+      name: a.gameName || a.name,
+      level: a.level ?? 0,
+      state,
+      sprite: MAGE_SPRITE_NAMES[a.teamColor] || "mage-blue",
+    };
+    if (state === "active") {
+      entry.activity = a.currentTool || a.state;
+      entry.progress = a.exp ?? 0;
+      entry.progressMax = a.expToNext ?? 100;
+    }
+    return entry;
+  });
+
+  // Find which slot is most recently active
+  let activeSlot = 0;
+  let latestActivity = 0;
+  for (let i = 0; i < ccMain.length; i++) {
+    if (ccMain[i].lastActivity > latestActivity) {
+      latestActivity = ccMain[i].lastActivity;
+      activeSlot = i;
+    }
   }
-  res.json({ agents: compact, count: compact.length });
+
+  res.json({
+    agents,
+    activeSlot,
+    bodyColors: lastBodyColors,
+    hirstState: lastHirstState,
+  });
 });
 
 // Client-triggered sparkle — perfectly timed with visual level-up
