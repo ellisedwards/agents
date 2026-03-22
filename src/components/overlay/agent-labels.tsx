@@ -60,9 +60,11 @@ function ServerInfo() {
   );
 }
 
-function GameGuide() {
+function HelpGuide() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const gameModeOn = useAgentOfficeStore((s) => s.gameModeOn);
+  const clawHealth = useAgentOfficeStore((s) => s.clawHealth);
 
   useEffect(() => {
     if (!open) return;
@@ -83,78 +85,151 @@ function GameGuide() {
       </button>
       {open && (
         <div
-          className="absolute top-6 right-0 rounded-[7px] px-[14px] py-[12px] min-w-[260px] max-h-[400px] overflow-y-auto space-y-3"
+          className="absolute top-6 right-0 rounded-[7px] px-[14px] py-[12px] min-w-[280px] max-w-[320px] max-h-[80vh] overflow-y-auto space-y-3"
           style={{ backgroundColor: "rgba(31, 31, 36, 0.94)", animation: "panelReveal 0.15s ease-out" }}
         >
-          <div className="font-mono text-[11px] text-white/80 font-bold">Game Guide</div>
+          <div className="font-mono text-[11px] text-white/80 font-bold">Agent Office</div>
 
+          {/* Overview */}
           <div className="space-y-1">
-            <div className="font-mono text-[9px] text-yellow-300/70 font-bold">EXP Awards</div>
-            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
-              <div>Write / Edit: 8 exp</div>
-              <div>Bash: 5 exp</div>
-              <div>Read / Grep / Glob: 3 exp</div>
-              <div>Agent (subagent): 10 exp</div>
-              <div>Thinking: 1 exp (30s cooldown)</div>
+            <div className="font-mono text-[8px] text-white/40 space-y-1 leading-[12px]">
+              <div>Watches Claude Code sessions on this Mac and shows them as characters in the scene.</div>
+              <div>Connects to the claw server (Pi) to drive the Yeelight and LED matrix based on agent activity.</div>
             </div>
           </div>
 
+          {/* Shortcuts */}
           <div className="space-y-1">
-            <div className="font-mono text-[9px] text-green-300/70 font-bold">Bonuses</div>
+            <div className="font-mono text-[9px] text-blue-300/70 font-bold">Shortcuts</div>
             <div className="font-mono text-[8px] text-white/40 space-y-0.5">
-              <div>First Blood: +3 exp (first tool use)</div>
-              <div>Streak: +5 exp (active 5+ min)</div>
-              <div>Speed Combo: +2 exp (3 tools in 10s)</div>
-              <div>Rivalry: +3 exp (2+ agents typing)</div>
-              <div>Subagent Share: parent gets 50%</div>
+              <div className="flex justify-between"><span className="text-white/60">D</span><span>Toggle debug panel</span></div>
+              <div className="flex justify-between"><span className="text-white/60">L</span><span>Toggle agent labels</span></div>
             </div>
           </div>
 
+          {/* Controls */}
           <div className="space-y-1">
-            <div className="font-mono text-[9px] text-amber-300/70 font-bold">Critical Hits</div>
+            <div className="font-mono text-[9px] text-blue-300/70 font-bold">Controls</div>
             <div className="font-mono text-[8px] text-white/40 space-y-0.5">
-              <div>10% chance: 2x base exp</div>
-              <div>Lucky Break (2%): 3x exp</div>
-              <div>Both can stack</div>
+              <div className="flex justify-between"><span className="text-white/60">clr</span><span>Reset agent tracking</span></div>
+              <div className="flex justify-between"><span className="text-white/60">rst</span><span>SSH tower-reset on Pi</span></div>
+              <div className="flex justify-between"><span className="text-white/60">slider</span><span>Yeelight brightness</span></div>
+              <div className="flex justify-between"><span className="text-white/60">relay</span><span>Claw relay messages</span></div>
+              <div className="flex justify-between"><span className="text-white/60">settings</span><span>Theme, tower, triggers</span></div>
             </div>
           </div>
 
+          {/* Connection */}
           <div className="space-y-1">
-            <div className="font-mono text-[9px] text-red-300/70 font-bold">Pokeball Tiers</div>
+            <div className="font-mono text-[9px] text-blue-300/70 font-bold">Connection</div>
             <div className="font-mono text-[8px] text-white/40 space-y-0.5">
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Standard (Lv 1)</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Great Ball (Lv 20)</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-800 inline-block border border-yellow-500/50" /> Ultra Ball (Lv 30)</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" /> Gold Top (Lv 50)</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" style={{ boxShadow: "0 0 3px #ffcc44" }} /> Full Gold + Shimmer (Lv 75)</div>
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400/60 shrink-0" /><span><span className="text-green-400/60">wifi</span> — LAN to claw</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" /><span><span className="text-violet-400">tailscale</span> — VPN fallback</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" /><span><span className="text-red-400">claw down</span> — unreachable</span></div>
+            </div>
+            {clawHealth && (
+              <div className="font-mono text-[8px] text-white/25 pt-0.5">
+                Now: {!clawHealth.reachable ? "unreachable" : clawHealth.clawMode === "fallback" ? "tailscale" : "wifi"}
+                {clawHealth.bleConnected ? " + BLE" : ""}
+              </div>
+            )}
+          </div>
+
+          {/* Agent types & states */}
+          <div className="space-y-1">
+            <div className="font-mono text-[9px] text-blue-300/70 font-bold">Agents</div>
+            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+              <div><span className="text-[#c4856c]">CC</span> — Claude Code sessions &nbsp; <span className="text-[#c4856c]/60">sub</span> — subagents &nbsp; <span className="text-[#cc3333]">OC</span> — OpenClaw</div>
+              <div><span className="text-sky-400/80">thinking</span> · <span className="text-amber-400/80">typing</span> · <span className="text-sky-400/80">reading</span> · <span className="text-neutral-400">idle</span> · <span className="text-neutral-500">lounging</span></div>
             </div>
           </div>
 
+          {/* Troubleshooting */}
           <div className="space-y-1">
-            <div className="font-mono text-[9px] text-purple-300/70 font-bold">Titles</div>
+            <div className="font-mono text-[9px] text-blue-300/70 font-bold">Troubleshooting</div>
             <div className="font-mono text-[8px] text-white/40 space-y-0.5">
-              <div>Lv 1: Fresh Spawn / Rookie</div>
-              <div>Lv 5: Apprentice / Initiate</div>
-              <div>Lv 12: Journeyman / Scout</div>
-              <div>Lv 20: Veteran / Knight</div>
-              <div>Lv 30: Expert / Adept</div>
-              <div>Lv 40: Commander / Sage</div>
-              <div>Lv 50: Grand Master / Champion</div>
-              <div>Lv 70: Ascended / Exalted</div>
-              <div>Lv 90: Legendary / Mythic</div>
+              <div><span className="text-amber-400/70">stale build</span> — restart npm run dev</div>
+              <div><span className="text-amber-400/70">no agents</span> — start a CC session</div>
+              <div><span className="text-amber-400/70">claw down</span> — check Pi + port 9999</div>
+              <div><span className="text-amber-400/70">lights stuck</span> — hit rst</div>
+              <div><span className="text-amber-400/70">agents stuck</span> — hit clr to re-scan</div>
             </div>
           </div>
 
-          <div className="space-y-1">
-            <div className="font-mono text-[9px] text-cyan-300/70 font-bold">Achievements</div>
-            <div className="font-mono text-[8px] text-white/40 space-y-0.5">
-              <div>👑 Centurion — Reach Lv 50</div>
-              <div>🧠 Polymath — Master 5+ tools (50 uses each)</div>
-              <div>🏃 Marathon — 2-hour streak</div>
-              <div>🐚 Shell Shocked — 1000 Bash uses</div>
-              <div>💥 Critical Mass — 100 critical hits</div>
+          {/* Game Guide — only when game mode is on */}
+          {gameModeOn && (<>
+            <div className="border-t border-white/10 pt-2">
+              <div className="font-mono text-[11px] text-white/80 font-bold mb-2">Game Guide</div>
             </div>
-          </div>
+
+            <div className="space-y-1">
+              <div className="font-mono text-[9px] text-yellow-300/70 font-bold">EXP Awards</div>
+              <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+                <div>Write / Edit: 8 exp</div>
+                <div>Bash: 5 exp</div>
+                <div>Read / Grep / Glob: 3 exp</div>
+                <div>Agent (subagent): 10 exp</div>
+                <div>Thinking: 1 exp (30s cooldown)</div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-mono text-[9px] text-green-300/70 font-bold">Bonuses</div>
+              <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+                <div>First Blood: +3 exp (first tool use)</div>
+                <div>Streak: +5 exp (active 5+ min)</div>
+                <div>Speed Combo: +2 exp (3 tools in 10s)</div>
+                <div>Rivalry: +3 exp (2+ agents typing)</div>
+                <div>Subagent Share: parent gets 50%</div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-mono text-[9px] text-amber-300/70 font-bold">Critical Hits</div>
+              <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+                <div>10% chance: 2x base exp</div>
+                <div>Lucky Break (2%): 3x exp</div>
+                <div>Both can stack</div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-mono text-[9px] text-red-300/70 font-bold">Pokeball Tiers</div>
+              <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+                <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Standard (Lv 1)</div>
+                <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Great Ball (Lv 20)</div>
+                <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-800 inline-block border border-yellow-500/50" /> Ultra Ball (Lv 30)</div>
+                <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" /> Gold Top (Lv 50)</div>
+                <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" style={{ boxShadow: "0 0 3px #ffcc44" }} /> Full Gold + Shimmer (Lv 75)</div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-mono text-[9px] text-purple-300/70 font-bold">Titles</div>
+              <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+                <div>Lv 1: Fresh Spawn / Rookie</div>
+                <div>Lv 5: Apprentice / Initiate</div>
+                <div>Lv 12: Journeyman / Scout</div>
+                <div>Lv 20: Veteran / Knight</div>
+                <div>Lv 30: Expert / Adept</div>
+                <div>Lv 40: Commander / Sage</div>
+                <div>Lv 50: Grand Master / Champion</div>
+                <div>Lv 70: Ascended / Exalted</div>
+                <div>Lv 90: Legendary / Mythic</div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-mono text-[9px] text-cyan-300/70 font-bold">Achievements</div>
+              <div className="font-mono text-[8px] text-white/40 space-y-0.5">
+                <div>👑 Centurion — Reach Lv 50</div>
+                <div>🧠 Polymath — Master 5+ tools (50 uses each)</div>
+                <div>🏃 Marathon — 2-hour streak</div>
+                <div>🐚 Shell Shocked — 1000 Bash uses</div>
+                <div>💥 Critical Mass — 100 critical hits</div>
+              </div>
+            </div>
+          </>)}
         </div>
       )}
     </div>
@@ -569,8 +644,8 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
           )}
         </div>
 
-        {/* Game guide — only visible during game mode */}
-        {gameModeOn && <GameGuide />}
+        {/* Unified help + game guide */}
+        <HelpGuide />
 
         {/* Edit button + dropdown */}
         <div ref={editPanelRef} className="relative">

@@ -413,6 +413,9 @@ app.get("/api/claw-health", async (_req, res) => {
     }
     res.json({
       reachable: true,
+      clawMode: activeClaw,
+      circuitBreakerOpen: clawCircuitOpen,
+      bleConnected: isBleConnected(),
       yeelightConnected: statusData.connected === true,
       slots,
       activeSlots: slots.filter((s: string) => s !== "off").length,
@@ -435,7 +438,7 @@ app.get("/api/claw-health", async (_req, res) => {
       })) ?? undefined,
     });
   } catch {
-    res.json({ reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
+    res.json({ reachable: false, clawMode: activeClaw, circuitBreakerOpen: clawCircuitOpen, bleConnected: isBleConnected(), yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
   }
 });
 

@@ -12,6 +12,7 @@ export function StatusBar() {
   const gameModeOn = useAgentOfficeStore((s) => s.gameModeOn);
   const relayUnread = relayMessages.length - relaySeenCount;
 
+  const clawHealth = useAgentOfficeStore((s) => s.clawHealth);
   const ccMain = agents.filter((a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)).length;
   const ccSub = agents.filter((a) => a.source === "cc" && a.subagentClass !== null && a.subagentClass !== undefined).length;
   const ocCount = agents.filter((a) => a.source === "openclaw").length;
@@ -141,6 +142,24 @@ export function StatusBar() {
           OC: {ocCount}
         </span>
       )}
+      {/* Claw connection mode */}
+      {clawHealth && (
+        <span className={`flex items-center gap-1 ${
+          !clawHealth.reachable ? "text-red-400" :
+          clawHealth.clawMode === "fallback" ? "text-violet-400" : "text-green-400/60"
+        }`} title={
+          !clawHealth.reachable ? "Claw unreachable" :
+          clawHealth.clawMode === "fallback" ? "Connected via Tailscale" : "Connected via WiFi"
+        }>
+          <span className={`w-1.5 h-1.5 rounded-full inline-block ${
+            !clawHealth.reachable ? "bg-red-400" :
+            clawHealth.clawMode === "fallback" ? "bg-violet-400" : "bg-green-400/60"
+          }`} />
+          {!clawHealth.reachable ? "claw down" :
+           clawHealth.clawMode === "fallback" ? "tailscale" : "wifi"}
+        </span>
+      )}
+
       {status === "connected" && agents.length > 0 && (
         <button
           onClick={handleClear}

@@ -31,6 +31,9 @@ export interface UptimeMonitor {
 
 export interface ClawHealth {
   reachable: boolean;
+  clawMode?: "primary" | "fallback";
+  circuitBreakerOpen?: boolean;
+  bleConnected?: boolean;
   yeelightConnected: boolean;
   slots: string[];
   activeSlots: number;
@@ -152,6 +155,8 @@ interface AgentOfficeStore {
   setLuckyWheelAgent: (id: string | null) => void;
   storageWarning: boolean;
   dismissStorageWarning: () => void;
+  toasts: Array<{ id: string; message: string; type: "info" | "warn" | "success"; ts: number }>;
+  addToast: (message: string, type?: "info" | "warn" | "success") => void;
 }
 
 const initialTower = loadTowerPrefs();
@@ -184,6 +189,14 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
   setLuckyWheelAgent: (id) => set({ luckyWheelAgent: id }),
   storageWarning: false,
   dismissStorageWarning: () => set({ storageWarning: false }),
+  toasts: [],
+  addToast: (message, type = "info") => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    set({ toasts: [...get().toasts, { id, message, type, ts: Date.now() }] });
+    setTimeout(() => {
+      set({ toasts: get().toasts.filter(t => t.id !== id) });
+    }, 5000);
+  },
   hudPosition: (localStorage.getItem("agent-office-hud-pos") as HudPosition) || "top-left",
   levelUpEvents: [],
   addLevelUp: (agentId, name, level, teamColor) => {
@@ -231,12 +244,82 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
         merged.push(old);
       }
     }
+    // Debug-only toasts for agent arrivals
+    if (get().debugOn) {
+      const prevIds = new Set(prev.map(a => a.id));
+      for (const a of merged) {
+        if (!prevIds.has(a.id) && a.source === "cc" && a.subagentClass === null) {
+          get().addToast(`${a.name} joined`, "info");
+        }
+      }
+    }
+
     set({ agents: merged });
   },
   selectAgent: (id) => set({ selectedAgentId: id }),
-  setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
+  setConnectionStatus: (connectionStatus) => {
+    const prev = get().connectionStatus;
+    if (prev !== connectionStatus) {
+      if (connectionStatus === "disconnected" && prev === "connected") {
+        get().addToast("Server connection lost", "warn");
+      } else if (connectionStatus === "connected" && prev !== "connected") {
+        get().addToast("Server connected", "success");
+      }
+    }
+    set({ connectionStatus });
+  },
   setMonitors: (monitors) => set({ monitors, monitorsLoaded: true }),
-  setClawHealth: (clawHealth) => set({ clawHealth }),
+  setClawHealth: (clawHealth) => {
+    const prev = get().clawHealth;
+    const toast = get().addToast;
+
+    // Detect claw mode changes (WiFi ↔ Tailscale)
+    if (prev?.clawMode && clawHealth.clawMode && prev.clawMode !== clawHealth.clawMode) {
+      if (clawHealth.clawMode === "fallback") {
+        toast("Switched to Tailscale (WiFi unreachable)", "warn");
+      } else {
+        toast("Switched back to WiFi", "success");
+      }
+    }
+
+    // Claw reachability changes
+    if (prev && prev.reachable !== clawHealth.reachable) {
+      if (clawHealth.reachable) {
+        toast("Claw server connected", "success");
+      } else {
+        toast("Claw server unreachable", "warn");
+      }
+    }
+
+    // Yeelight connection changes
+    if (prev && prev.yeelightConnected !== clawHealth.yeelightConnected) {
+      if (clawHealth.yeelightConnected) {
+        toast("Yeelight connected", "success");
+      } else {
+        toast("Yeelight disconnected", "warn");
+      }
+    }
+
+    // BLE subscriber changes
+    if (prev && prev.bleConnected !== clawHealth.bleConnected) {
+      if (clawHealth.bleConnected) {
+        toast("ESP32 connected via BLE", "success");
+      } else if (prev.bleConnected) {
+        toast("ESP32 BLE disconnected", "warn");
+      }
+    }
+
+    // Debug-only: circuit breaker state changes
+    if (get().debugOn && prev && prev.circuitBreakerOpen !== clawHealth.circuitBreakerOpen) {
+      if (clawHealth.circuitBreakerOpen) {
+        toast("Circuit breaker OPEN — pausing claw requests", "warn");
+      } else {
+        toast("Circuit breaker closed — resuming", "info");
+      }
+    }
+
+    set({ clawHealth });
+  },
   setStatusPosterOn: (statusPosterOn) => set({ statusPosterOn }),
   setHealthPosterOn: (healthPosterOn) => set({ healthPosterOn }),
   toggleClawDetail: () => set({ clawDetailOpen: !get().clawDetailOpen }),

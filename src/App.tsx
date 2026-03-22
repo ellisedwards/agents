@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
 import { useDemoAgents } from "@/hooks/use-demo-agents";
 import { useAgentSSE } from "@/hooks/use-agent-sse";
 import { useAgentOfficeStore } from "@/components/store";
@@ -10,6 +10,8 @@ import { SpeechBubbles } from "@/components/overlay/speech-bubble";
 import { PixelTower } from "@/components/overlay/pixel-tower";
 import { DebugPanel } from "@/components/overlay/debug-panel";
 import { PixelEditor } from "@/components/overlay/pixel-editor";
+import { Toasts } from "@/components/overlay/toasts";
+// HelpGuide is now inside agent-labels.tsx (unified ? panel in top bar)
 
 const LazySpriteEditor = lazy(() =>
   import("@/components/sprite-editor/SpriteEditor").then(m => ({ default: m.SpriteEditor }))
@@ -52,6 +54,21 @@ export function App() {
   useDemoAgents(isDemo);
   useAgentSSE(!isDemo);
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ignore when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const s = useAgentOfficeStore.getState();
+      switch (e.key.toLowerCase()) {
+        case "d": s.setDebugOn(!s.debugOn); break;
+        case "l": s.setLabelsOn(!s.labelsOn); break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   return (
     <div className="relative w-full h-screen bg-[#08080e] flex items-center justify-center">
       <OfficeCanvas onTransformChange={setTransform} canvasRef={canvasRef} />
@@ -60,6 +77,7 @@ export function App() {
       <SpeechBubbles transform={transform} />
       <PixelTower />
       <StatusBar />
+      <Toasts />
       {debugOn && <DebugPanel />}
 
       {/* Claw health detail panel — draggable */}
