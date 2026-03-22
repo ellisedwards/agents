@@ -42,7 +42,7 @@ function Panel({ pixels, px, gap }: { pixels: string[]; px: number; gap: number 
               top: row * (px + gap),
               width: px,
               height: px,
-              backgroundColor: isLit ? displayColor : anyLit ? "rgba(255,255,255,0.06)" : "#000000",
+              backgroundColor: isLit ? displayColor : "transparent",
               borderRadius: px / 2,
               boxShadow: isLit
                 ? `0 0 ${px}px ${displayColor}aa, 0 0 ${px * 2}px ${displayColor}44`
