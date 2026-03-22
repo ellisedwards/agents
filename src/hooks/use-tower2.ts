@@ -1,15 +1,17 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 
-const TOWER2_ENDPOINT = "/api/tower2-status";
 const POLL_INTERVAL = 250;
 
 export interface Tower2Data {
-  mode: string;       // thinking, typing, done, dots, water, meds, alert, idle
+  mode: string;
   animating: boolean;
   dots: { name: string; status: string }[];
+  pixels: string[];
+  width: number;
+  height: number;
 }
 
-const EMPTY: Tower2Data = { mode: "idle", animating: false, dots: [] };
+const EMPTY: Tower2Data = { mode: "idle", animating: false, dots: [], pixels: [], width: 5, height: 10 };
 
 export function useTower2() {
   const [data, setData] = useState<Tower2Data>(EMPTY);
@@ -22,11 +24,11 @@ export function useTower2() {
     async function poll() {
       while (active) {
         try {
-          const res = await fetch(TOWER2_ENDPOINT, { signal: AbortSignal.timeout(3000) });
+          const res = await fetch("/api/tower2-pixels", { signal: AbortSignal.timeout(3000) });
           if (res.ok) {
             const json = await res.json();
             if (active && json.ok) {
-              setData(json);
+              setData(prev => ({ ...prev, ...json }));
               setConnected(true);
               failures = 0;
             }

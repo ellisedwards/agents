@@ -379,7 +379,17 @@ app.get("/api/tower2-status", async (_req, res) => {
     const data = await curlRaw(tower2Url, "/status", 2);
     res.json(data);
   } catch {
-    res.json({ ok: false, mode: "offline", animating: false, dots: [] });
+    res.json({ ok: false, mode: "offline", animating: false, dots: [], pixels: [] });
+  }
+});
+
+app.get("/api/tower2-pixels", async (_req, res) => {
+  try {
+    const tower2Url = `http://${getActiveClawHost()}:9998`;
+    const data = await curlRaw(tower2Url, "/pixels", 2);
+    res.json(data);
+  } catch {
+    res.json({ ok: false, pixels: [], width: 5, height: 10, mode: "offline" });
   }
 });
 
