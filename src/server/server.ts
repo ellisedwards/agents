@@ -7,6 +7,16 @@ import { loadConfig, clawBaseUrl } from "./config";
 import { createWatcher } from "./agents/watcher-singleton";
 import type { AgentState } from "../shared/types";
 import { startBleBridge, updateBleState, isBleConnected } from "./ble-bridge";
+import { MAGE_COLORS, MAGE_WIDTH, MAGE_HEIGHT, makeMageSprite, makeMageWalk1, makeMageWalk2 } from "../components/characters/colored-mages";
+import { CLAWD_SPRITES, CLAWD_WIDTH, CLAWD_HEIGHT } from "../components/characters/clawd";
+import type { PixelRect } from "../components/characters/clawd";
+import { CHARMANDER_SPRITES, CHARMANDER_WIDTH, CHARMANDER_HEIGHT } from "../components/characters/charmander";
+import { SQUIRTLE_SPRITES, SQUIRTLE_WIDTH, SQUIRTLE_HEIGHT } from "../components/characters/squirtle";
+import { BULBASAUR_SPRITES, BULBASAUR_WIDTH, BULBASAUR_HEIGHT } from "../components/characters/bulbasaur";
+import { MEW_SPRITES, MEW_WIDTH, MEW_HEIGHT, MEW_WALK1, MEW_WALK2, MEW_SLEEP } from "../components/characters/mew";
+import { TRAINER_SPRITES, TRAINER_BLINK, TRAINER_WIDTH, TRAINER_HEIGHT } from "../components/characters/trainer";
+import { PIKACHU_SPRITES, PIKACHU_WIDTH, PIKACHU_HEIGHT, PIKACHU_WALK1, PIKACHU_WALK2 } from "../components/characters/pikachu";
+import { CLAW_SPRITES, CLAW_WIDTH, CLAW_HEIGHT } from "../components/characters/claw";
 
 // --- Claw API response types ---
 interface ClawStatus {
@@ -307,8 +317,50 @@ const MAGE_SPRITE_NAMES = ["mage-blue", "mage-red", "mage-purple", "mage-orange"
 let lastBodyColors: string[] = [];
 let lastHirstState = "off";
 
+// Simulated tower colors from local CC agent activity (used when claw unreachable)
+const HIRST_PALETTE = [
+  "#5ea87a", "#d4a03c", "#4a9bc7", "#7b68ae", "#cc7833", "#4daa8d",
+  "#6b9e8a", "#8baa3c", "#d46a4e", "#5c8dbf", "#5b9a7c", "#78b5a0",
+];
+let simHirstFrame = 0;
+
+function generateSimulatedBodyColors(): string[] {
+  const colors: string[] = Array(50).fill("#000000");
+  simHirstFrame++;
+
+  const agents = watcher.getAgents().filter(a => !a.parentId).slice(0, 4);
+  const quadrantPixels = [
+    [0,1,5,6],     // slot 0: bottom-left 2x2
+    [3,4,8,9],     // slot 1: bottom-right 2x2
+    [15,16,20,21], // slot 2: top-left 2x2
+    [18,19,23,24], // slot 3: top-right 2x2
+  ];
+
+  agents.forEach((agent, i) => {
+    const tool = agent.currentTool || "";
+    const state = agent.state || "idle";
+    let color = "#000000";
+
+    if (state === "thinking") {
+      const wave = (Math.sin(Date.now() / 1000 * 0.7 + i * 1.5) + 1) / 2;
+      const r = Math.floor(200 * (0.3 + wave * 0.7));
+      const g = Math.floor(140 * (0.3 + wave * 0.7));
+      const b = Math.floor(30 * (0.2 + wave * 0.3));
+      color = `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
+    } else if (tool && (state === "typing" || state === "reading")) {
+      color = HIRST_PALETTE[(simHirstFrame + i) % HIRST_PALETTE.length];
+    }
+
+    for (const px of quadrantPixels[i] ?? []) {
+      colors[px] = color;
+    }
+  });
+
+  return colors;
+}
+
 // Keep body colors and hirst state updated from claw polling
-// (piggyback on the BLE interval or add a dedicated one)
+// Falls back to simulated colors when claw is unreachable
 setInterval(async () => {
   try {
     const [pixelsData, statusData] = await Promise.all([
@@ -320,14 +372,47 @@ setInterval(async () => {
       const bottom = pixelsData.panels.bottom || [];
       lastBodyColors = [...middle.slice(0, 25), ...bottom.slice(0, 25)];
     }
+
+    // Use simulated colors when: claw unreachable OR tower is dark but agents are active
+    const allBlack = lastBodyColors.length === 0 || lastBodyColors.every(c => c === "#000000");
+    const activeAgents = watcher.getAgents().filter(a => !a.parentId && (a.state === "typing" || a.state === "reading" || a.state === "thinking"));
+    if ((!pixelsData?.panels || allBlack) && activeAgents.length > 0) {
+      lastBodyColors = generateSimulatedBodyColors();
+    }
+
     if (statusData?.claw_activity) {
       const a = statusData.claw_activity;
       lastHirstState = a === "typing" ? "running" : a === "thinking" ? "in" : "off";
+    }
+    // Also derive hirst from local agents when claw has no activity
+    if (!statusData?.claw_activity || statusData.claw_activity === "idle" || statusData.claw_activity === "done") {
+      const agents = watcher.getAgents().filter(a => !a.parentId);
+      const anyTyping = agents.some(a => a.state === "typing" || a.state === "reading");
+      const anyThinking = agents.some(a => a.state === "thinking");
+      if (anyTyping || anyThinking) {
+        lastHirstState = anyTyping ? "running" : "in";
+      }
     }
   } catch {}
 }, 1000);
 
 let espLastPoll = 0;
+
+// Sticky starter assignment for ESP32 — mirrors client-side logic
+const ESP_STARTERS = ["charmander", "squirtle", "bulbasaur", "mew"];
+const espStickyStarters = new Map<string, string>();
+function espAssignStarter(agentId: string, activeIds: Set<string>): string {
+  if (espStickyStarters.has(agentId)) return espStickyStarters.get(agentId)!;
+  // Clean up departed agents
+  for (const id of espStickyStarters.keys()) {
+    if (!activeIds.has(id)) espStickyStarters.delete(id);
+  }
+  const used = new Set(espStickyStarters.values());
+  let pick = ESP_STARTERS.find(s => !used.has(s));
+  if (!pick) pick = ESP_STARTERS[espStickyStarters.size % ESP_STARTERS.length];
+  espStickyStarters.set(agentId, pick);
+  return pick;
+}
 
 app.get("/api/esp32-status", (_req, res) => {
   espLastPoll = Date.now();
@@ -335,6 +420,8 @@ app.get("/api/esp32-status", (_req, res) => {
   const ccMain = allAgents
     .filter(a => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined))
     .slice(0, 4); // max 4 slots
+
+  const activeIds = new Set(ccMain.map(a => a.id));
 
   const agents = ccMain.map(a => {
     const state = (a.state === "typing" || a.state === "reading" || a.state === "thinking") ? "active"
@@ -344,7 +431,7 @@ app.get("/api/esp32-status", (_req, res) => {
       name: a.gameName || a.name,
       level: a.level ?? 0,
       state,
-      sprite: MAGE_SPRITE_NAMES[a.teamColor] || "mage-blue",
+      sprite: espAssignStarter(a.id, activeIds),
     };
     if (state === "active") {
       entry.activity = a.currentTool || a.state;
@@ -576,8 +663,37 @@ app.get("/api/pixels", async (_req, res) => {
       clawGetSafe("/status").catch(() => null) as Promise<ClawStatus | null>,
       clawGetSafe("/hook/agent-slots").catch(() => null) as Promise<ClawSlots | null>,
     ]);
-    if (!pixelsData?.panels) return res.status(502).json({ error: "claw unreachable" });
-    const data = pixelsData;
+    let data: any;
+    const hasRealPixels = pixelsData?.panels;
+    const allPanelsBlack = hasRealPixels &&
+      [...(pixelsData.panels.middle || []), ...(pixelsData.panels.bottom || [])].every((c: string) => c === "#000000");
+    const localActive = watcher.getAgents().filter(a => !a.parentId && (a.state === "typing" || a.state === "reading" || a.state === "thinking")).length > 0;
+
+    if (hasRealPixels && !allPanelsBlack) {
+      data = pixelsData;
+    } else if (localActive) {
+      // Simulated mode — tower dark or unreachable but agents are active
+      const simColors = generateSimulatedBodyColors();
+      data = {
+        panels: {
+          middle: simColors.slice(0, 25),
+          bottom: simColors.slice(25, 50),
+          top: Array(25).fill("#000000"),
+        },
+        simulated: true,
+      };
+    } else if (hasRealPixels) {
+      data = pixelsData;
+    } else {
+      data = {
+        panels: {
+          middle: Array(25).fill("#000000"),
+          bottom: Array(25).fill("#000000"),
+          top: Array(25).fill("#000000"),
+        },
+        simulated: true,
+      };
+    }
     if (statusData) {
       data.clawActivity = statusData.claw_activity || "idle";
     }
@@ -704,6 +820,85 @@ app.post("/api/save-sprite", express.json({ limit: "10mb" }), (req, res) => {
   } catch (err: any) {
     res.json({ ok: false, error: err.message });
   }
+});
+
+// --- Sprite data endpoint for ESP32 ---
+// Serves PixelRect[] sprite data for all character types.
+type SpriteEntry = { width: number; height: number; frames: { name: string; pixels: PixelRect[] }[] };
+
+const AGENT_STATES = ["idle", "typing", "reading", "thinking", "waiting"] as const;
+function agentFrames(sprites: Record<string, PixelRect[]>): { name: string; pixels: PixelRect[] }[] {
+  return AGENT_STATES.map(s => ({ name: s, pixels: sprites[s] }));
+}
+
+const spriteRegistry: Record<string, SpriteEntry> = {};
+
+// CC main agents (starter pokemon + mew)
+spriteRegistry["charmander"] = { width: CHARMANDER_WIDTH, height: CHARMANDER_HEIGHT, frames: agentFrames(CHARMANDER_SPRITES) };
+spriteRegistry["squirtle"] = { width: SQUIRTLE_WIDTH, height: SQUIRTLE_HEIGHT, frames: agentFrames(SQUIRTLE_SPRITES) };
+spriteRegistry["bulbasaur"] = { width: BULBASAUR_WIDTH, height: BULBASAUR_HEIGHT, frames: agentFrames(BULBASAUR_SPRITES) };
+spriteRegistry["mew"] = {
+  width: MEW_WIDTH, height: MEW_HEIGHT,
+  frames: [...agentFrames(MEW_SPRITES), { name: "walk1", pixels: MEW_WALK1 }, { name: "walk2", pixels: MEW_WALK2 }, { name: "sleep", pixels: MEW_SLEEP }],
+};
+spriteRegistry["clawd"] = { width: CLAWD_WIDTH, height: CLAWD_HEIGHT, frames: agentFrames(CLAWD_SPRITES) };
+
+// Manager
+spriteRegistry["trainer"] = {
+  width: TRAINER_WIDTH, height: TRAINER_HEIGHT,
+  frames: [...agentFrames(TRAINER_SPRITES), { name: "blink", pixels: TRAINER_BLINK }],
+};
+
+// Subagents
+spriteRegistry["claw"] = { width: CLAW_WIDTH, height: CLAW_HEIGHT, frames: agentFrames(CLAW_SPRITES) };
+spriteRegistry["pikachu"] = {
+  width: PIKACHU_WIDTH, height: PIKACHU_HEIGHT,
+  frames: [...agentFrames(PIKACHU_SPRITES), { name: "walk1", pixels: PIKACHU_WALK1 }, { name: "walk2", pixels: PIKACHU_WALK2 }],
+};
+
+// Mages
+const MAGE_NAME_MAP: Record<string, number> = {
+  "mage-blue": 0, "mage-red": 1, "mage-purple": 2,
+  "mage-orange": 3, "mage-gold": 4, "mage-teal": 5,
+};
+for (const [name, idx] of Object.entries(MAGE_NAME_MAP)) {
+  const color = MAGE_COLORS[idx];
+  spriteRegistry[name] = {
+    width: MAGE_WIDTH, height: MAGE_HEIGHT,
+    frames: [
+      { name: "idle", pixels: makeMageSprite(color) },
+      { name: "walk1", pixels: makeMageWalk1(color) },
+      { name: "walk2", pixels: makeMageWalk2(color) },
+    ],
+  };
+}
+
+app.get("/api/sprites/:name", (req, res) => {
+  const { name } = req.params;
+  const sprite = spriteRegistry[name];
+  if (!sprite) {
+    return res.status(404).json({ error: `Unknown sprite: ${name}`, available: Object.keys(spriteRegistry) });
+  }
+
+  // Optional: ?frame=idle to get just one frame
+  const frameName = req.query.frame as string | undefined;
+  if (frameName) {
+    const frame = sprite.frames.find(f => f.name === frameName);
+    if (!frame) {
+      return res.status(404).json({ error: `Unknown frame: ${frameName}`, available: sprite.frames.map(f => f.name) });
+    }
+    return res.json({ name, width: sprite.width, height: sprite.height, frame: frame.name, pixels: frame.pixels });
+  }
+
+  res.json({ name, ...sprite });
+});
+
+// List all available sprites
+app.get("/api/sprites", (_req, res) => {
+  const list = Object.entries(spriteRegistry).map(([name, s]) => ({
+    name, width: s.width, height: s.height, frames: s.frames.map(f => f.name),
+  }));
+  res.json(list);
 });
 
 // --- Static files (production) ---

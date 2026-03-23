@@ -1,6 +1,6 @@
 // src/server/ble-bridge.ts
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
+import { createRequire as _cr } from "module";
+const _require = _cr(import.meta.url);
 
 const PIXEL_SERVICE_UUID    = "a0f10001000000000000000000000000";
 const PIXEL_CHAR_UUID       = "a0f10002000000000000000000000000";
@@ -47,7 +47,7 @@ export function startBleBridge(): void {
   if (started) return;
 
   try {
-    const blenoLib = require("@stoprocent/bleno");
+    const blenoLib = _require("@stoprocent/bleno");
     bleno = blenoLib.withBindings("mac");
   } catch (err: any) {
     console.log("[ble] bleno not available:", err.message);
