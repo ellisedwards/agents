@@ -495,6 +495,7 @@ function drawWoodSign(
 // Status poster — on the back wall near the fireplace
 const STATUS_UP = "#22c55e";
 const STATUS_DOWN = "#ef4444";
+const STATUS_AWAY = "#a855f7";
 const BAR_COLOR = "#2a2a2a";
 
 function renderStatusPoster(
@@ -670,7 +671,10 @@ function renderHealthPoster(
   ctx.fillRect(px + 1, r1y, 3, 1);     // top bar
   ctx.fillRect(px, r1y + 1, 1, 1);     // left side
   ctx.fillRect(px + 1, r1y + 2, 3, 1); // bottom bar
-  ctx.fillStyle = clawHealth.reachable ? STATUS_UP : STATUS_DOWN;
+  const modeColor = clawHealth.mode === "home" ? STATUS_UP
+    : clawHealth.mode === "away" ? STATUS_AWAY
+    : STATUS_DOWN; // offline or null
+  ctx.fillStyle = modeColor;
   ctx.fillRect(dotCol, r1y, 2, 2);
 
   // Row 2 (bottom): yeelight — rays around a dot
