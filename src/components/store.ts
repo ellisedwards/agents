@@ -284,9 +284,9 @@ export const useAgentOfficeStore = create<AgentOfficeStore>((set, get) => ({
     // Detect claw mode changes (WiFi ↔ Tailscale)
     if (prev?.clawMode && clawHealth.clawMode && prev.clawMode !== clawHealth.clawMode) {
       if (clawHealth.clawMode === "fallback") {
-        toast("Switched to Tailscale (WiFi unreachable)", "warn");
+        toast("HOME network not detected — using Tailscale", "warn");
       } else {
-        toast("Switched back to WiFi", "success");
+        toast("HOME network connected", "success");
       }
     }
 
