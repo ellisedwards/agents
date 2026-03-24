@@ -494,7 +494,12 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     style={{ gridTemplateColumns: "9px 96px auto 120px 8px" }}>
                     {/* Row 1 */}
                     <div className="w-[9px] h-[9px] rounded-full" style={{ backgroundColor: teamHex }} />
-                    <span className="font-semibold text-[14px] text-white truncate leading-tight">
+                    <span className="font-semibold text-[14px] text-white truncate leading-tight" title={(() => {
+                      const m = a.id.match(/projects\/([^/]+)\//);
+                      const proj = m ? m[1].replace(/-/g, "/").replace(/^\//, "") : "unknown";
+                      const sid = a.id.replace(/.*\//, "").replace(".jsonl", "").slice(0, 8);
+                      return `${proj}\nsession: ${sid}\nslot: ${a.name}`;
+                    })()}>
                       {(a.gameName ?? a.name) + (nameSuffix.get(a.id) ?? "")}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
                     </span>
                     <span className="font-semibold text-[14px] whitespace-nowrap" style={{ opacity: isDupe ? 0.25 : 1 }}>
