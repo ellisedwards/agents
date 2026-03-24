@@ -47,6 +47,19 @@ export interface ClawHealth {
   zones?: { thinking: string; display: string; context: string };
   waitingCount?: number;
   transitionInProgress?: boolean;
+  towerEngine?: {
+    active: boolean;
+    hirstPhase: string;
+    slotStates: string[];
+  };
+  esp32?: {
+    polling: boolean;
+    lastPoll: number | null;
+  };
+  recovery?: {
+    enabled: boolean;
+    inProgress: boolean;
+  };
 }
 
 export type TimeMode = "auto" | "day" | "dawn" | "night";

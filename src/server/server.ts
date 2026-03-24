@@ -656,6 +656,15 @@ app.get("/api/claw-health", async (_req, res) => {
     circuitBreakerOpen: clawCircuitOpen,
     bleConnected: isBleConnected(),
     espConnected: (Date.now() - espLastPoll) < 5000,
+    towerEngine: towerEngine.getStatus(),
+    esp32: {
+      polling: (Date.now() - espLastPoll) < 5000,
+      lastPoll: espLastPoll > 0 ? espLastPoll : null,
+    },
+    recovery: {
+      enabled: isHome(),
+      inProgress: autoRecoveryInProgress,
+    },
   };
 
   // AWAY/OFFLINE: don't poll claw, just report local state

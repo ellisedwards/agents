@@ -222,6 +222,15 @@ export class TowerEngine {
     return this.slotStates.some(s => s !== "off") || this.hirstPhase !== "off";
   }
 
+  /** Summary for status panel */
+  getStatus(): { active: boolean; hirstPhase: string; slotStates: string[] } {
+    return {
+      active: this.isActive(),
+      hirstPhase: this.hirstPhase,
+      slotStates: [...this.slotStates],
+    };
+  }
+
   // --- Main tick (30fps) ---
   private tick(): void {
     const now = Date.now();
