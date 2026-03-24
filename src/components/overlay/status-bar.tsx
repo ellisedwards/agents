@@ -142,21 +142,22 @@ export function StatusBar() {
           OC: {ocCount}
         </span>
       )}
-      {/* Claw connection mode */}
+      {/* Connection mode */}
       {clawHealth && (
         <span className={`flex items-center gap-1 ${
-          !clawHealth.reachable ? "text-red-400" :
-          clawHealth.clawMode === "fallback" ? "text-violet-400" : "text-green-400/60"
+          clawHealth.mode === "home" ? "text-green-400/60" :
+          clawHealth.mode === "away" ? "text-violet-400" : "text-red-400"
         }`} title={
-          !clawHealth.reachable ? "Claw unreachable" :
-          clawHealth.clawMode === "fallback" ? "Connected via Tailscale" : "Connected via WiFi"
+          clawHealth.mode === "home" ? "HOME — connected to claw via LAN" :
+          clawHealth.mode === "away" ? "AWAY — local tower engine, claw via Tailscale" :
+          "OFFLINE — local tower engine only"
         }>
           <span className={`w-1.5 h-1.5 rounded-full inline-block ${
-            !clawHealth.reachable ? "bg-red-400" :
-            clawHealth.clawMode === "fallback" ? "bg-violet-400" : "bg-green-400/60"
+            clawHealth.mode === "home" ? "bg-green-400/60" :
+            clawHealth.mode === "away" ? "bg-violet-400" : "bg-red-400"
           }`} />
-          {!clawHealth.reachable ? "claw down" :
-           clawHealth.clawMode === "fallback" ? "tailscale" : "wifi"}
+          {clawHealth.mode === "home" ? "home" :
+           clawHealth.mode === "away" ? "away" : "offline"}
         </span>
       )}
       {/* Yeelight disconnected warning — only when claw is up but bulb isn't */}

@@ -69,11 +69,16 @@ export function parseTranscriptLine(line: string): ParsedEvent | null {
       return { type: "state_change", state, toolName: name };
     }
 
-    // Text-only assistant message → thinking
+    // Text-only assistant message
     const hasText = content.some(
       (c: any) => c.type === "text" && c.text?.length > 0
     );
     if (hasText) {
+      // Text-only with stop_reason=end_turn → turn is actually done
+      // (no more tool calls coming — agent finished responding)
+      if (parsed.message?.stop_reason === "end_turn") {
+        return { type: "turn_end" };
+      }
       return { type: "state_change", state: "thinking" };
     }
   }

@@ -32,6 +32,7 @@ export interface UptimeMonitor {
 export interface ClawHealth {
   reachable: boolean;
   clawMode?: "primary" | "fallback";
+  mode?: "home" | "away" | "offline";
   circuitBreakerOpen?: boolean;
   bleConnected?: boolean;
   espConnected?: boolean;

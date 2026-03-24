@@ -7,6 +7,7 @@ import { loadConfig, clawBaseUrl } from "./config";
 import { createWatcher } from "./agents/watcher-singleton";
 import type { AgentState } from "../shared/types";
 import { startBleBridge, updateBleState, isBleConnected } from "./ble-bridge";
+import { TowerEngine } from "./tower-engine";
 import { MAGE_COLORS, MAGE_WIDTH, MAGE_HEIGHT, makeMageSprite, makeMageWalk1, makeMageWalk2 } from "../components/characters/colored-mages";
 import { CLAWD_SPRITES, CLAWD_WIDTH, CLAWD_HEIGHT } from "../components/characters/clawd";
 import type { PixelRect } from "../components/characters/clawd";
@@ -57,26 +58,41 @@ interface RelayMessage {
 // and http.get fail with EHOSTUNREACH even after the host comes back.
 // curl is immune because each invocation is a fresh process.
 
-// Host failover: try primary (WiFi), fall back to Tailscale
+// --- Connection mode ---
+// Agent Office knows what mode it's in. Everything else reads this.
+type ConnectionMode = "home" | "away" | "offline";
+let connectionMode: ConnectionMode = "offline";
 let activeClaw: "primary" | "fallback" = "primary";
 let primaryCheckTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Current mode — exposed to all endpoints and downstream tools */
+export function getConnectionMode(): ConnectionMode { return connectionMode; }
+function isHome(): boolean { return connectionMode === "home"; }
+function isAway(): boolean { return connectionMode === "away"; }
 
 function getClawUrl(): string {
   return activeClaw === "primary" ? claw : clawFallback;
 }
 
+function setMode(mode: ConnectionMode) {
+  if (mode !== connectionMode) {
+    connectionMode = mode;
+    console.log(`[mode] ${mode.toUpperCase()}${mode === "home" ? ` (${claw})` : mode === "away" ? ` (${clawFallback})` : ""}`);
+  }
+}
+
 function switchToFallback() {
   if (activeClaw === "fallback") return;
   activeClaw = "fallback";
-  console.log(`[claw] switched to fallback (${clawFallback})`);
+  setMode(clawFallback ? "away" : "offline");
   // Periodically try primary again
   if (!primaryCheckTimer) {
     primaryCheckTimer = setInterval(() => {
       curlRaw(claw, "/status", 1).then(() => {
         activeClaw = "primary";
-        console.log(`[claw] switched back to primary (${claw})`);
+        setMode("home");
         if (primaryCheckTimer) { clearInterval(primaryCheckTimer); primaryCheckTimer = null; }
-      }).catch(() => {}); // still down, stay on fallback
+      }).catch(() => {}); // still down, stay on fallback/away
     }, 60_000);
   }
 }
@@ -317,83 +333,45 @@ const MAGE_SPRITE_NAMES = ["mage-blue", "mage-red", "mage-purple", "mage-orange"
 let lastBodyColors: string[] = [];
 let lastHirstState = "off";
 
-// Simulated tower colors from local CC agent activity (used when claw unreachable)
-const HIRST_PALETTE = [
-  "#5ea87a", "#d4a03c", "#4a9bc7", "#7b68ae", "#cc7833", "#4daa8d",
-  "#6b9e8a", "#8baa3c", "#d46a4e", "#5c8dbf", "#5b9a7c", "#78b5a0",
-];
-let simHirstFrame = 0;
+// Tower engine (imported above) replaces the old crude simulation.
+// Hook events drive the engine state machine, which produces proper 75-pixel
+// hirst animations matching the physical tower 1:1.
 
-function generateSimulatedBodyColors(): string[] {
-  const colors: string[] = Array(50).fill("#000000");
-  simHirstFrame++;
-
-  const agents = watcher.getAgents().filter(a => !a.parentId).slice(0, 4);
-  const quadrantPixels = [
-    [0,1,5,6],     // slot 0: bottom-left 2x2
-    [3,4,8,9],     // slot 1: bottom-right 2x2
-    [15,16,20,21], // slot 2: top-left 2x2
-    [18,19,23,24], // slot 3: top-right 2x2
-  ];
-
-  agents.forEach((agent, i) => {
-    const tool = agent.currentTool || "";
-    const state = agent.state || "idle";
-    let color = "#000000";
-
-    if (state === "thinking") {
-      const wave = (Math.sin(Date.now() / 1000 * 0.7 + i * 1.5) + 1) / 2;
-      const r = Math.floor(200 * (0.3 + wave * 0.7));
-      const g = Math.floor(140 * (0.3 + wave * 0.7));
-      const b = Math.floor(30 * (0.2 + wave * 0.3));
-      color = `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
-    } else if (tool && (state === "typing" || state === "reading")) {
-      color = HIRST_PALETTE[(simHirstFrame + i) % HIRST_PALETTE.length];
-    }
-
-    for (const px of quadrantPixels[i] ?? []) {
-      colors[px] = color;
-    }
-  });
-
-  return colors;
-}
-
-// Keep body colors and hirst state updated from claw polling
-// Falls back to simulated colors when claw is unreachable
+// Keep body colors and hirst state updated.
+// HOME: poll claw for real pixel data.
+// AWAY/OFFLINE: use tower engine output. No claw requests.
 setInterval(async () => {
-  try {
-    const [pixelsData, statusData] = await Promise.all([
-      clawGet(claw, "/pixels", 2).catch(() => null) as Promise<any>,
-      clawGet(claw, "/status", 2).catch(() => null) as Promise<any>,
-    ]);
-    if (pixelsData?.panels) {
-      const middle = pixelsData.panels.middle || [];
-      const bottom = pixelsData.panels.bottom || [];
-      lastBodyColors = [...middle.slice(0, 25), ...bottom.slice(0, 25)];
-    }
-
-    // Use simulated colors when: claw unreachable OR tower is dark but agents are active
-    const allBlack = lastBodyColors.length === 0 || lastBodyColors.every(c => c === "#000000");
-    const activeAgents = watcher.getAgents().filter(a => !a.parentId && (a.state === "typing" || a.state === "reading" || a.state === "thinking"));
-    if ((!pixelsData?.panels || allBlack) && activeAgents.length > 0) {
-      lastBodyColors = generateSimulatedBodyColors();
-    }
-
-    if (statusData?.claw_activity) {
-      const a = statusData.claw_activity;
-      lastHirstState = a === "typing" ? "running" : a === "thinking" ? "in" : "off";
-    }
-    // Also derive hirst from local agents when claw has no activity
-    if (!statusData?.claw_activity || statusData.claw_activity === "idle" || statusData.claw_activity === "done") {
-      const agents = watcher.getAgents().filter(a => !a.parentId);
-      const anyTyping = agents.some(a => a.state === "typing" || a.state === "reading");
-      const anyThinking = agents.some(a => a.state === "thinking");
-      if (anyTyping || anyThinking) {
-        lastHirstState = anyTyping ? "running" : "in";
+  if (isHome()) {
+    // HOME mode — poll claw for real data
+    try {
+      const [pixelsData, statusData] = await Promise.all([
+        clawGet(claw, "/pixels", 2).catch(() => null) as Promise<any>,
+        clawGet(claw, "/status", 2).catch(() => null) as Promise<any>,
+      ]);
+      if (pixelsData?.panels) {
+        const middle = pixelsData.panels.middle || [];
+        const bottom = pixelsData.panels.bottom || [];
+        lastBodyColors = [...middle.slice(0, 25), ...bottom.slice(0, 25)];
       }
+      if (statusData?.claw_activity) {
+        const a = statusData.claw_activity;
+        lastHirstState = a === "typing" ? "running" : a === "thinking" ? "in" : "off";
+      }
+    } catch {
+      // Claw went down — switch to away
+      switchToFallback();
     }
-  } catch {}
+  } else {
+    // AWAY/OFFLINE — use tower engine, no claw requests
+    if (towerEngine.isActive()) {
+      const ep = towerEngine.getPixels();
+      lastBodyColors = [...ep.middle, ...ep.bottom];
+      lastHirstState = "running";
+    } else {
+      lastBodyColors = Array(50).fill("#000000");
+      lastHirstState = "off";
+    }
+  }
 }, 1000);
 
 let espLastPoll = 0;
@@ -424,7 +402,8 @@ app.get("/api/esp32-status", (_req, res) => {
   const activeIds = new Set(ccMain.map(a => a.id));
 
   const agents = ccMain.map(a => {
-    const state = (a.state === "typing" || a.state === "reading" || a.state === "thinking") ? "active"
+    const state = a.state === "thinking" ? "thinking"
+      : (a.state === "typing" || a.state === "reading") ? "active"
       : a.state === "idle" || a.state === "lounging" ? "waiting"
       : "off";
     const entry: Record<string, any> = {
@@ -456,6 +435,7 @@ app.get("/api/esp32-status", (_req, res) => {
     activeSlot,
     bodyColors: lastBodyColors,
     hirstState: lastHirstState,
+    mode: connectionMode,
   });
 });
 
@@ -523,6 +503,57 @@ app.post("/api/light-test", express.json(), async (req, res) => {
   }
 });
 
+// --- Hook proxy endpoints ---
+// Claude Code hooks fire here. Always updates local tower engine.
+// If claw is reachable (HOME mode), also forwards to claw.
+// If not (AWAY mode), local engine handles it — no wasted requests.
+
+app.get("/hook/prompt-start", (req, res) => {
+  const slot = parseInt(req.query.slot as string, 10) || 0;
+  const session_id = req.query.session_id || "";
+  const name = req.query.name || "";
+  // Always update local engine
+  towerEngine.onPromptStart(slot);
+  // Forward to claw only if reachable
+  if (!clawCircuitOpen) {
+    clawGet(claw, `/hook/prompt-start?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+app.get("/hook/thinking-start", (req, res) => {
+  const slot = parseInt(req.query.slot as string, 10) || 0;
+  const session_id = req.query.session_id || "";
+  const name = req.query.name || "";
+  towerEngine.onThinkingStart(slot);
+  if (!clawCircuitOpen) {
+    clawGet(claw, `/hook/thinking-start?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+app.get("/hook/thinking-end", (req, res) => {
+  const slot = parseInt(req.query.slot as string, 10) || 0;
+  const session_id = req.query.session_id || "";
+  const name = req.query.name || "";
+  towerEngine.onThinkingEnd(slot);
+  if (!clawCircuitOpen) {
+    clawGet(claw, `/hook/thinking-end?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+app.get("/hook/prompt-end", (req, res) => {
+  const slot = parseInt(req.query.slot as string, 10) || 0;
+  const session_id = req.query.session_id || "";
+  const name = req.query.name || "";
+  towerEngine.onPromptEnd(slot);
+  if (!clawCircuitOpen) {
+    clawGet(claw, `/hook/prompt-end?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
 // --- Lucky Pokeball multiplier ---
 app.post("/api/lucky-multiplier", express.json(), (req, res) => {
   const { agentId, multiplier, uses } = req.body;
@@ -550,6 +581,45 @@ app.post("/api/game-kill", (_req, res) => {
   res.json({ ok: true });
 });
 
+// --- Claw connection mode ---
+app.get("/api/claw-mode", (_req, res) => {
+  res.json({
+    mode: connectionMode,
+    active: activeClaw,
+    primary: claw,
+    fallback: clawFallback || null,
+    circuitOpen: clawCircuitOpen,
+    failCount: clawFailCount,
+  });
+});
+
+app.post("/api/claw-mode", express.json(), (req, res) => {
+  const { mode } = req.body;
+  if (mode === "primary") {
+    activeClaw = "primary";
+    clawCircuitOpen = false;
+    clawFailCount = 0;
+    if (primaryCheckTimer) { clearInterval(primaryCheckTimer); primaryCheckTimer = null; }
+    setMode("home");
+  } else if (mode === "fallback" || mode === "tailscale" || mode === "away") {
+    if (!clawFallback) return res.status(400).json({ error: "no fallback configured" });
+    activeClaw = "fallback";
+    clawCircuitOpen = false;
+    clawFailCount = 0;
+    setMode("away");
+  } else if (mode === "auto") {
+    // Reset to auto-detect: try primary, fail over naturally
+    activeClaw = "primary";
+    clawCircuitOpen = false;
+    clawFailCount = 0;
+    if (primaryCheckTimer) { clearInterval(primaryCheckTimer); primaryCheckTimer = null; }
+    setMode("offline"); // will re-detect on next poll
+  } else {
+    return res.status(400).json({ error: "mode must be primary, tailscale, or auto" });
+  }
+  res.json({ ok: true, active: activeClaw });
+});
+
 // --- Light brightness ---
 app.get("/api/brightness", async (_req, res) => {
   try {
@@ -575,6 +645,27 @@ app.get("/api/brightness/:level", async (req, res) => {
 
 // --- Claw health ---
 app.get("/api/claw-health", async (_req, res) => {
+  const base = {
+    clawMode: activeClaw,
+    mode: connectionMode,
+    circuitBreakerOpen: clawCircuitOpen,
+    bleConnected: isBleConnected(),
+    espConnected: (Date.now() - espLastPoll) < 5000,
+  };
+
+  // AWAY/OFFLINE: don't poll claw, just report local state
+  if (!isHome()) {
+    return res.json({
+      ...base,
+      reachable: false,
+      yeelightConnected: false,
+      slots: [],
+      activeSlots: 0,
+      matrixMode: null,
+    });
+  }
+
+  // HOME: poll claw for full health data
   try {
     const [statusData, pixelsData, slotsData, uptimeData] = await Promise.all([
       clawGetSafe("/status") as Promise<ClawStatus>,
@@ -582,7 +673,6 @@ app.get("/api/claw-health", async (_req, res) => {
       clawGetSafe("/hook/agent-slots").catch(() => null) as Promise<ClawSlots | null>,
       clawGetSafe("/hook/uptime-kuma").catch(() => null) as Promise<any>,
     ]);
-    // Derive slot status from actual pixel data (source of truth)
     const quadrantIndices = [[15,16,20,21],[18,19,23,24],[0,1,5,6],[3,4,8,9]];
     let slots = statusData.agent_slots?.slots || ["off","off","off","off"];
     if (pixelsData?.panels) {
@@ -592,11 +682,8 @@ app.get("/api/claw-health", async (_req, res) => {
       );
     }
     res.json({
+      ...base,
       reachable: true,
-      clawMode: activeClaw,
-      circuitBreakerOpen: clawCircuitOpen,
-      bleConnected: isBleConnected(),
-      espConnected: (Date.now() - espLastPoll) < 5000,
       yeelightConnected: statusData.connected === true,
       slots,
       activeSlots: slots.filter((s: string) => s !== "off").length,
@@ -619,8 +706,7 @@ app.get("/api/claw-health", async (_req, res) => {
       })) ?? undefined,
     });
   } catch {
-    res.json({ reachable: false, clawMode: activeClaw, circuitBreakerOpen: clawCircuitOpen, bleConnected: isBleConnected(),
-      espConnected: (Date.now() - espLastPoll) < 5000, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
+    res.json({ ...base, reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
   }
 });
 
@@ -657,53 +743,31 @@ app.post("/api/tower-reset", (_req, res) => {
 
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
-  try {
-    const [pixelsData, statusData, slotsData] = await Promise.all([
-      clawGetSafe("/pixels") as Promise<ClawPixels>,
-      clawGetSafe("/status").catch(() => null) as Promise<ClawStatus | null>,
-      clawGetSafe("/hook/agent-slots").catch(() => null) as Promise<ClawSlots | null>,
-    ]);
-    let data: any;
-    const hasRealPixels = pixelsData?.panels;
-    const allPanelsBlack = hasRealPixels &&
-      [...(pixelsData.panels.middle || []), ...(pixelsData.panels.bottom || [])].every((c: string) => c === "#000000");
-    const localActive = watcher.getAgents().filter(a => !a.parentId && (a.state === "typing" || a.state === "reading" || a.state === "thinking")).length > 0;
-
-    if (hasRealPixels && !allPanelsBlack) {
-      data = pixelsData;
-    } else if (localActive) {
-      // Simulated mode — tower dark or unreachable but agents are active
-      const simColors = generateSimulatedBodyColors();
-      data = {
-        panels: {
-          middle: simColors.slice(0, 25),
-          bottom: simColors.slice(25, 50),
-          top: Array(25).fill("#000000"),
-        },
-        simulated: true,
-      };
-    } else if (hasRealPixels) {
-      data = pixelsData;
-    } else {
-      data = {
-        panels: {
-          middle: Array(25).fill("#000000"),
-          bottom: Array(25).fill("#000000"),
-          top: Array(25).fill("#000000"),
-        },
-        simulated: true,
-      };
+  // HOME mode: use real pixel data from claw
+  if (isHome()) {
+    try {
+      const [pixelsData, statusData, slotsData] = await Promise.all([
+        clawGetSafe("/pixels") as Promise<ClawPixels>,
+        clawGetSafe("/status").catch(() => null) as Promise<ClawStatus | null>,
+        clawGetSafe("/hook/agent-slots").catch(() => null) as Promise<ClawSlots | null>,
+      ]);
+      if (pixelsData?.panels) {
+        const data: any = pixelsData;
+        if (statusData) data.clawActivity = statusData.claw_activity || "idle";
+        if (slotsData?.slots_detail) data.slotsDetail = slotsData.slots_detail;
+        return res.json(data);
+      }
+    } catch {
+      // Claw failed — fall through to engine
     }
-    if (statusData) {
-      data.clawActivity = statusData.claw_activity || "idle";
-    }
-    if (slotsData?.slots_detail) {
-      data.slotsDetail = slotsData.slots_detail;
-    }
-    res.json(data);
-  } catch {
-    res.status(502).json({ error: "claw unreachable" });
   }
+
+  // AWAY/OFFLINE: use local tower engine
+  const enginePixels = towerEngine.getPixels();
+  res.json({
+    panels: enginePixels,
+    simulated: true,
+  });
 });
 
 app.get("/api/uptime-kuma", async (_req, res) => {
@@ -922,6 +986,10 @@ if (fs.existsSync(clientDir)) {
 // --- Start ---
 watcher.start();
 
+// Tower engine for AWAY mode — runs at 30fps, driven by hooks
+const towerEngine = new TowerEngine();
+towerEngine.start();
+
 // Level-up sparkle is now client-driven via POST /api/sparkle
 // (client triggers at the exact visual moment, not on a server poll)
 
@@ -964,8 +1032,28 @@ setInterval(async () => {
   } catch {}
 }, 250);
 
+// Determine initial mode on startup
+(async () => {
+  try {
+    await curlRaw(claw, "/status", 2);
+    setMode("home");
+  } catch {
+    if (clawFallback) {
+      try {
+        await curlRaw(clawFallback, "/status", 2);
+        activeClaw = "fallback";
+        setMode("away");
+      } catch {
+        setMode("offline");
+      }
+    } else {
+      setMode("offline");
+    }
+  }
+})();
+
 const server = app.listen(config.port, () => {
-  console.log(`Agent Office running at http://localhost:${config.port}  claw=${claw}  fallback=${clawFallback || "none"}`);
+  console.log(`Agent Office running at http://localhost:${config.port}  claw=${claw}  fallback=${clawFallback || "none"} mode=${connectionMode}`);
 });
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {

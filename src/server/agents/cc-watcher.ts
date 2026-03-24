@@ -10,6 +10,7 @@ const CLAUDE_DIR = path.join(os.homedir(), ".claude", "projects");
 const STALE_MS = 30 * 60 * 1000; // 30 minutes
 const SUBAGENT_STALE_MS = 5 * 60 * 1000; // 5 min — subagents are short-lived
 const LOUNGE_MS = 5 * 60 * 1000; // 5 minutes idle → lounging
+const IDLE_TIMEOUT_MS = 15_000; // 15s no events → revert active states to idle
 const SCAN_INTERVAL_MS = 3_000;
 const WATCH_INTERVAL_MS = 500;
 const MAX_WATCHED = 20;
@@ -379,7 +380,11 @@ export class ClaudeCodeWatcher extends EventEmitter {
         session.state === "idle" &&
         !hasActiveSubagents &&
         now - session.lastActivity > LOUNGE_MS;
-      const effectiveState = (session.state === "idle" && hasActiveSubagents) ? "thinking" : session.state;
+      let effectiveState: AgentActivityState = (session.state === "idle" && hasActiveSubagents) ? "thinking" : session.state;
+      const ACTIVE_STATES: Set<AgentActivityState> = new Set(["typing", "reading", "thinking"]);
+      if (ACTIVE_STATES.has(effectiveState) && !hasActiveSubagents && now - session.lastActivity > IDLE_TIMEOUT_MS) {
+        effectiveState = "idle";
+      }
       agents.push({
         id: filePath,
         source: "cc",
@@ -420,7 +425,13 @@ export class ClaudeCodeWatcher extends EventEmitter {
       }
 
       // Show as "thinking" while subagents work (main session idles during background tasks)
-      const effectiveState = (session.state === "idle" && hasActiveSubagents) ? "thinking" : session.state;
+      let effectiveState = (session.state === "idle" && hasActiveSubagents) ? "thinking" : session.state;
+
+      // Revert active states to idle if no JSONL events for 15s (stale state detection)
+      const ACTIVE_STATES: Set<AgentActivityState> = new Set(["typing", "reading", "thinking"]);
+      if (ACTIVE_STATES.has(effectiveState) && !hasActiveSubagents && now - session.lastActivity > IDLE_TIMEOUT_MS) {
+        effectiveState = "idle";
+      }
 
       agents.push({
         id: filePath,
