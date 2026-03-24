@@ -209,6 +209,11 @@ export class TowerEngine {
     };
   }
 
+  /** Get current slot states for ESP32 sync */
+  getSlotStates(): SlotState[] {
+    return [...this.slotStates];
+  }
+
   /** Check if any slot is active (for determining whether to use engine output) */
   isActive(): boolean {
     return this.slotStates.some(s => s !== "off") || this.hirstPhase !== "off";

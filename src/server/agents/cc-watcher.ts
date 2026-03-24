@@ -102,7 +102,15 @@ export class ClaudeCodeWatcher extends EventEmitter {
       totalFound += jsonlFiles.length;
       for (const filePath of jsonlFiles) {
         if (this.sessions.has(filePath)) continue;
-        if (this.departedPaths.has(filePath)) continue;
+        // Re-admit departed files if they've grown since departure (still active)
+        const departedAt = this.departedPaths.get(filePath);
+        if (departedAt !== undefined) {
+          try {
+            const stat = fs.statSync(filePath);
+            if (stat.mtimeMs <= departedAt) continue; // no new writes — stay departed
+          } catch { continue; }
+          this.departedPaths.delete(filePath);
+        }
         if (this.sessions.size >= MAX_WATCHED) break;
         console.log(`[cc-watcher] new session: ${path.basename(filePath)} (from ${path.basename(dir)})`);
         this.startWatching(filePath, now);
@@ -347,10 +355,9 @@ export class ClaudeCodeWatcher extends EventEmitter {
       if (session.idleSinceCheck) clearTimeout(session.idleSinceCheck);
       fs.unwatchFile(filePath);
       this.sessions.delete(filePath);
-      // Only block re-discovery for subagents — main agents should be re-discovered
-      if (session.subagentClass !== null) {
-        this.departedPaths.set(filePath, now);
-      }
+      // Block re-discovery for all cleared agents (they'll naturally reappear
+      // if still active, since departedPaths expires after STALE_MS)
+      this.departedPaths.set(filePath, now);
     }
     this.emitUpdate();
   }

@@ -217,13 +217,15 @@ function getActiveClawHost(): string {
 function checkAndAutoRecover(claw: string) {
   setInterval(async () => {
     if (autoRecoveryInProgress) return;
+    // Only auto-recover in HOME mode — don't touch the physical tower when away
+    if (!isHome()) return;
     try {
       const data = await clawGet(claw, "/status") as ClawStatus;
       const connected = data.connected === true;
       if (!connected && lastMatrixConnected) {
         console.log("[auto-recovery] Yeelight disconnected, running tower-reset...");
         autoRecoveryInProgress = true;
-        execFile("ssh", ["-T", "-o", "ConnectTimeout=5", `ellis@${getActiveClawHost()}`,
+        execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", `ellis@${getActiveClawHost()}`,
           "~/clawd/scripts/tower-reset"], { timeout: 15000 },
           (err, stdout) => {
             autoRecoveryInProgress = false;
@@ -430,12 +432,17 @@ app.get("/api/esp32-status", (_req, res) => {
     }
   }
 
+  // Tower-engine slot states are authoritative — driven by hooks with explicit slot numbers.
+  // ESP32 should use these directly instead of deriving from agent array index.
+  const engineSlots = towerEngine.getSlotStates();
+
   res.json({
     agents,
     activeSlot,
     bodyColors: lastBodyColors,
     hirstState: lastHirstState,
     mode: connectionMode,
+    slotStates: engineSlots,
   });
 });
 
@@ -731,7 +738,7 @@ app.get("/api/relay", async (_req, res) => {
 
 // --- Tower reset ---
 app.post("/api/tower-reset", (_req, res) => {
-  execFile("ssh", ["-T", "-o", "ConnectTimeout=5", `ellis@${getActiveClawHost()}`, "~/clawd/scripts/tower-reset"], { timeout: 15000 }, (err, stdout, stderr) => {
+  execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", `ellis@${getActiveClawHost()}`, "~/clawd/scripts/tower-reset"], { timeout: 15000 }, (err, stdout, stderr) => {
     if (err) {
       console.error("[tower-reset] error:", err.message, stderr);
       return res.status(500).json({ ok: false, error: err.message });
