@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useAgentOfficeStore } from "@/components/store";
 import { usePixelTower } from "@/hooks/use-pixel-tower";
+import { onSeatChange } from "@/components/scene/desk-layout";
 
 type DebugSource = "pixels" | "agents" | "hooks" | "tower" | "esp" | "seats" | "claw" | "net";
 
@@ -226,6 +227,14 @@ export function DebugPanel() {
     prevSlots.current = detail;
     setLog((prev) => [...prev.slice(-MAX_LINES), { time: Date.now(), source: "seats" as const, text: detail }]);
   }, [clawHealth?.slotsDetail]);
+
+  // Seat assignment changes
+  useEffect(() => {
+    onSeatChange((text) => {
+      setLog((prev) => [...prev.slice(-MAX_LINES), { time: Date.now(), source: "seats" as DebugSource, text }]);
+    });
+    return () => onSeatChange(null);
+  }, []);
 
   // Network monitor changes
   useEffect(() => {

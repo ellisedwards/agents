@@ -76,6 +76,10 @@ const stickyAssignments = new Map<string, number>(); // agentId → deskIndex
 // Cache the last result so multiple consumers can read it without recomputing
 let cachedResult: AssignmentResult | null = null;
 
+let prevSeatSummary = "";
+let seatChangeCallback: ((text: string) => void) | null = null;
+export function onSeatChange(cb: ((text: string) => void) | null) { seatChangeCallback = cb; }
+
 export function computeAssignments(
   agentIds: string[],          // desk-eligible agent IDs (no subagents, no lounging/departing)
   allCCMainIds: string[],      // ALL CC main agent IDs (including lounging/departing) — for sticky preservation
@@ -196,6 +200,16 @@ export function computeAssignments(
     getSlot: (id) => assignments.get(id)?.clawSlot,
     getDeskIndex: (id) => assignments.get(id)?.deskIndex,
   };
+
+  // Debug: notify seat changes
+  const seatSummary = [...assignments.entries()]
+    .filter(([, a]) => a.deskIndex >= 0) // only assigned agents (exclude overflow at -1)
+    .map(([id, a]) => `${id}→desk${a.deskIndex}`)
+    .join(" ");
+  if (seatSummary !== prevSeatSummary) {
+    prevSeatSummary = seatSummary;
+    if (seatChangeCallback && seatSummary) seatChangeCallback(`assign ${seatSummary}`);
+  }
 
   return cachedResult;
 }
