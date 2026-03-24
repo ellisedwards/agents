@@ -4,7 +4,7 @@
 
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
-const TTL_MS = 60_000; // 60s auto-deactivate — covers slow tools and interrupted turns
+const TTL_MS = 300_000; // 5min auto-deactivate — safety net for crashed sessions only (Stop hook handles normal cleanup)
 
 // --- Layout ---
 // 75 pixels: 3 stacked 5x5 panels. Panel 0=bottom, 1=middle, 2=top.
