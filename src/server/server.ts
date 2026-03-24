@@ -3,6 +3,9 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { execFile } from "child_process";
+import { EventEmitter } from "events";
+const debugEmitter = new EventEmitter();
+debugEmitter.setMaxListeners(20);
 import { loadConfig, clawBaseUrl } from "./config";
 import { createWatcher } from "./agents/watcher-singleton";
 import type { AgentState } from "../shared/types";
@@ -436,6 +439,8 @@ app.get("/api/esp32-status", (_req, res) => {
   // ESP32 should use these directly instead of deriving from agent array index.
   const engineSlots = towerEngine.getSlotStates();
 
+  debugEmitter.emit("event", { source: "esp", text: `poll agents=${agents.length} slots=[${engineSlots.join(",")}] mode=${connectionMode}`, time: Date.now() });
+
   res.json({
     agents,
     activeSlot,
@@ -520,6 +525,7 @@ app.get("/hook/prompt-start", (req, res) => {
   const session_id = req.query.session_id || "";
   const name = req.query.name || "";
   towerEngine.onPromptStart(slot);
+  debugEmitter.emit("event", { source: "hooks", text: `prompt-start slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
   if (!clawCircuitOpen) {
     clawGet(claw, `/hook/prompt-start?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
   }
@@ -531,6 +537,7 @@ app.get("/hook/thinking-start", (req, res) => {
   const session_id = req.query.session_id || "";
   const name = req.query.name || "";
   towerEngine.onThinkingStart(slot);
+  debugEmitter.emit("event", { source: "hooks", text: `thinking-start slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
   if (!clawCircuitOpen) {
     clawGet(claw, `/hook/thinking-start?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
   }
@@ -542,6 +549,7 @@ app.get("/hook/thinking-end", (req, res) => {
   const session_id = req.query.session_id || "";
   const name = req.query.name || "";
   towerEngine.onThinkingEnd(slot);
+  debugEmitter.emit("event", { source: "hooks", text: `thinking-end slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
   if (!clawCircuitOpen) {
     clawGet(claw, `/hook/thinking-end?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
   }
@@ -553,10 +561,29 @@ app.get("/hook/prompt-end", (req, res) => {
   const session_id = req.query.session_id || "";
   const name = req.query.name || "";
   towerEngine.onPromptEnd(slot);
+  debugEmitter.emit("event", { source: "hooks", text: `prompt-end slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
   if (!clawCircuitOpen) {
     clawGet(claw, `/hook/prompt-end?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
   }
   res.json({ ok: true });
+});
+
+// --- Debug SSE stream ---
+app.get("/api/debug-events", (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+
+  const onEvent = (evt: { source: string; text: string; time: number }) => {
+    res.write(`data: ${JSON.stringify(evt)}\n\n`);
+  };
+  debugEmitter.on("event", onEvent);
+
+  req.on("close", () => {
+    debugEmitter.off("event", onEvent);
+  });
 });
 
 // --- Lucky Pokeball multiplier ---
@@ -1003,6 +1030,10 @@ watcher.start();
 // Tower engine — 30fps animation, driven by CC hooks via /hook/* endpoints above
 const towerEngine = new TowerEngine();
 towerEngine.start();
+
+towerEngine.on("debug", (evt: { source: string; text: string; time: number }) => {
+  debugEmitter.emit("event", evt);
+});
 
 // Level-up sparkle is now client-driven via POST /api/sparkle
 // (client triggers at the exact visual moment, not on a server poll)

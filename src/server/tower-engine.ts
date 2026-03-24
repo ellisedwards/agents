@@ -2,6 +2,8 @@
 // Replicates the physical tower's behavior 1:1 for AWAY mode.
 // Hook events drive the state machine. Outputs 75 hex colors at 30fps.
 
+import { EventEmitter } from "events";
+
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
 const TTL_MS = 300_000; // 5min auto-deactivate — safety net for crashed sessions only (Stop hook handles normal cleanup)
@@ -119,7 +121,7 @@ type SlotState = "off" | "waiting" | "active";
 type HirstPhase = "off" | "in" | "running" | "out";
 
 // --- Tower Engine ---
-export class TowerEngine {
+export class TowerEngine extends EventEmitter {
   // Slot states
   private slotStates: SlotState[] = ["off", "off", "off", "off"];
   private slotLastActivity: number[] = [0, 0, 0, 0];
@@ -143,6 +145,7 @@ export class TowerEngine {
   private interval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
+    super();
     // Init 50 hirst dots
     for (let i = 0; i < 50; i++) {
       this.hirstDots.push(initHirstDot());
@@ -165,18 +168,26 @@ export class TowerEngine {
   // --- Hook handlers ---
   onPromptStart(slot: number): void {
     if (slot < 0 || slot > 3) return;
+    const prev = this.slotStates[slot];
     // One-way: only set "waiting" from "off". Don't downgrade "active"→"waiting" between turns.
     if (this.slotStates[slot] === "off") {
       this.slotStates[slot] = "waiting";
     }
     this.slotLastActivity[slot] = Date.now(); // always refresh TTL
+    if (this.slotStates[slot] !== prev) {
+      this.emit("debug", { source: "tower", text: `slot${slot} ${prev}→${this.slotStates[slot]}`, time: Date.now() });
+    }
   }
 
   onThinkingStart(slot: number): void {
     if (slot < 0 || slot > 3) return;
     const wasAnyActive = this.slotStates.some(s => s === "active");
+    const prev = this.slotStates[slot];
     this.slotStates[slot] = "active";
     this.slotLastActivity[slot] = Date.now();
+    if (prev !== "active") {
+      this.emit("debug", { source: "tower", text: `slot${slot} ${prev}→active${!wasAnyActive && this.hirstPhase === "off" ? " hirst:off→in" : ""}`, time: Date.now() });
+    }
     // Trigger hirst-in if first active slot
     if (!wasAnyActive && this.hirstPhase === "off") {
       this.hirstPhase = "in";
@@ -187,11 +198,16 @@ export class TowerEngine {
 
   onThinkingEnd(slot: number): void {
     if (slot < 0 || slot > 3) return;
+    const prev = this.slotStates[slot];
     this.slotStates[slot] = "off";
     this.slotLastActivity[slot] = Date.now();
+    if (prev !== "off") {
+      this.emit("debug", { source: "tower", text: `slot${slot} ${prev}→off`, time: Date.now() });
+    }
     // Trigger hirst-out if no more active slots
     const anyActive = this.slotStates.some(s => s === "active");
     if (!anyActive && (this.hirstPhase === "running" || this.hirstPhase === "in")) {
+      this.emit("debug", { source: "tower", text: `hirst:${this.hirstPhase}→out`, time: Date.now() });
       this.hirstPhase = "out";
       this.hirstTransitionStart = Date.now();
     }
@@ -199,8 +215,12 @@ export class TowerEngine {
 
   onPromptEnd(slot: number): void {
     if (slot < 0 || slot > 3) return;
+    const prev = this.slotStates[slot];
     this.slotStates[slot] = "off";
     this.slotLastActivity[slot] = Date.now();
+    if (prev !== "off") {
+      this.emit("debug", { source: "tower", text: `slot${slot} ${prev}→off (prompt-end)`, time: Date.now() });
+    }
   }
 
   /** Get current 75-pixel output as { bottom: string[25], middle: string[25], top: string[25] } */
@@ -239,6 +259,9 @@ export class TowerEngine {
     // TTL check — auto-deactivate stale slots
     for (let i = 0; i < 4; i++) {
       if (this.slotStates[i] !== "off" && now - this.slotLastActivity[i] > TTL_MS) {
+        const prev = this.slotStates[i];
+        this.emit("debug", { source: "tower", text: `slot${i} TTL expired (${prev}→off)`, time: now });
+        this.slotStates[i] = "off";
         this.onThinkingEnd(i);
       }
     }
@@ -255,13 +278,13 @@ export class TowerEngine {
 
   private updateHirstPhase(now: number): void {
     if (this.hirstPhase === "in") {
-      const elapsed = now - this.hirstTransitionStart;
-      if (elapsed >= 600) {
+      if (now - this.hirstTransitionStart >= 600) {
+        this.emit("debug", { source: "tower", text: "hirst:in→running", time: now });
         this.hirstPhase = "running";
       }
     } else if (this.hirstPhase === "out") {
-      const elapsed = now - this.hirstTransitionStart;
-      if (elapsed >= 450) {
+      if (now - this.hirstTransitionStart >= 450) {
+        this.emit("debug", { source: "tower", text: "hirst:out→off", time: now });
         this.hirstPhase = "off";
       }
     }
