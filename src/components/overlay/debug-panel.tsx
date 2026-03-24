@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, type ReactNode } from "react";
 import { useAgentOfficeStore } from "@/components/store";
 import { usePixelTower } from "@/hooks/use-pixel-tower";
 import { onSeatChange } from "@/components/scene/desk-layout";
@@ -48,8 +48,8 @@ function fmt(ts: number): string {
 }
 
 // Syntax-highlight debug text like code
-function colorizeText(text: string): (string | JSX.Element)[] {
-  const parts: (string | JSX.Element)[] = [];
+function colorizeText(text: string): (string | ReactNode)[] {
+  const parts: (string | ReactNode)[] = [];
   let key = 0;
   // Split on tokens we want to colorize
   const regex = /(\w+)=([\w.?]+|\[[^\]]*\])|(\b(?:idle|thinking|typing|reading|waiting|active|off|connected|disconnected|on|OFF|DOWN|TRANSITION|none|clear|prompt-start|thinking-start|thinking-end|prompt-end|poll|assign|TTL|expired)\b)|(\b\d+(?:\.\d+)?(?:ms|s|%)?)\b|(\([^)]*\))|(\b(?:S\d):\w+)/g;
