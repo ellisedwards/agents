@@ -4,7 +4,7 @@
 
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
-const TTL_MS = 45_000; // 45s auto-deactivate if no heartbeat
+const TTL_MS = 60_000; // 60s auto-deactivate — covers slow tools and interrupted turns
 
 // --- Layout ---
 // 75 pixels: 3 stacked 5x5 panels. Panel 0=bottom, 1=middle, 2=top.
@@ -165,8 +165,11 @@ export class TowerEngine {
   // --- Hook handlers ---
   onPromptStart(slot: number): void {
     if (slot < 0 || slot > 3) return;
-    this.slotStates[slot] = "waiting";
-    this.slotLastActivity[slot] = Date.now();
+    // One-way: only set "waiting" from "off". Don't downgrade "active"→"waiting" between turns.
+    if (this.slotStates[slot] === "off") {
+      this.slotStates[slot] = "waiting";
+    }
+    this.slotLastActivity[slot] = Date.now(); // always refresh TTL
   }
 
   onThinkingStart(slot: number): void {

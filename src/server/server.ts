@@ -511,17 +511,15 @@ app.post("/api/light-test", express.json(), async (req, res) => {
 });
 
 // --- Hook proxy endpoints ---
-// Claude Code hooks fire here. Always updates local tower engine.
-// If claw is reachable (HOME mode), also forwards to claw.
-// If not (AWAY mode), local engine handles it — no wasted requests.
+// Claude Code hooks fire here. Always updates local tower engine + forwards to claw.
+// Hooks carry slot numbers from cc-slot.sh. Tower engine is source of truth for both
+// digital tower and ESP32 — no claw dependency in away mode.
 
 app.get("/hook/prompt-start", (req, res) => {
   const slot = parseInt(req.query.slot as string, 10) || 0;
   const session_id = req.query.session_id || "";
   const name = req.query.name || "";
-  // Always update local engine
   towerEngine.onPromptStart(slot);
-  // Forward to claw only if reachable
   if (!clawCircuitOpen) {
     clawGet(claw, `/hook/prompt-start?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
   }
@@ -993,7 +991,7 @@ if (fs.existsSync(clientDir)) {
 // --- Start ---
 watcher.start();
 
-// Tower engine for AWAY mode — runs at 30fps, driven by hooks
+// Tower engine — 30fps animation, driven by CC hooks via /hook/* endpoints above
 const towerEngine = new TowerEngine();
 towerEngine.start();
 
