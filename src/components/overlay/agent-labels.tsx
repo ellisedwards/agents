@@ -494,14 +494,34 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                     style={{ gridTemplateColumns: "9px 96px auto 120px 8px" }}>
                     {/* Row 1 */}
                     <div className="w-[9px] h-[9px] rounded-full" style={{ backgroundColor: teamHex }} />
-                    <span className="font-semibold text-[14px] text-white truncate leading-tight" title={(() => {
-                      const m = a.id.match(/projects\/([^/]+)\//);
-                      const proj = m ? m[1].replace(/-/g, "/").replace(/^\//, "") : "unknown";
-                      const sid = a.id.replace(/.*\//, "").replace(".jsonl", "").slice(0, 8);
-                      return `${proj}\nsession: ${sid}\nslot: ${a.name}`;
-                    })()}>
+                    <span className="font-semibold text-[14px] text-white truncate leading-tight relative cursor-default peer">
                       {(a.gameName ?? a.name) + (nameSuffix.get(a.id) ?? "")}{isRecord ? <span className="text-[11px] ml-1">🔥</span> : ""}
                     </span>
+                    {/* Session tooltip — styled to match HUD */}
+                    {(() => {
+                      const m = a.id.match(/projects\/([^/]+)\//);
+                      const proj = m ? m[1].split("-").filter(Boolean).pop() || "unknown" : "unknown";
+                      const sid = a.id.replace(/.*\//, "").replace(".jsonl", "").slice(0, 8);
+                      return (
+                        <div className="absolute left-[9px] bottom-full mb-1 hidden peer-hover:block z-[60] pointer-events-none">
+                          <div className="bg-[#12121e]/95 border border-white/10 rounded px-2 py-1.5 font-mono text-[9px] space-y-0.5 whitespace-nowrap shadow-lg">
+                            <div className="text-white/40 uppercase tracking-wider text-[8px]">Session</div>
+                            <div className="flex gap-3">
+                              <span className="text-neutral-500">project</span>
+                              <span className="text-cyan-400">{proj}</span>
+                            </div>
+                            <div className="flex gap-3">
+                              <span className="text-neutral-500">session</span>
+                              <span className="text-neutral-300">{sid}</span>
+                            </div>
+                            <div className="flex gap-3">
+                              <span className="text-neutral-500">slot</span>
+                              <span className="text-neutral-300">{a.name}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <span className="font-semibold text-[14px] whitespace-nowrap" style={{ opacity: isDupe ? 0.25 : 1 }}>
                       <span className="text-[#787878]">LV</span>
                       <span className="text-white">{a.level ?? 1}</span>
