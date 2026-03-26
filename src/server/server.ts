@@ -622,9 +622,8 @@ app.get("/hook/prompt-start", (req, res) => {
   const name = req.query.name || "";
   towerEngine.onPromptStart(slot);
   debugEmitter.emit("event", { source: "hooks", text: `prompt-start slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
-  if (!clawCircuitOpen) {
-    clawGet(claw, `/hook/prompt-start?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
-  }
+  // Fire-and-forget to primary claw only — never failover (that would flip mode to AWAY)
+  curlRaw(claw, `/hook/prompt-start?slot=${slot}&session_id=${session_id}&name=${name}`, 2).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -634,9 +633,7 @@ app.get("/hook/thinking-start", (req, res) => {
   const name = req.query.name || "";
   towerEngine.onThinkingStart(slot);
   debugEmitter.emit("event", { source: "hooks", text: `thinking-start slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
-  if (!clawCircuitOpen) {
-    clawGet(claw, `/hook/thinking-start?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
-  }
+  curlRaw(claw, `/hook/thinking-start?slot=${slot}&session_id=${session_id}&name=${name}`, 2).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -646,9 +643,7 @@ app.get("/hook/thinking-end", (req, res) => {
   const name = req.query.name || "";
   towerEngine.onThinkingEnd(slot);
   debugEmitter.emit("event", { source: "hooks", text: `thinking-end slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
-  if (!clawCircuitOpen) {
-    clawGet(claw, `/hook/thinking-end?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
-  }
+  curlRaw(claw, `/hook/thinking-end?slot=${slot}&session_id=${session_id}&name=${name}`, 2).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -658,9 +653,7 @@ app.get("/hook/prompt-end", (req, res) => {
   const name = req.query.name || "";
   towerEngine.onPromptEnd(slot);
   debugEmitter.emit("event", { source: "hooks", text: `prompt-end slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
-  if (!clawCircuitOpen) {
-    clawGet(claw, `/hook/prompt-end?slot=${slot}&session_id=${session_id}&name=${name}`).catch(() => {});
-  }
+  curlRaw(claw, `/hook/prompt-end?slot=${slot}&session_id=${session_id}&name=${name}`, 2).catch(() => {});
   res.json({ ok: true });
 });
 
