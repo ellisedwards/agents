@@ -55,6 +55,39 @@ interface RelayMessage {
   time: string;
 }
 
+// --- Claw cache ---
+// Single source of truth for all claw data. Refreshed once per second.
+// All endpoints and internal loops read from here instead of hitting the claw.
+interface ClawCache {
+  tower1: {
+    pixels: ClawPixels | null;
+    status: ClawStatus | null;
+    slots: ClawSlots | null;
+    agentSlots: { slots: string[]; waiting_count: number; active_count: number } | null;
+    lastUpdated: number;
+  };
+  tower2: {
+    data: any | null;
+    lastUpdated: number;
+  };
+  uptimeKuma: {
+    data: any | null;
+    lastUpdated: number;
+  };
+  relay: {
+    messages: RelayMessage[];
+    replies: Array<{ msg: string; time: string }>;
+    lastUpdated: number;
+  };
+}
+
+const clawCache: ClawCache = {
+  tower1: { pixels: null, status: null, slots: null, agentSlots: null, lastUpdated: 0 },
+  tower2: { data: null, lastUpdated: 0 },
+  uptimeKuma: { data: null, lastUpdated: 0 },
+  relay: { messages: [], replies: [], lastUpdated: 0 },
+};
+
 // --- Claw communication via curl ---
 // Node's networking gets permanently poisoned when a destination becomes
 // temporarily unreachable (macOS per-process routing cache). Both fetch()
@@ -67,6 +100,8 @@ type ConnectionMode = "home" | "away" | "offline";
 let connectionMode: ConnectionMode = "offline";
 let activeClaw: "primary" | "fallback" = "primary";
 let primaryCheckTimer: ReturnType<typeof setTimeout> | null = null;
+let homePollFailCount = 0;
+const HOME_POLL_FAIL_THRESHOLD = 5; // consecutive failures before switching to away
 
 /** Current mode — exposed to all endpoints and downstream tools */
 export function getConnectionMode(): ConnectionMode { return connectionMode; }
@@ -93,6 +128,7 @@ function switchToFallback() {
     primaryCheckTimer = setInterval(() => {
       curlRaw(claw, "/status", 1).then(() => {
         activeClaw = "primary";
+        homePollFailCount = 0;
         setMode("home");
         if (primaryCheckTimer) { clearInterval(primaryCheckTimer); primaryCheckTimer = null; }
       }).catch(() => {}); // still down, stay on fallback/away
@@ -347,12 +383,17 @@ let lastHirstState = "off";
 // AWAY/OFFLINE: use tower engine output. No claw requests.
 setInterval(async () => {
   if (isHome()) {
-    // HOME mode — poll claw for real data
+    // HOME mode — poll claw directly (no auto-failover, that causes flapping)
     try {
       const [pixelsData, statusData] = await Promise.all([
-        clawGet(claw, "/pixels", 2).catch(() => null) as Promise<any>,
-        clawGet(claw, "/status", 2).catch(() => null) as Promise<any>,
+        curlRaw(claw, "/pixels", 2).catch(() => null) as Promise<any>,
+        curlRaw(claw, "/status", 2).catch(() => null) as Promise<any>,
       ]);
+      if (pixelsData?.panels || statusData) {
+        homePollFailCount = 0; // at least one succeeded
+      } else {
+        homePollFailCount++;
+      }
       if (pixelsData?.panels) {
         const middle = pixelsData.panels.middle || [];
         const bottom = pixelsData.panels.bottom || [];
@@ -362,9 +403,16 @@ setInterval(async () => {
         const a = statusData.claw_activity;
         lastHirstState = a === "typing" ? "running" : a === "thinking" ? "in" : "off";
       }
+      if (homePollFailCount >= HOME_POLL_FAIL_THRESHOLD) {
+        switchToFallback();
+        homePollFailCount = 0;
+      }
     } catch {
-      // Claw went down — switch to away
-      switchToFallback();
+      homePollFailCount++;
+      if (homePollFailCount >= HOME_POLL_FAIL_THRESHOLD) {
+        switchToFallback();
+        homePollFailCount = 0;
+      }
     }
   } else {
     // AWAY/OFFLINE — use tower engine, no claw requests
@@ -1077,15 +1125,22 @@ setInterval(async () => {
   } catch {}
 }, 250);
 
-// Determine initial mode on startup
+// Determine initial mode on startup (retry — claw can be slow to respond)
 (async () => {
-  try {
-    await curlRaw(claw, "/status", 2);
-    setMode("home");
-  } catch {
+  let found = false;
+  for (let attempt = 0; attempt < 3 && !found; attempt++) {
+    try {
+      await curlRaw(claw, "/status", 3);
+      setMode("home");
+      found = true;
+    } catch {
+      if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  if (!found) {
     if (clawFallback) {
       try {
-        await curlRaw(clawFallback, "/status", 2);
+        await curlRaw(clawFallback, "/status", 3);
         activeClaw = "fallback";
         setMode("away");
       } catch {
