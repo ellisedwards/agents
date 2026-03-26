@@ -1084,36 +1084,43 @@ startBleBridge();
 // Push data to BLE subscribers at ~4Hz (matches ESP32 poll rate)
 setInterval(async () => {
   if (!isBleConnected()) return;
-  try {
-    const [pixelsData, statusData] = await Promise.all([
-      clawGet(claw, "/pixels", 2).catch(() => null) as Promise<any>,
-      clawGet(claw, "/status", 2).catch(() => null) as Promise<any>,
-    ]);
-    if (!pixelsData?.panels) return;
 
-    const middle = pixelsData.panels.middle || [];
-    const bottom = pixelsData.panels.bottom || [];
-    const bodyColors: number[] = [];
+  // Read from cache — no claw requests
+  const pixelsData = isHome() ? clawCache.tower1.pixels : null;
+  const statusData = isHome() ? clawCache.tower1.status : null;
+
+  let bodyColors: number[];
+  let slotStates = [0, 0, 0, 0];
+  let hirstState = 0;
+
+  if (pixelsData?.panels) {
+    const middle = (pixelsData.panels as any).middle || [];
+    const bottom = (pixelsData.panels as any).bottom || [];
+    bodyColors = [];
     for (let i = 0; i < 25; i++) {
       bodyColors.push(parseInt((middle[i] || "#000000").slice(1), 16));
     }
     for (let i = 0; i < 25; i++) {
       bodyColors.push(parseInt((bottom[i] || "#000000").slice(1), 16));
     }
+  } else {
+    // AWAY/OFFLINE — use tower engine colors
+    bodyColors = lastBodyColors.map(c => parseInt(c.slice(1), 16));
+  }
 
-    const agentSlots = statusData?.agent_slots?.slots || [];
-    const slotStates = [0, 0, 0, 0];
+  if (statusData?.agent_slots?.slots) {
+    const agentSlots = statusData.agent_slots.slots;
     for (let i = 0; i < 4 && i < agentSlots.length; i++) {
       if (agentSlots[i] === "active") slotStates[i] = 2;
       else if (agentSlots[i] === "waiting") slotStates[i] = 1;
       else slotStates[i] = 0;
     }
+  }
 
-    const activity = statusData?.claw_activity || "idle";
-    const hirstState = activity === "typing" ? 2 : activity === "thinking" ? 1 : 0;
+  const activity = statusData?.claw_activity || "idle";
+  hirstState = activity === "typing" ? 2 : activity === "thinking" ? 1 : 0;
 
-    updateBleState({ bodyColors, slotStates, hirstState });
-  } catch {}
+  updateBleState({ bodyColors, slotStates, hirstState });
 }, 250);
 
 // Determine initial mode on startup (retry — claw can be slow to respond)
