@@ -169,11 +169,16 @@ export class ClaudeCodeWatcher extends EventEmitter {
   private startWatching(filePath: string, now: number) {
     let parentId: string | null = null;
     let subagentClass: MageColorIndex | null = null;
-    let teamColor: MageColorIndex = (nextMageColor++ % 6) as MageColorIndex;
 
     // Only match subagents that live in a /subagents/ subdirectory
     // of a known parent session's UUID folder
     const isInSubagentsDir = filePath.includes("/subagents/");
+
+    // Only consume a color slot for top-level sessions, not subagents
+    // (subagents inherit their parent's color below)
+    let teamColor: MageColorIndex = isInSubagentsDir
+      ? (0 as MageColorIndex) // placeholder — will be overwritten by parent color
+      : (nextMageColor++ % 6) as MageColorIndex;
     if (isInSubagentsDir) {
       // Quick check: if the last line has stop_reason "end_turn", it already completed
       let fd: number | undefined;
