@@ -378,22 +378,29 @@ let lastHirstState = "off";
 // Hook events drive the engine state machine, which produces proper 75-pixel
 // hirst animations matching the physical tower 1:1.
 
-// Keep body colors and hirst state updated.
-// HOME: poll claw for real pixel data.
-// AWAY/OFFLINE: use tower engine output. No claw requests.
+// --- Single claw poll loop — refreshes cache once per second ---
+// All consumers (endpoints, BLE, body colors) read from clawCache instead.
 setInterval(async () => {
   if (isHome()) {
-    // HOME mode — poll claw directly (no auto-failover, that causes flapping)
+    // Tower 1: pixels + status + slots
     try {
-      const [pixelsData, statusData] = await Promise.all([
+      const [pixelsData, statusData, slotsData] = await Promise.all([
         curlRaw(claw, "/pixels", 2).catch(() => null) as Promise<any>,
         curlRaw(claw, "/status", 2).catch(() => null) as Promise<any>,
+        curlRaw(claw, "/hook/agent-slots", 2).catch(() => null) as Promise<any>,
       ]);
-      if (pixelsData?.panels || statusData) {
-        homePollFailCount = 0; // at least one succeeded
+      if (pixelsData || statusData) {
+        homePollFailCount = 0;
       } else {
         homePollFailCount++;
       }
+      clawCache.tower1.pixels = pixelsData;
+      clawCache.tower1.status = statusData;
+      clawCache.tower1.slots = slotsData;
+      clawCache.tower1.agentSlots = statusData?.agent_slots || null;
+      clawCache.tower1.lastUpdated = Date.now();
+
+      // Update body colors and hirst state from cache
       if (pixelsData?.panels) {
         const middle = pixelsData.panels.middle || [];
         const bottom = pixelsData.panels.bottom || [];
@@ -403,6 +410,7 @@ setInterval(async () => {
         const a = statusData.claw_activity;
         lastHirstState = a === "typing" ? "running" : a === "thinking" ? "in" : "off";
       }
+
       if (homePollFailCount >= HOME_POLL_FAIL_THRESHOLD) {
         switchToFallback();
         homePollFailCount = 0;
@@ -414,6 +422,15 @@ setInterval(async () => {
         homePollFailCount = 0;
       }
     }
+
+    // Tower 2: pixels (separate port 9998)
+    try {
+      const tower2Url = `http://${getActiveClawHost()}:9998`;
+      const t2data = await curlRaw(tower2Url, "/pixels", 2).catch(() => null) as any;
+      clawCache.tower2.data = t2data;
+      clawCache.tower2.lastUpdated = Date.now();
+    } catch {}
+
   } else {
     // AWAY/OFFLINE — use tower engine, no claw requests
     if (towerEngine.isActive()) {
@@ -424,6 +441,8 @@ setInterval(async () => {
       lastBodyColors = Array(50).fill("#000000");
       lastHirstState = "off";
     }
+    clawCache.tower1.lastUpdated = Date.now();
+    clawCache.tower2.lastUpdated = Date.now();
   }
 }, 1000);
 
