@@ -520,23 +520,21 @@ app.get("/api/esp32-status", (_req, res) => {
 
 // --- Tower 2 proxy (same host as claw, port 9998) ---
 app.get("/api/tower2-status", async (_req, res) => {
-  try {
-    const tower2Url = `http://${getActiveClawHost()}:9998`;
-    const data = await curlRaw(tower2Url, "/status", 2);
-    res.json(data);
-  } catch {
-    res.json({ ok: false, mode: "offline", animating: false, dots: [], pixels: [] });
+  if (isHome()) {
+    try {
+      const tower2Url = `http://${getActiveClawHost()}:9998`;
+      const data = await curlRaw(tower2Url, "/status", 2);
+      return res.json(data);
+    } catch {}
   }
+  res.json({ ok: false, mode: "offline", animating: false, dots: [], pixels: [] });
 });
 
 app.get("/api/tower2-pixels", async (_req, res) => {
-  try {
-    const tower2Url = `http://${getActiveClawHost()}:9998`;
-    const data = await curlRaw(tower2Url, "/pixels", 2);
-    res.json(data);
-  } catch {
-    res.json({ ok: false, pixels: [], width: 5, height: 10, mode: "offline" });
+  if (isHome() && clawCache.tower2.data) {
+    return res.json(clawCache.tower2.data);
   }
+  res.json({ ok: false, pixels: [], width: 5, height: 10, mode: "offline" });
 });
 
 // Client-triggered sparkle — perfectly timed with visual level-up
@@ -761,11 +759,10 @@ app.get("/api/claw-health", async (_req, res) => {
     },
   };
 
-  // AWAY/OFFLINE: don't poll claw, just report local state
-  if (!isHome()) {
+  if (!isHome() || !clawCache.tower1.status) {
     return res.json({
       ...base,
-      reachable: false,
+      reachable: !isHome() ? false : clawCache.tower1.lastUpdated > 0,
       yeelightConnected: false,
       slots: [],
       activeSlots: 0,
@@ -773,49 +770,36 @@ app.get("/api/claw-health", async (_req, res) => {
     });
   }
 
-  // HOME: poll claw for full health data
-  try {
-    const [statusData, pixelsData, slotsData, uptimeData] = await Promise.all([
-      clawGetSafe("/status") as Promise<ClawStatus>,
-      clawGetSafe("/pixels").catch(() => null) as Promise<ClawPixels | null>,
-      clawGetSafe("/hook/agent-slots").catch(() => null) as Promise<ClawSlots | null>,
-      clawGetSafe("/hook/uptime-kuma").catch(() => null) as Promise<any>,
-    ]);
-    const quadrantIndices = [[15,16,20,21],[18,19,23,24],[0,1,5,6],[3,4,8,9]];
-    let slots = statusData.agent_slots?.slots || ["off","off","off","off"];
-    if (pixelsData?.panels) {
-      const top = pixelsData.panels.top || [];
-      slots = quadrantIndices.map((indices: number[]) =>
-        indices.some((i: number) => top[i] && top[i] !== "#000000") ? "active" : "off"
-      );
-    }
-    res.json({
-      ...base,
-      reachable: true,
-      yeelightConnected: statusData.connected === true,
-      slots,
-      activeSlots: slots.filter((s: string) => s !== "off").length,
-      matrixMode: statusData.claw_activity || null,
-      brightness: statusData.brightness ?? null,
-      animationRunning: statusData.animation_running ?? false,
-      slotsDetail: slotsData?.slots_detail ?? undefined,
-      waitingCount: slotsData?.waiting_count ?? 0,
-      transitionInProgress: slotsData?.transition_in_progress ?? false,
-      zones: statusData.zones ? {
-        thinking: statusData.zones.thinking,
-        display: statusData.zones.display,
-        context: statusData.zones.context,
-      } : undefined,
-      uptimeMonitors: uptimeData?.monitors?.map((m: any) => ({
-        name: m.name,
-        status: m.status,
-        ping: m.ping,
-        up: m.up,
-      })) ?? undefined,
-    });
-  } catch {
-    res.json({ ...base, reachable: false, yeelightConnected: false, slots: [], activeSlots: 0, matrixMode: null });
+  const statusData = clawCache.tower1.status;
+  const pixelsData = clawCache.tower1.pixels;
+  const slotsData = clawCache.tower1.slots;
+
+  const quadrantIndices = [[15,16,20,21],[18,19,23,24],[0,1,5,6],[3,4,8,9]];
+  let slots = statusData.agent_slots?.slots || ["off","off","off","off"];
+  if (pixelsData?.panels) {
+    const top = (pixelsData.panels as any).top || [];
+    slots = quadrantIndices.map((indices: number[]) =>
+      indices.some((i: number) => top[i] && top[i] !== "#000000") ? "active" : "off"
+    );
   }
+  res.json({
+    ...base,
+    reachable: true,
+    yeelightConnected: statusData.connected === true,
+    slots,
+    activeSlots: slots.filter((s: string) => s !== "off").length,
+    matrixMode: statusData.claw_activity || null,
+    brightness: statusData.brightness ?? null,
+    animationRunning: statusData.animation_running ?? false,
+    slotsDetail: slotsData?.slots_detail ?? undefined,
+    waitingCount: (slotsData as any)?.waiting_count ?? 0,
+    transitionInProgress: (slotsData as any)?.transition_in_progress ?? false,
+    zones: (statusData as any).zones ? {
+      thinking: (statusData as any).zones.thinking,
+      display: (statusData as any).zones.display,
+      context: (statusData as any).zones.context,
+    } : undefined,
+  });
 });
 
 // --- Relay ---
@@ -851,26 +835,14 @@ app.post("/api/tower-reset", (_req, res) => {
 
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
-  // HOME mode: use real pixel data from claw
-  if (isHome()) {
-    try {
-      const [pixelsData, statusData, slotsData] = await Promise.all([
-        clawGetSafe("/pixels") as Promise<ClawPixels>,
-        clawGetSafe("/status").catch(() => null) as Promise<ClawStatus | null>,
-        clawGetSafe("/hook/agent-slots").catch(() => null) as Promise<ClawSlots | null>,
-      ]);
-      if (pixelsData?.panels) {
-        const data: any = pixelsData;
-        if (statusData) data.clawActivity = statusData.claw_activity || "idle";
-        if (slotsData?.slots_detail) data.slotsDetail = slotsData.slots_detail;
-        return res.json(data);
-      }
-    } catch {
-      // Claw failed — fall through to engine
-    }
+  if (isHome() && clawCache.tower1.pixels?.panels) {
+    const data: any = { ...clawCache.tower1.pixels };
+    if (clawCache.tower1.status) data.clawActivity = clawCache.tower1.status.claw_activity || "idle";
+    if (clawCache.tower1.slots?.slots_detail) data.slotsDetail = clawCache.tower1.slots.slots_detail;
+    return res.json(data);
   }
 
-  // AWAY/OFFLINE: use local tower engine
+  // AWAY/OFFLINE or cache empty: use local tower engine
   const enginePixels = towerEngine.getPixels();
   res.json({
     panels: enginePixels,
