@@ -244,41 +244,72 @@ function triggerLevelUpSparkle(slotIndex: number) {
   }).catch(() => {}); // silent fail
 }
 
-// --- Auto-recovery: reconnect matrix if socket dies ---
+// --- Auto-recovery: reconnect Yeelight if connection drops ---
 let lastMatrixConnected = true;
 let autoRecoveryInProgress = false;
+let lastRecoveryAttempt = 0;
+const RECOVERY_COOLDOWN = 300_000; // 5 minutes between recovery attempts
+const DISCONNECT_GRACE = 30_000; // 30s grace period before attempting recovery
+let disconnectedSince = 0;
 
 function getActiveClawHost(): string {
   return activeClaw === "fallback" && config.clawHostFallback
     ? config.clawHostFallback : config.clawHost;
 }
 
-function checkAndAutoRecover(claw: string) {
+function checkAndAutoRecover(_claw: string) {
   setInterval(async () => {
     if (autoRecoveryInProgress) return;
-    // Only auto-recover in HOME mode — don't touch the physical tower when away
     if (!isHome()) return;
-    try {
-      const data = await clawGet(claw, "/status") as ClawStatus;
-      const connected = data.connected === true;
-      if (!connected && lastMatrixConnected) {
-        console.log("[auto-recovery] Yeelight disconnected, running tower-reset...");
-        autoRecoveryInProgress = true;
-        execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", `ellis@${getActiveClawHost()}`,
-          "~/clawd/scripts/tower-reset"], { timeout: 15000 },
-          (err, stdout) => {
-            autoRecoveryInProgress = false;
-            if (err) console.error("[auto-recovery] Failed:", err.message);
-            else console.log("[auto-recovery] Reset result:", stdout.trim());
-          });
-      }
-      if (connected && !lastMatrixConnected) {
+
+    const statusData = clawCache.tower1.status;
+    if (!statusData) return;
+
+    const connected = statusData.connected === true;
+
+    if (!connected && lastMatrixConnected) {
+      // Just went disconnected — start grace timer
+      disconnectedSince = Date.now();
+    }
+
+    if (connected) {
+      disconnectedSince = 0;
+      if (!lastMatrixConnected) {
         console.log("[auto-recovery] Yeelight reconnected");
       }
-      lastMatrixConnected = connected;
-    } catch {
-      // claw unreachable — nothing to recover
     }
+
+    // Only attempt recovery after grace period and cooldown
+    if (!connected && disconnectedSince > 0 &&
+        (Date.now() - disconnectedSince) > DISCONNECT_GRACE &&
+        (Date.now() - lastRecoveryAttempt) > RECOVERY_COOLDOWN) {
+
+      console.log("[auto-recovery] Yeelight disconnected for 30s, attempting /reconnect...");
+      autoRecoveryInProgress = true;
+      lastRecoveryAttempt = Date.now();
+
+      try {
+        const result = await curlRaw(claw, "/reconnect", 5) as any;
+        console.log("[auto-recovery] Reconnect result:", JSON.stringify(result));
+        if (!result?.ok) {
+          // Reconnect failed — try full tower-reset as last resort
+          console.log("[auto-recovery] Reconnect failed, trying tower-reset...");
+          execFile("ssh", ["-T", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new", `ellis@${getActiveClawHost()}`,
+            "~/clawd/scripts/tower-reset"], { timeout: 15000 },
+            (err, stdout) => {
+              autoRecoveryInProgress = false;
+              if (err) console.error("[auto-recovery] Reset failed:", err.message);
+              else console.log("[auto-recovery] Reset result:", stdout.trim());
+            });
+          return; // let the callback clear autoRecoveryInProgress
+        }
+      } catch {
+        console.log("[auto-recovery] /reconnect endpoint unreachable");
+      }
+      autoRecoveryInProgress = false;
+    }
+
+    lastMatrixConnected = connected;
   }, 10000); // check every 10s
 }
 
