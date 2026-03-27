@@ -52,6 +52,12 @@ export function StatusBar() {
       .catch(() => {});
   };
 
+  const handleCompact = () => {
+    fetch("/api/agents/compact", { method: "POST" })
+      .then(() => window.location.replace("/?t=" + Date.now()))
+      .catch(() => {});
+  };
+
   // Stale build detection — check every 30s, auto-reload once, then show warning
   const [staleBuild, setStaleBuild] = useState(false);
   useEffect(() => {
@@ -176,13 +182,22 @@ export function StatusBar() {
       )}
 
       {status === "connected" && agents.length > 0 && (
-        <button
-          onClick={handleClear}
-          className="text-neutral-500 hover:text-neutral-300 transition-colors"
-          title="Reset agent tracking"
-        >
-          clr
-        </button>
+        <>
+          <button
+            onClick={handleCompact}
+            className="text-neutral-500 hover:text-neutral-300 transition-colors"
+            title="Compact — reassign agents to lowest slots"
+          >
+            cmp
+          </button>
+          <button
+            onClick={handleClear}
+            className="text-neutral-500 hover:text-neutral-300 transition-colors"
+            title="Reset agent tracking"
+          >
+            clr
+          </button>
+        </>
       )}
 
       {/* Game mode stats moved to floating panel in agent-labels */}

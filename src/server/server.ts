@@ -380,6 +380,27 @@ app.post("/api/agents/clear", (_req, res) => {
   res.json({ ok: true });
 });
 
+// Compact — reassign active agents to lowest slots (0,1,2,3)
+app.post("/api/agents/compact", (_req, res) => {
+  // Clear cc-slot.sh assignment files so next hook call reassigns from slot 0
+  for (let s = 0; s < 4; s++) {
+    try { fs.unlinkSync(`/tmp/.cc-active-${s}`); } catch {}
+  }
+  // Clear per-TTY slot files
+  try {
+    const tmpFiles = fs.readdirSync("/tmp");
+    for (const f of tmpFiles) {
+      if (f.startsWith(".cc-slot-")) {
+        try { fs.unlinkSync(`/tmp/${f}`); } catch {}
+      }
+    }
+  } catch {}
+  // Reset tower engine slots
+  towerEngine.clearSlots();
+  console.log("[compact] cleared slot assignments — agents will reassign on next hook");
+  res.json({ ok: true });
+});
+
 // Kill a specific agent — remove from watcher + clear exp
 app.post("/api/kill-agent", express.json(), (req, res) => {
   const { agentId } = req.body;

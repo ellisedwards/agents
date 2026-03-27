@@ -6,7 +6,7 @@ import { EventEmitter } from "events";
 
 const FPS = 30;
 const FRAME_MS = 1000 / FPS;
-const TTL_MS = 300_000; // 5min auto-deactivate — safety net for crashed sessions only (Stop hook handles normal cleanup)
+const TTL_MS = 1_800_000; // 30min — sub-agents can run 10-20min without parent hooks firing
 
 // --- Layout ---
 // 75 pixels: 3 stacked 5x5 panels. Panel 0=bottom, 1=middle, 2=top.
@@ -240,6 +240,15 @@ export class TowerEngine extends EventEmitter {
   /** Check if any slot is active (for determining whether to use engine output) */
   isActive(): boolean {
     return this.slotStates.some(s => s !== "off") || this.hirstPhase !== "off";
+  }
+
+  /** Reset all slot states to off (used by compact to allow re-assignment) */
+  clearSlots(): void {
+    for (let i = 0; i < 4; i++) {
+      this.slotStates[i] = "off";
+      this.slotLastActivity[i] = 0;
+    }
+    this.emit("debug", { source: "tower", text: "all slots cleared (compact)", time: Date.now() });
   }
 
   /** Summary for status panel */
