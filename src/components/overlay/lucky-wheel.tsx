@@ -146,7 +146,7 @@ export default function SlotMachine({ agentName, teamColor, onResult, onClose }:
   const rafRef = useRef(0);
   const stoppedRef = useRef([true, true, true]);
   const targetsRef = useRef([0, 0, 0]); // target offsets per reel
-  const outcomeRef = useRef<ReturnType<typeof generateOutcome>>({ symbols: ["cherry", "cherry", "cherry"], nearMiss: false });
+  const outcomeRef = useRef<ReturnType<typeof generateOutcome>>({ symbols: ["poke", "poke", "poke"], nearMiss: false });
   const allWinsRef = useRef(allWins);
   allWinsRef.current = allWins;
   const pullRef = useRef(0);

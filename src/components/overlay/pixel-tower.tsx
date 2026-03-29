@@ -110,7 +110,7 @@ export function PixelTower() {
     const container = e.currentTarget.parentElement;
     if (!container) return;
     const bounds = container.getBoundingClientRect();
-    const towerW = e.currentTarget.offsetWidth;
+    const towerW = (e.currentTarget as HTMLElement).offsetWidth;
     const rawX = dragRef.current.origX + (e.clientX - dragRef.current.startX);
     const rawY = dragRef.current.origY + (e.clientY - dragRef.current.startY);
     setTowerPos({

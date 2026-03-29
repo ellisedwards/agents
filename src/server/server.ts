@@ -395,8 +395,9 @@ app.post("/api/agents/compact", (_req, res) => {
       }
     }
   } catch {}
-  // Reset tower engine slots
+  // Reset tower engine slots + hook slot map
   towerEngine.clearSlots();
+  hookSlotMap.clear();
   console.log("[compact] cleared slot assignments — agents will reassign on next hook");
   res.json({ ok: true });
 });
@@ -433,36 +434,27 @@ let lastHirstState = "off";
 // --- Single claw poll loop — refreshes cache once per second ---
 // All consumers (endpoints, BLE, body colors) read from clawCache instead.
 setInterval(async () => {
+  // Local tower engine is always source of truth for body colors + hirst state (all modes)
+  if (towerEngine.isActive()) {
+    const ep = towerEngine.getPixels();
+    lastBodyColors = [...ep.middle, ...ep.bottom];
+    lastHirstState = "running";
+  } else {
+    lastBodyColors = Array(50).fill("#000000");
+    lastHirstState = "off";
+  }
+  clawCache.tower1.lastUpdated = Date.now();
+
   if (isHome()) {
-    // Tower 1: pixels + status + slots
+    // Only poll /status for Yeelight auto-recovery (no pixels/slots — local engine is brain)
     try {
-      const [pixelsData, statusData, slotsData] = await Promise.all([
-        curlRaw(claw, "/pixels", 2).catch(() => null) as Promise<any>,
-        curlRaw(claw, "/status", 2).catch(() => null) as Promise<any>,
-        curlRaw(claw, "/hook/agent-slots", 2).catch(() => null) as Promise<any>,
-      ]);
-      if (pixelsData || statusData) {
+      const statusData = await curlRaw(claw, "/status", 2).catch(() => null) as any;
+      if (statusData) {
+        clawCache.tower1.status = statusData;
         homePollFailCount = 0;
       } else {
         homePollFailCount++;
       }
-      clawCache.tower1.pixels = pixelsData;
-      clawCache.tower1.status = statusData;
-      clawCache.tower1.slots = slotsData;
-      clawCache.tower1.agentSlots = statusData?.agent_slots || null;
-      clawCache.tower1.lastUpdated = Date.now();
-
-      // Update body colors and hirst state from cache
-      if (pixelsData?.panels) {
-        const middle = pixelsData.panels.middle || [];
-        const bottom = pixelsData.panels.bottom || [];
-        lastBodyColors = [...middle.slice(0, 25), ...bottom.slice(0, 25)];
-      }
-      if (statusData?.claw_activity) {
-        const a = statusData.claw_activity;
-        lastHirstState = a === "typing" ? "running" : a === "thinking" ? "in" : "off";
-      }
-
       if (homePollFailCount >= HOME_POLL_FAIL_THRESHOLD) {
         switchToFallback();
         homePollFailCount = 0;
@@ -475,28 +467,33 @@ setInterval(async () => {
       }
     }
 
-    // Tower 2: pixels (separate port 9998)
+    // Tower 2: auxiliary display (separate system, keep reading)
     try {
       const tower2Url = `http://${getActiveClawHost()}:9998`;
       const t2data = await curlRaw(tower2Url, "/pixels", 2).catch(() => null) as any;
       clawCache.tower2.data = t2data;
       clawCache.tower2.lastUpdated = Date.now();
     } catch {}
-
-  } else {
-    // AWAY/OFFLINE — use tower engine, no claw requests
-    if (towerEngine.isActive()) {
-      const ep = towerEngine.getPixels();
-      lastBodyColors = [...ep.middle, ...ep.bottom];
-      lastHirstState = "running";
-    } else {
-      lastBodyColors = Array(50).fill("#000000");
-      lastHirstState = "off";
-    }
-    clawCache.tower1.lastUpdated = Date.now();
-    clawCache.tower2.lastUpdated = Date.now();
   }
+
+  clawCache.tower2.lastUpdated = Date.now();
 }, 1000);
+
+// Push local tower engine slot states to physical tower every 500ms (HOME mode only)
+// Same pattern as ESP32 — claw is a dumb display, local engine is the brain.
+setInterval(() => {
+  if (!isHome()) return;
+  const slots = towerEngine.getSlotStates();
+  const body = JSON.stringify({ slots });
+  execFile("curl", [
+    "-s", "-X", "POST",
+    "-H", "Content-Type: application/json",
+    "-d", body,
+    "--connect-timeout", "1",
+    "--max-time", "1",
+    `${claw}/state`,
+  ], { timeout: 2000 }, () => {}); // fire-and-forget is fine — next push self-heals
+}, 500);
 
 let espLastPoll = 0;
 
@@ -530,16 +527,26 @@ app.get("/api/esp32-status", (_req, res) => {
       : (a.state === "typing" || a.state === "reading") ? "active"
       : a.state === "idle" || a.state === "lounging" ? "waiting"
       : "off";
+    // Extract short project name from id path
+    // id is like: /Users/ellis/.claude/projects/-Users-ellis-Code-workspace-myproject/uuid.jsonl
+    // We want the directory name, which is the encoded project path
+    const dirName = a.id.split("/").find(p => p.startsWith("-")) || "";
+    const projectParts = dirName.replace(/^-/, "").split("-");
+    const project = projectParts[projectParts.length - 1] || "unknown";
+
     const entry: Record<string, any> = {
       name: a.gameName || a.name,
       level: a.level ?? 0,
       state,
       sprite: espAssignStarter(a.id, activeIds),
+      progress: a.exp ?? 0,
+      progressMax: a.expToNext ?? 100,
+      tc: a.teamColor ?? 0,
+      project,
+      slot: ccMain.indexOf(a),
     };
     if (state === "active") {
       entry.activity = a.currentTool || a.state;
-      entry.progress = a.exp ?? 0;
-      entry.progressMax = a.expToNext ?? 100;
     }
     return entry;
   });
@@ -637,11 +644,15 @@ app.post("/api/light-test", express.json(), async (req, res) => {
 // Hooks carry slot numbers from cc-slot.sh. Tower engine is source of truth for both
 // digital tower and ESP32 — no claw dependency in away mode.
 
+// Local slot→session map — built from hook events, used for desk assignment
+const hookSlotMap = new Map<number, string>(); // slot → session_id
+
 app.get("/hook/prompt-start", (req, res) => {
   const slot = parseInt(req.query.slot as string, 10) || 0;
   const session_id = req.query.session_id || "";
   const name = req.query.name || "";
   towerEngine.onPromptStart(slot);
+  if (session_id && slot >= 0 && slot <= 3) hookSlotMap.set(slot, String(session_id));
   debugEmitter.emit("event", { source: "hooks", text: `prompt-start slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
   // Fire-and-forget to primary claw only — never failover (that would flip mode to AWAY)
   curlRaw(claw, `/hook/prompt-start?slot=${slot}&session_id=${session_id}&name=${name}`, 2).catch(() => {});
@@ -653,6 +664,7 @@ app.get("/hook/thinking-start", (req, res) => {
   const session_id = req.query.session_id || "";
   const name = req.query.name || "";
   towerEngine.onThinkingStart(slot);
+  if (session_id && slot >= 0 && slot <= 3) hookSlotMap.set(slot, String(session_id));
   debugEmitter.emit("event", { source: "hooks", text: `thinking-start slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
   curlRaw(claw, `/hook/thinking-start?slot=${slot}&session_id=${session_id}&name=${name}`, 2).catch(() => {});
   res.json({ ok: true });
@@ -673,6 +685,8 @@ app.get("/hook/prompt-end", (req, res) => {
   const session_id = req.query.session_id || "";
   const name = req.query.name || "";
   towerEngine.onPromptEnd(slot);
+  // Don't clear hookSlotMap on prompt-end — agent keeps its slot for desk assignment
+  // Slot is only freed when cc-slot.sh reassigns it to a different session
   debugEmitter.emit("event", { source: "hooks", text: `prompt-end slot=${slot} sid=${session_id} name=${name}`, time: Date.now() });
   curlRaw(claw, `/hook/prompt-end?slot=${slot}&session_id=${session_id}&name=${name}`, 2).catch(() => {});
   res.json({ ok: true });
@@ -880,18 +894,18 @@ app.post("/api/tower-reset", (_req, res) => {
 
 // --- Claw proxy endpoints ---
 app.get("/api/pixels", async (_req, res) => {
-  if (isHome() && clawCache.tower1.pixels?.panels) {
-    const data: any = { ...clawCache.tower1.pixels };
-    if (clawCache.tower1.status) data.clawActivity = clawCache.tower1.status.claw_activity || "idle";
-    if (clawCache.tower1.slots?.slots_detail) data.slotsDetail = clawCache.tower1.slots.slots_detail;
-    return res.json(data);
-  }
-
-  // AWAY/OFFLINE or cache empty: use local tower engine
+  // Local tower engine is always source of truth (all modes)
   const enginePixels = towerEngine.getPixels();
+  const slotStates = towerEngine.getSlotStates();
+  // Build slotsDetail from local hook data (cc-slot.sh → hooks → hookSlotMap)
+  const slotsDetail = [];
+  for (let s = 0; s < 4; s++) {
+    slotsDetail.push({ session_id: hookSlotMap.get(s) || "", state: slotStates[s] });
+  }
   res.json({
     panels: enginePixels,
-    simulated: true,
+    slotsDetail,
+    simulated: !isHome(),
   });
 });
 

@@ -136,12 +136,12 @@ interface AgentOfficeStore {
   editMode: EditMode;
   gameModeOn: boolean;
   hudPosition: HudPosition;
-  levelUpEvents: Array<{ id: string; agentId: string; name: string; level: number; teamColor: string; ts: number }>;
-  addLevelUp: (agentId: string, name: string, level: number, teamColor: string) => void;
-  expGainEvents: Array<{ id: string; agentId: string; amount: number; teamColor: string; ts: number }>;
-  addExpGain: (agentId: string, amount: number, teamColor: string) => void;
-  achievementEvents: Array<{ id: string; agentName: string; achievementId: string; icon: string; name: string; teamColor: string; ts: number }>;
-  addAchievement: (agentName: string, achievementId: string, icon: string, name: string, teamColor: string) => void;
+  levelUpEvents: Array<{ id: string; agentId: string; name: string; level: number; teamColor: number; ts: number }>;
+  addLevelUp: (agentId: string, name: string, level: number, teamColor: number) => void;
+  expGainEvents: Array<{ id: string; agentId: string; amount: number; teamColor: number; ts: number }>;
+  addExpGain: (agentId: string, amount: number, teamColor: number) => void;
+  achievementEvents: Array<{ id: string; agentName: string; achievementId: string; icon: string; name: string; teamColor: number; ts: number }>;
+  addAchievement: (agentName: string, achievementId: string, icon: string, name: string, teamColor: number) => void;
   setAgents: (agents: AgentState[]) => void;
   selectAgent: (id: string | null) => void;
   setConnectionStatus: (status: AgentOfficeStore["connectionStatus"]) => void;

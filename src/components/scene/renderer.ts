@@ -1385,6 +1385,15 @@ export function renderScene(
     allMainIds,
     towerInfo.data.slotsDetail,
   );
+
+  // Top panel pixels — used for pokeball glow + lounging override
+  const topPixels = towerInfo.data.panels.top;
+  const SLOT_PIXELS_MAP = [
+    [15, 16, 20, 21], // slot 0 — BL quadrant
+    [18, 19, 23, 24], // slot 1 — BR quadrant
+    [0, 1, 5, 6],     // slot 2 — TL quadrant
+    [3, 4, 8, 9],     // slot 3 — TR quadrant
+  ];
   const deskMap = new Map<string, { x: number; y: number; characterX: number; characterY: number }>();
   for (const [id, asgn] of assignResult.assignments) {
     const d = asgn.desk;
@@ -1543,7 +1552,13 @@ export function renderScene(
     let spriteState: string = agent.state;
     let flipX = false;
 
-    if (agent.state === "lounging") {
+    // Override lounging if tower slot is lit (agent got prompt-start but cc-watcher hasn't caught up)
+    const agentSlot = assignResult.getSlot(agent.id);
+    const slotLit = agentSlot !== undefined &&
+      SLOT_PIXELS_MAP[agentSlot].some((i) => topPixels[i] !== "#000000");
+    const effectiveLounging = agent.state === "lounging" && !slotLit;
+
+    if (effectiveLounging) {
       // Lounging agents wander slowly from their last desk position
       const savedDesk = lastDeskPos.get(agent.id);
       const homeX = savedDesk ? savedDesk.x : BUILDING_X + BUILDING_W / 2;
@@ -2050,13 +2065,6 @@ export function renderScene(
 
   // 10. Laptop glow — on top of desk fronts
   if (towerInfo.connected) {
-    const topPixels = towerInfo.data.panels.top;
-    const SLOT_PIXELS = [
-      [15, 16, 20, 21], // slot 0 — BL quadrant (claw slot 0)
-      [18, 19, 23, 24], // slot 1 — BR quadrant (claw slot 1)
-      [0, 1, 5, 6],     // slot 2 — TL quadrant (claw slot 2)
-      [3, 4, 8, 9],     // slot 3 — TR quadrant (claw slot 3)
-    ];
     const mainCCs = agents.filter(
       (a) => a.source === "cc" && (a.subagentClass === null || a.subagentClass === undefined)
     );
@@ -2064,7 +2072,7 @@ export function renderScene(
     for (const agent of mainCCs) {
       const slot = assignResult.getSlot(agent.id);
       if (slot === undefined) continue;
-      const quadrantLit = SLOT_PIXELS[slot].some((i) => topPixels[i] !== "#000000");
+      const quadrantLit = SLOT_PIXELS_MAP[slot].some((i) => topPixels[i] !== "#000000");
       if (!quadrantLit) continue;
       if (agent.state === "lounging" || agent.state === "departing") continue;
       const pos = deskMap.get(agent.id);

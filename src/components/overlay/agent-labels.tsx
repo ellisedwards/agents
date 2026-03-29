@@ -1241,7 +1241,7 @@ export function AgentLabels({ transform }: AgentLabelsProps) {
                 luckyWheelAgent,
                 `${displayName} ${best.multiplier}x LUCKY!`,
                 slotAgent.level ?? 1,
-                String(slotAgent.teamColor)
+                slotAgent.teamColor
               );
               if (best.multiplier >= 50) {
                 const slot = cached?.getSlot(luckyWheelAgent);
