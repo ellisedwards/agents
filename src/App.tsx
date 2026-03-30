@@ -13,6 +13,7 @@ import { PixelEditor } from "@/components/overlay/pixel-editor";
 import { Toasts } from "@/components/overlay/toasts";
 import { PixelTower2 } from "@/components/overlay/pixel-tower2";
 import { SystemStatusPanel } from "@/components/overlay/system-status-panel";
+import { ReloadBanner } from "@/components/overlay/reload-banner";
 
 const LazySpriteEditor = lazy(() =>
   import("@/components/sprite-editor/SpriteEditor").then(m => ({ default: m.SpriteEditor }))
@@ -58,6 +59,7 @@ export function App() {
       <PixelTower2 />
       <StatusBar />
       <Toasts />
+      <ReloadBanner />
       {debugOn && <DebugPanel />}
 
       {clawDetailOpen && <SystemStatusPanel />}

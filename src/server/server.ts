@@ -4,6 +4,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { execFile } from "child_process";
 import { EventEmitter } from "events";
+import mqtt from "mqtt";
 const debugEmitter = new EventEmitter();
 debugEmitter.setMaxListeners(20);
 import { loadConfig, clawBaseUrl } from "./config";
@@ -427,6 +428,19 @@ const MAGE_SPRITE_NAMES = ["mage-blue", "mage-red", "mage-purple", "mage-orange"
 let lastBodyColors: string[] = [];
 let lastHirstState = "off";
 
+// --- MQTT relay for remote ESP32 fallback ---
+const mqttClient = mqtt.connect("mqtts://b9bc8289.ala.us-east-1.emqxsl.com:8883", {
+  username: "espconnect",
+  password: "esp123",
+  clientId: "agentoffice-" + Date.now(),
+  reconnectPeriod: 5000,
+});
+mqttClient.on("connect", () => console.log("[mqtt] connected to EMQX broker"));
+mqttClient.on("error", (err) => console.error("[mqtt] error:", err.message));
+
+let mqttLastPublished = "";
+let mqttLastPublishTime = 0;
+
 // Tower engine (imported above) replaces the old crude simulation.
 // Hook events drive the engine state machine, which produces proper 75-pixel
 // hirst animations matching the physical tower 1:1.
@@ -444,6 +458,23 @@ setInterval(async () => {
     lastHirstState = "off";
   }
   clawCache.tower1.lastUpdated = Date.now();
+
+  // Publish to MQTT for remote ESP32 fallback (on-change or every 500ms)
+  if (mqttClient.connected) {
+    const engineSlots = towerEngine.getSlotStates();
+    const mqttPayload = JSON.stringify({
+      bodyColors: lastBodyColors,
+      slotStates: engineSlots.map((s: number) => s === 2 ? "active" : s === 1 ? "waiting" : "off"),
+      hirstState: lastHirstState,
+      mode: connectionMode,
+    });
+    const now = Date.now();
+    if (mqttPayload !== mqttLastPublished || (now - mqttLastPublishTime) >= 500) {
+      mqttClient.publish("esp32/status", mqttPayload, { retain: true, qos: 1 });
+      mqttLastPublished = mqttPayload;
+      mqttLastPublishTime = now;
+    }
+  }
 
   if (isHome()) {
     // Only poll /status for Yeelight auto-recovery (no pixels/slots — local engine is brain)

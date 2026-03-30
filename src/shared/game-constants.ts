@@ -81,6 +81,15 @@ export const AGENT_NAMES = [
   "Glyph", "Flux", "Onyx", "Nova", "Byte", "Sage",
   "Drift", "Spark", "Wren", "Echo", "Zephyr", "Ash",
   "Cosmo", "Fable", "Jinx", "Mochi", "Pip", "Quill",
+  // Final Fantasy I–VI
+  "Cecil", "Rosa", "Rydia", "Kain", "Edge",
+  "Terra", "Locke", "Celes", "Sabin", "Edgar",
+  "Bartz", "Lenna", "Faris", "Galuf", "Krile",
+  "Firion", "Maria", "Minwu", "Refia", "Luneth",
+  // More RPG + original
+  "Vivi", "Cyan", "Palom", "Porom", "Nyx",
+  "Sora", "Auron", "Flint", "Iris", "Dusk",
+  "Lux", "Coda", "Aether", "Thorn", "Vesper",
 ];
 
 // --- Pokeball Tier Thresholds ---
